@@ -13,6 +13,7 @@ import com.mywifiadata.app.data.model.AppSettings
 import com.mywifiadata.app.data.model.AppUsage
 import com.mywifiadata.app.data.model.DayUsage
 import com.mywifiadata.app.data.model.SpeedSample
+import com.mywifiadata.app.data.model.ThemeMode
 import com.mywifiadata.app.data.model.TrafficTotals
 import com.mywifiadata.app.data.model.WifiStatus
 import com.mywifiadata.app.monitor.MonitorService
@@ -328,6 +329,10 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
 
     fun setDynamicColorEnabled(enabled: Boolean) {
         repository.settingsStore.update { it.copy(dynamicColorEnabled = enabled) }
+    }
+
+    fun setThemeMode(mode: ThemeMode) {
+        repository.settingsStore.update { it.copy(themeMode = mode) }
     }
 
     fun clearData() {
