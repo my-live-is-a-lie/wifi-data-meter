@@ -107,15 +107,16 @@ jobs:
           fi
           ./gradlew $TASKS --stacktrace --console=plain 2>&1 | tee build.log
 
-      # عند الفشل: أهم أسطر الخطأ تُنشر كتنبيهات (annotations) تظهر في صفحة التشغيل مباشرة
-      - name: Show failure details
+      # عند الفشل: أهم أسطر الخطأ تُنشر كتنبيهات (annotations) تظهر في صفحة التشغيل مباشرة.
+      # الحد الأقصى 10 تنبيهات لكل خطوة، لذا نوزّع الأخطاء على خطوتين (حتى 20 خطأ).
+      - name: Show failure details (errors 1-10)
         if: failure()
         run: |
           [ -f build.log ] || { echo "لا يوجد سجل بناء"; exit 0; }
           {
             echo "### أسطر الخطأ"
             echo '```'
-            grep -E "^e: |^w: file|error: |Execution failed for task|What went wrong|Caused by:|Could not (find|resolve|determine|install)" build.log | head -40 || true
+            grep -E "^e: |error: |Execution failed for task|What went wrong|Caused by:|Could not (find|resolve|determine|install)" build.log | head -40 || true
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -123,7 +124,21 @@ jobs:
           for line in "${ERRORS[@]}"; do
             echo "::error title=Build::$(printf '%s' "$line" | sed 's/%/%25/g; s/\r//g')"
           done
-          # آخر 30 سطرًا في تنبيه واحد (يحتوي عادةً على سبب الفشل النهائي)
+
+      - name: Show failure details (errors 11-20)
+        if: failure()
+        run: |
+          [ -f build.log ] || exit 0
+          mapfile -t ERRORS < <(grep -E "^e: |error: |Execution failed for task|What went wrong|Could not (find|resolve|determine|install)" build.log | sed -n '11,20p')
+          for line in "${ERRORS[@]}"; do
+            echo "::error title=Build2::$(printf '%s' "$line" | sed 's/%/%25/g; s/\r//g')"
+          done
+
+      # آخر 30 سطرًا في تنبيه واحد (يحتوي عادةً على سبب الفشل النهائي)
+      - name: Show failure tail
+        if: failure()
+        run: |
+          [ -f build.log ] || exit 0
           TAIL="$(tail -n 30 build.log | sed 's/%/%25/g; s/\r//g' | sed ':a;N;$!ba;s/\n/%0A/g')"
           echo "::error title=Tail::${TAIL}"
 
@@ -207,6 +222,11 @@ jobs:
           for line in "${ERRORS[@]}"; do
             echo "::error title=Build::$(printf '%s' "$line" | sed 's/%/%25/g; s/\r//g')"
           done
+
+      - name: Show failure tail
+        if: failure()
+        run: |
+          [ -f build.log ] || exit 0
           TAIL="$(tail -n 30 build.log | sed 's/%/%25/g; s/\r//g' | sed ':a;N;$!ba;s/\n/%0A/g')"
           echo "::error title=Tail::${TAIL}"
 
