@@ -23,10 +23,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
-/** عنوان قسم مع نص توضيحي اختياري وعناصر إضافية في النهاية. */
+/**
+ * عنوان قسم مع نص توضيحي اختياري وعناصر إضافية في النهاية.
+ *
+ * العنوان والنص التوضيحي في سطر واحد لتقليص ارتفاع البطاقات: العنوان في
+ * البداية والنص التوضيحي في النهاية (يسار في العربية) ليُملأ عرض البطاقة
+ * بالكامل بدل ترك النصف الأيسر فارغًا.
+ */
 @Composable
 fun SectionHeader(
     title: String,
@@ -40,19 +47,29 @@ fun SectionHeader(
             .padding(horizontal = 4.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(modifier = Modifier.weight(1f)) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMediumEmphasized,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (supportingText != null) {
             Text(
-                text = title,
-                style = MaterialTheme.typography.titleMediumEmphasized,
-                color = MaterialTheme.colorScheme.onSurface,
+                text = supportingText,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                // weight يضمن عدم تجاوز النص لحدود البطاقة، وEnd يضعه في
+                // الطرف المقابل للعنوان (يسار في RTL) لاستخدام المساحة الفارغة.
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 8.dp),
+                textAlign = TextAlign.End,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-            if (supportingText != null) {
-                Text(
-                    text = supportingText,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+        } else {
+            Spacer(modifier = Modifier.weight(1f))
         }
         trailing?.invoke()
     }
@@ -88,6 +105,11 @@ fun ExpressiveCard(
 }
 
 /** مربّع إحصائي: أيقونة + رقم رئيسي + تسمية. */
+/**
+ * بلاطة إحصاء مدمجة: القيمة في سطر أول بجانب الأيقونة (التي تملأ الطرف
+ * الأيسر بدل أن تحتل سطرًا خاصًا بها)، ثم التسمية والتعليق أسفلها.
+ * هذا يقلل ارتفاع البطاقة المحتوية عليها ويستغل العرض الفارغ.
+ */
 @Composable
 fun StatTile(
     label: String,
@@ -104,19 +126,25 @@ fun StatTile(
         colors = CardDefaults.cardColors(containerColor = containerColor, contentColor = contentColor),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = contentColor.copy(alpha = 0.85f),
-                modifier = Modifier.size(22.dp),
-            )
-            Spacer(modifier = Modifier.size(10.dp))
-            Text(
-                text = value,
-                style = MaterialTheme.typography.titleLargeEmphasized,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.titleLargeEmphasized,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = contentColor.copy(alpha = 0.85f),
+                    modifier = Modifier.size(22.dp),
+                )
+            }
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,

@@ -302,6 +302,7 @@ fun MainScreen(viewModel: AppViewModel) {
                     onIntervalChange = { viewModel.setSampleInterval(it) },
                     onDynamicColorChange = { viewModel.setDynamicColorEnabled(it) },
                     onTrackingChange = { toggleTracking(it) },
+                    onThemeModeChange = { viewModel.setThemeMode(it) },
                     onOpenUsageAccess = { SystemActions.openUsageAccessSettings(context) },
                     onOpenWifiSettings = { SystemActions.openWifiSettings(context) },
                     onClearData = { viewModel.clearData() },

@@ -2,6 +2,7 @@ package com.mywifiadata.app.data
 
 import android.content.Context
 import com.mywifiadata.app.data.model.AppSettings
+import com.mywifiadata.app.data.model.ThemeMode
 import com.mywifiadata.app.data.model.TrafficTotals
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -45,6 +46,9 @@ class SettingsStore(context: Context) {
         sampleIntervalSeconds = prefs.getInt(KEY_INTERVAL, 15),
         dynamicColorEnabled = prefs.getBoolean(KEY_DYNAMIC_COLOR, true),
         trackingEnabled = prefs.getBoolean(KEY_TRACKING, false),
+        themeMode = prefs.getString(KEY_THEME_MODE, null)
+            ?.let { stored -> ThemeMode.entries.firstOrNull { it.name == stored } }
+            ?: ThemeMode.SYSTEM,
         sessionStartMillis = prefs.getLong(KEY_SESSION_START, System.currentTimeMillis()),
         sessionBaseline = TrafficTotals(
             rxBytes = prefs.getLong(KEY_SESSION_RX, 0L),
@@ -63,6 +67,7 @@ class SettingsStore(context: Context) {
             .putInt(KEY_INTERVAL, settings.sampleIntervalSeconds)
             .putBoolean(KEY_DYNAMIC_COLOR, settings.dynamicColorEnabled)
             .putBoolean(KEY_TRACKING, settings.trackingEnabled)
+            .putString(KEY_THEME_MODE, settings.themeMode.name)
             .putLong(KEY_SESSION_START, settings.sessionStartMillis)
             .putLong(KEY_SESSION_RX, settings.sessionBaseline.rxBytes)
             .putLong(KEY_SESSION_TX, settings.sessionBaseline.txBytes)
@@ -86,5 +91,6 @@ class SettingsStore(context: Context) {
         private const val KEY_SESSION_TX = "session_baseline_tx"
         private const val KEY_ALERT_CYCLE = "alert_cycle"
         private const val KEY_ALERT_LEVEL = "alert_level"
+        private const val KEY_THEME_MODE = "theme_mode"
     }
 }

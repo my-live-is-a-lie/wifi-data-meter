@@ -80,6 +80,14 @@ data class DayUsage(
     val totals: TrafficTotals,
 )
 
+/**
+ * سمة التطبيق: اتباع النظام أو اختيار يدوي.
+ *
+ * [BLACK] هو وضع «مظلم» بخلفية AMOLED سوداء بالكامل لتوفير استهلاك الطاقة
+ * على الشاشات OLED.
+ */
+enum class ThemeMode { SYSTEM, LIGHT, DARK, BLACK }
+
 /** إعدادات التطبيق المخزّنة محليًا. */
 data class AppSettings(
     val quotaBytes: Long = 0L,
@@ -89,6 +97,7 @@ data class AppSettings(
     val sampleIntervalSeconds: Int = 15,
     val dynamicColorEnabled: Boolean = true,
     val trackingEnabled: Boolean = false,
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val sessionStartMillis: Long = System.currentTimeMillis(),
     val sessionBaseline: TrafficTotals = TrafficTotals.Empty,
     val alertCycleStartMillis: Long = 0L,
