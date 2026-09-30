@@ -160,6 +160,20 @@ jobs:
             echo "::error title=Build::$(printf '%s' "$line" | sed 's/%/%25/g; s/\r//g')"
           done
 
+          # رسالة الفشل الحقيقية: الأسطر التالية لعبارة «What went wrong:» (أي خطأ غير مطابق للأنماط أعلاه)
+          START="$(grep -n 'What went wrong' build.log | head -1 | cut -d: -f1)"
+          if [ -n "$START" ]; then
+            CAUSE="$(tail -n +"$START" build.log | head -n 20 | sed 's/%/%25/g; s/\r//g' | sed ':a;N;$!ba;s/\n/%0A/g')"
+            echo "::error title=Cause::${CAUSE}"
+          fi
+
+          # رسالة الفشل الحقيقية: الأسطر التالية لعبارة «What went wrong:» (أي خطأ غير مطابق للأنماط أعلاه)
+          START="$(grep -n 'What went wrong' build.log | head -1 | cut -d: -f1)"
+          if [ -n "$START" ]; then
+            CAUSE="$(tail -n +"$START" build.log | head -n 20 | sed 's/%/%25/g; s/\r//g' | sed ':a;N;$!ba;s/\n/%0A/g')"
+            echo "::error title=Cause::${CAUSE}"
+          fi
+
       - name: Show failure details (errors 11-20)
         if: failure()
         run: |
