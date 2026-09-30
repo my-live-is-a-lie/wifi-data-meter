@@ -133,6 +133,9 @@ fun MainScreen(viewModel: AppViewModel) {
 
     BackHandler(enabled = fabMenuExpanded) { fabMenuExpanded = false }
 
+    // زر الرجوع يغلق تفاصيل التطبيق قبل الخروج من الشاشة
+    BackHandler(enabled = state.appDetail != null) { viewModel.closeAppDetail() }
+
     val tabs = AppTab.entries
     val currentTab = tabs[selectedTabIndex.coerceIn(0, tabs.lastIndex)]
 
@@ -142,14 +145,14 @@ fun MainScreen(viewModel: AppViewModel) {
             TopAppBar(
                 title = { Text(text = stringResource(currentTab.labelRes)) },
                 subtitle = {
+                    val speedText = Format.speed(state.currentSpeed?.totalBytesPerSecond ?: 0.0)
                     Text(
                         text = when {
-                            state.wifi.isWifiConnected && state.wifi.ssid != null ->
-                                "${state.wifi.ssid} • ${Format.speed(state.currentSpeed?.totalBytesPerSecond ?: 0.0)}"
-
+                            // اسم الشبكة كما هو، وإن لم يتوفر نعرض نصًا جاهزًا بدل قالب %1$s
                             state.wifi.isWifiConnected ->
-                                stringResource(R.string.status_connected) +
-                                    " • " + Format.speed(state.currentSpeed?.totalBytesPerSecond ?: 0.0)
+                                "${state.wifi.ssid ?: stringResource(R.string.status_connected_unknown)} • $speedText"
+
+                            state.wifi.isOnline -> "${stringResource(R.string.status_not_wifi)} • $speedText"
 
                             else -> stringResource(R.string.wifi_not_connected_title)
                         },
@@ -264,18 +267,30 @@ fun MainScreen(viewModel: AppViewModel) {
                     onResetSession = { viewModel.resetSession() },
                 )
 
-                AppTab.APPS -> AppsScreen(
-                    state = state,
-                    onPeriodChange = { viewModel.setAppsPeriod(it) },
-                    onShowSystemAppsChange = { viewModel.setShowSystemApps(it) },
-                    onOpenUsageAccess = { SystemActions.openUsageAccessSettings(context) },
-                )
+                AppTab.APPS -> {
+                    val appDetail = state.appDetail
+                    if (appDetail != null) {
+                        AppDetailScreen(
+                            detail = appDetail,
+                            onBack = { viewModel.closeAppDetail() },
+                        )
+                    } else {
+                        AppsScreen(
+                            state = state,
+                            onPeriodChange = { viewModel.setAppsPeriod(it) },
+                            onShowSystemAppsChange = { viewModel.setShowSystemApps(it) },
+                            onOpenUsageAccess = { SystemActions.openUsageAccessSettings(context) },
+                            onAppClick = { viewModel.openAppDetail(it) },
+                        )
+                    }
+                }
 
                 AppTab.HISTORY -> HistoryScreen(
                     state = state,
                     onPeriodChange = { viewModel.setHistoryPeriod(it) },
                     onSelectDay = { viewModel.selectDay(it) },
                     onOpenUsageAccess = { SystemActions.openUsageAccessSettings(context) },
+                    onAppClick = { viewModel.openAppDetail(it) },
                 )
 
                 AppTab.SETTINGS -> SettingsScreen(

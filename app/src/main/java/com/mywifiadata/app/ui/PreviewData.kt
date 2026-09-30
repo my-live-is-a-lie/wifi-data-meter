@@ -14,6 +14,7 @@ import com.mywifiadata.app.data.model.SpeedSample
 import com.mywifiadata.app.data.model.TrafficTotals
 import com.mywifiadata.app.data.model.WifiBand
 import com.mywifiadata.app.data.model.WifiStatus
+import com.mywifiadata.app.ui.screens.AppDetailScreen
 import com.mywifiadata.app.ui.screens.AppsScreen
 import com.mywifiadata.app.ui.screens.DashboardScreen
 import com.mywifiadata.app.ui.screens.HistoryScreen
@@ -127,6 +128,7 @@ private fun AppsPreview() {
             onPeriodChange = {},
             onShowSystemAppsChange = {},
             onOpenUsageAccess = {},
+            onAppClick = {},
         )
     }
 }
@@ -140,6 +142,25 @@ private fun HistoryPreview() {
             onPeriodChange = {},
             onSelectDay = {},
             onOpenUsageAccess = {},
+            onAppClick = {},
+        )
+    }
+}
+
+@Preview(name = "تفاصيل تطبيق", showBackground = true, heightDp = 900)
+@Composable
+private fun AppDetailPreview() {
+    val apps = sampleState().apps
+    PreviewFrame {
+        AppDetailScreen(
+            detail = AppDetailState(
+                app = apps.first(),
+                isLoading = false,
+                today = TrafficTotals(2_600_000_000, 240_000_000),
+                week = TrafficTotals(9_400_000_000, 900_000_000),
+                month = TrafficTotals(18_400_000_000, 1_200_000_000),
+            ),
+            onBack = {},
         )
     }
 }

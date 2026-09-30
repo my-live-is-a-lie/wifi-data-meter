@@ -25,8 +25,6 @@ import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonGroup
-import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
@@ -34,6 +32,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.rememberSliderState
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
@@ -49,6 +50,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mywifiadata.app.R
 import com.mywifiadata.app.core.Format
@@ -364,18 +367,25 @@ private fun IntervalSelector(intervalSeconds: Int, onIntervalChange: (Int) -> Un
             color = MaterialTheme.colorScheme.onSurface,
         )
         Spacer(modifier = Modifier.height(8.dp))
-        ButtonGroup(
-            overflowIndicator = { menuState ->
-                ButtonGroupDefaults.OverflowIndicator(menuState = menuState)
-            },
-            modifier = Modifier.fillMaxWidth(),
-        ) {
+        // أزرار مقسّمة (SegmentedButtons) بدل ButtonGroup: تسميات قصيرة + قصّ بثلاث نقاط
+        // بدل تجاوز النص لحدود الزر كما كان يحدث مع الأرقام السابقة.
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
             options.forEachIndexed { index, seconds ->
-                toggleableItem(
-                    checked = intervalSeconds == seconds,
-                    label = labels[index],
-                    onCheckedChange = { onIntervalChange(seconds) },
-                    weight = 1f,
+                SegmentedButton(
+                    selected = intervalSeconds == seconds,
+                    onClick = { onIntervalChange(seconds) },
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
+                    icon = {},
+                    label = {
+                        Text(
+                            text = labels[index],
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    },
                 )
             }
         }

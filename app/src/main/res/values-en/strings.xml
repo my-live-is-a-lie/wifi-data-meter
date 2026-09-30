@@ -14,6 +14,8 @@
     <string name="status_not_wifi">On mobile data (not Wi‑Fi)</string>
 
     <string name="wifi_card_title">Network details</string>
+    <string name="wifi_details_expand">Show network details</string>
+    <string name="wifi_details_collapse">Hide network details</string>
     <string name="label_ssid">Network name</string>
     <string name="label_signal">Signal strength</string>
     <string name="label_link_speed">Link speed</string>
@@ -79,6 +81,11 @@
     <string name="system_apps_label">System apps</string>
     <string name="unknown_app_label">Unknown app</string>
     <string name="apps_count">%1$d apps</string>
+    <string name="app_detail_title">App usage</string>
+    <string name="app_detail_hint">Tap any app to see its usage for today, the week and the month.</string>
+    <string name="app_detail_cd">App usage details</string>
+    <string name="app_detail_loading">Calculating usage…</string>
+    <string name="app_detail_back">Back to the app list</string>
 
     <string name="history_screen_title">Usage history</string>
     <string name="history_empty_title">No history yet</string>
@@ -86,6 +93,7 @@
     <string name="history_selected_day">Selected day</string>
     <string name="history_top_apps">Top apps</string>
     <string name="history_days_shown">Last %1$d days</string>
+    <string name="history_today_title">Today\'s history</string>
 
     <string name="settings_screen_title">Settings</string>
     <string name="settings_section_quota">Plan and billing</string>
@@ -99,10 +107,10 @@
     <string name="settings_threshold">Alert threshold</string>
     <string name="settings_section_monitor">Monitoring</string>
     <string name="settings_interval">Sampling rate</string>
-    <string name="settings_interval_5">Every 5 seconds</string>
-    <string name="settings_interval_15">Every 15 seconds</string>
-    <string name="settings_interval_30">Every 30 seconds</string>
-    <string name="settings_interval_60">Every minute</string>
+    <string name="settings_interval_5">5s</string>
+    <string name="settings_interval_15">15s</string>
+    <string name="settings_interval_30">30s</string>
+    <string name="settings_interval_60">60s</string>
     <string name="settings_dynamic_color">System colors (Material You)</string>
     <string name="settings_dynamic_color_desc">Use wallpaper‑based colors on Android 12+.</string>
     <string name="settings_section_data">Data</string>

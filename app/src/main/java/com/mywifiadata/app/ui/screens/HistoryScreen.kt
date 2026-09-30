@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import com.mywifiadata.app.R
 import com.mywifiadata.app.core.Format
 import com.mywifiadata.app.core.UsagePeriod
+import com.mywifiadata.app.data.model.AppUsage
 import com.mywifiadata.app.data.model.DayUsage
 import com.mywifiadata.app.ui.UiState
 import com.mywifiadata.app.ui.components.AppUsageRow
@@ -53,6 +54,7 @@ fun HistoryScreen(
     onPeriodChange: (UsagePeriod) -> Unit,
     onSelectDay: (Int?) -> Unit,
     onOpenUsageAccess: () -> Unit,
+    onAppClick: (AppUsage) -> Unit,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(16.dp),
 ) {
@@ -68,9 +70,7 @@ fun HistoryScreen(
         item {
             PeriodSelector(
                 period = state.historyPeriod,
-                onPeriodChange = { period ->
-                    if (period != UsagePeriod.TODAY) onPeriodChange(period)
-                },
+                onPeriodChange = onPeriodChange,
             )
         }
 
@@ -136,6 +136,7 @@ fun HistoryScreen(
                             app = app,
                             share = app.totals.totalBytes.toFloat() / dayTotal.toFloat(),
                             rank = index + 1,
+                            onClick = { onAppClick(app) },
                         )
                     }
                 }
@@ -149,7 +150,7 @@ fun HistoryScreen(
 private fun ChartCard(state: UiState, onSelectDay: (Int?) -> Unit) {
     val entries = state.daily.mapIndexed { index, day ->
         BarEntry(
-            label = Format.weekdayShort(day.startMillis),
+            label = Format.dayOfMonth(day.startMillis),
             value = day.totals.totalBytes,
             highlight = index == state.daily.lastIndex,
         )
@@ -158,20 +159,32 @@ private fun ChartCard(state: UiState, onSelectDay: (Int?) -> Unit) {
     ExpressiveCard {
         Column(modifier = Modifier.fillMaxWidth()) {
             SectionHeader(
-                title = stringResource(R.string.history_days_shown, state.historyDays),
+                title = if (state.historyDays <= 1) {
+                    stringResource(R.string.history_today_title)
+                } else {
+                    stringResource(R.string.history_days_shown, state.historyDays)
+                },
                 supportingText = stringResource(R.string.live_chart_title),
             )
             Spacer(modifier = Modifier.height(16.dp))
             if (entries.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 32.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    LoadingIndicator(
-                        modifier = Modifier.size(48.dp),
-                        color = MaterialTheme.colorScheme.primary,
+                if (state.isLoading) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 32.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        LoadingIndicator(
+                            modifier = Modifier.size(48.dp),
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                } else {
+                    EmptyState(
+                        icon = Icons.Rounded.ShowChart,
+                        title = stringResource(R.string.history_empty_title),
+                        message = stringResource(R.string.history_empty_body),
                     )
                 }
             } else {
