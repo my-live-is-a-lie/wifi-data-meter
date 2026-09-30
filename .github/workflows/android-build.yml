@@ -1,14 +1,27 @@
 # بناء تطبيق «مقياس الواي فاي» على GitHub Actions
 #
 # - يعتمد على الـ Wrapper المضمَّن في المشروع (Gradle 9.5.0) فلا حاجة لتثبيت Gradle يدويًا.
-# - يشغّل ثلاث مهام فقط: تجميع APK للتصحيح + اختبارات الوحدة + رفع الـ APK كـ Artifact.
-# - التسريع: تخزين مؤقت (Cache) لـ Gradle User Home ومخزن البناء + الاعتماديات،
-#   وتشغيل كل شيء في أمر Gradle واحد، وإلغاء التشغيلات القديمة تلقائيًا.
+# - يبني APK للتصحيح + يشغّل اختبارات الوحدة + يرفع الـ APK كـ Artifact.
+#
+# أهم ما يجعل البناء سريعًا:
+#  1) Enhanced Caching من setup-gradle: كاش مُجزّأ (fine-grained) + إزالة تكرار (Deduplication)
+#     + استرجاع جزئي عبر restore keys، وهو أسرع بكثير من الكاش البسيط (الذي يفقد الكاش كاملًا
+#     عند أي تعديل في ملفات البناء). مجاني للمستودعات العامة، ومتاح حاليًا كمعاينة مجانية للخاصة.
+#     (للرجوع إلى المسار مفتوح المصدر بالكامل: cache-provider: basic)
+#  2) لا تنزيل لـ JDK: نطلب Temurin 25 الموجود مسبقًا في hosted tool cache لصورة ubuntu-latest.
+#  3) لا خطوة تثبيت لـ Android SDK: الصورة تأتي بـ cmdline-tools + build-tools 37 + platform-tools
+#     وANDROID_HOME مضبوطًا والتراخيص مقبولة، ويتكفّل AGP بتنزيل أي منصة ناقصة عند الحاجة.
+#  4) أمر Gradle واحد لكل المهام (تجميع + اختبارات) = تشغيل واحد لـ Gradle.
+#  5) إلغاء التشغيلات القديمة تلقائيًا (concurrency) + تخطي البناء عند تعديل ملفات التوثيق فقط.
+#  6) عدم الكتابة في الكاش من تشغيلات pull_request (نطاق كاشها محصور بـ refs/pull/*/merge).
 #
 # ملاحظات:
 # - الإصدارات مثبّتة بـ SHA (نفس النسخ المستخدمة في مستودع Google الرسمي android/snippets).
 # - يمكن تعديل قائمة الفروع التي تُشغّل البناء من قسم on.push.branches.
 # - إن كانت خاصية Actions معطّلة في المستودع: Settings → Actions → General → Allow all actions.
+# - لتفعيل تخزين "configuration cache" في كاش GitHub (اختياري، يوفّر زمن مرحلة الإعداد):
+#     gh secret set GRADLE_ENCRYPTION_KEY --body "$(openssl rand -base64 16)"
+#   وإن لم يُضَف السر، يعمل البناء عاديًا بدون تخزين الـ configuration cache.
 
 name: Android Build
 
@@ -64,37 +77,37 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up JDK 25 (Zulu)
+      # Temurin 25 موجود مسبقًا في الـ tool cache الخاص بصورة ubuntu-latest،
+      # فالتجهيز يستغرق ثانية أو ثانيتين بدون أي تنزيل (أسرع ~10 ثوانٍ من تنزيل Zulu).
+      - name: Set up JDK 25 (Temurin, pre-cached)
         uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
-          distribution: zulu
+          distribution: temurin
           java-version: '25'
 
-      # يخزّن مؤقتًا: مجلد Gradle User Home (الاعتماديات + مخزن البناء) والـ Wrapper،
-      # ويعرض ملخصًا للبناء في صفحة التشغيل.
-      - name: Set up Gradle (with caching)
+      # الكاش: مجلد Gradle User Home (الاعتماديات + distribution الـ Wrapper + مخزن البناء)
+      # مع إزالة التكرار بين التشغيلات، ويعرض أيضًا ملخصًا للبناء في صفحة التشغيل.
+      - name: Set up Gradle (enhanced caching)
         uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6
         with:
-          cache-provider: basic # تنفيذ مفتوح المصدر يعتمد على Cache الخاص بـ GitHub Actions
-          cache-read-only: false # الكتابة في الـ Cache حتى على الفروع غير الرئيسية (أسرع من ثاني تشغيل)
+          cache-provider: enhanced # الكاش المحسّن (الافتراضي في v6): تجزئة دقيقة + إزالة تكرار + restore keys
+          # نكتب في الكاش على الفروع التي نعمل عليها فعلًا، ولا نكتب من pull_request (كاشه محصور بـ merge ref)
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+          # مفتاح AES يتيح تخزين configuration cache في الكاش (اختياري — راجع الملاحظات أعلى الملف)
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
           cache-cleanup: on-success
           validate-wrappers: true # ملف gradle-wrapper.jar مأخوذ من مستودع Google الرسمي
           add-job-summary: always
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
-
-      # لا تُفشل البناء إن تعذّر التثبيت المسبق؛ سيكمل AGP بتنزيل ما ينقص.
-      - name: Ensure Android SDK platform (android-37)
+      # صورة ubuntu-latest تتضمن Android SDK مسبقًا (cmdline-tools + build-tools 37 + platform-tools)
+      # مع ANDROID_HOME/ANDROID_SDK_ROOT جاهزين وتراخيص مقبولة، ويقوم AGP بتنزيل أي مكوّن ناقص.
+      # لذلك نكتفي بخطوة تحقق سريعة (< ثانية) بدل خطوات تثبيت تكلّف ~16 ثانية في كل تشغيل.
+      - name: Verify Android SDK (preinstalled)
         run: |
           SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
-          if [ -d "$SDK_ROOT/platforms/android-37" ]; then
-            echo "android-37 موجود مسبقًا في $SDK_ROOT"
-            exit 0
-          fi
-          yes | sdkmanager --licenses >/dev/null 2>&1 || true
-          sdkmanager --install "platforms;android-37" \
-            || echo "::warning::تعذّر تثبيت platforms;android-37 مسبقًا، سيتكفّل AGP بتنزيله خلال البناء"
+          echo "ANDROID_HOME=$SDK_ROOT"
+          echo "platforms:  $(ls "$SDK_ROOT/platforms" 2>/dev/null | tr '\n' ' ')"
+          echo "build-tools: $(ls "$SDK_ROOT/build-tools" 2>/dev/null | tr '\n' ' ')"
 
       # أمر واحد لكل المهام = تشغيل واحد لـ Gradle (أسرع من أمرين منفصلين).
       # الناتج يُحفظ في build.log لتحليل الأخطاء عند الفشل.
@@ -186,30 +199,28 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up JDK 25 (Zulu)
+      - name: Set up JDK 25 (Temurin, pre-cached)
         uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
-          distribution: zulu
+          distribution: temurin
           java-version: '25'
 
-      - name: Set up Gradle (with caching)
+      - name: Set up Gradle (enhanced caching)
         uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6
         with:
-          cache-provider: basic
-          cache-read-only: false
+          cache-provider: enhanced
+          # الوسوم تُبنى مرات قليلة، فلا داعي للكتابة في الكاش منها (نطاق الكاش لا يصل للفروع)
+          cache-read-only: ${{ startsWith(github.ref, 'refs/tags/v') }}
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+          cache-cleanup: on-success
           validate-wrappers: true
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
-
-      - name: Ensure Android SDK platform (android-37)
+      - name: Verify Android SDK (preinstalled)
         run: |
           SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
-          if [ ! -d "$SDK_ROOT/platforms/android-37" ]; then
-            yes | sdkmanager --licenses >/dev/null 2>&1 || true
-            sdkmanager --install "platforms;android-37" \
-              || echo "::warning::تعذّر تثبيت platforms;android-37 مسبقًا، سيتكفّل AGP بتنزيله خلال البناء"
-          fi
+          echo "ANDROID_HOME=$SDK_ROOT"
+          echo "platforms:  $(ls "$SDK_ROOT/platforms" 2>/dev/null | tr '\n' ' ')"
+          echo "build-tools: $(ls "$SDK_ROOT/build-tools" 2>/dev/null | tr '\n' ' ')"
 
       - name: Build release APK (R8 + resource shrinking)
         run: ./gradlew :app:assembleRelease --stacktrace --console=plain 2>&1 | tee build.log
