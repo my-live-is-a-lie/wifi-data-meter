@@ -169,6 +169,10 @@ internal fun PeriodSelector(
     onPeriodChange: (UsagePeriod) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val todayLabel = stringResource(R.string.label_today)
+    val weekLabel = stringResource(R.string.label_week)
+    val monthLabel = stringResource(R.string.label_month)
+
     ButtonGroup(
         overflowIndicator = { menuState ->
             ButtonGroupDefaults.OverflowIndicator(menuState = menuState)
@@ -177,19 +181,19 @@ internal fun PeriodSelector(
     ) {
         toggleableItem(
             checked = period == UsagePeriod.TODAY,
-            label = stringResource(R.string.label_today),
+            label = todayLabel,
             onCheckedChange = { onPeriodChange(UsagePeriod.TODAY) },
             weight = 1f,
         )
         toggleableItem(
             checked = period == UsagePeriod.WEEK,
-            label = stringResource(R.string.label_week),
+            label = weekLabel,
             onCheckedChange = { onPeriodChange(UsagePeriod.WEEK) },
             weight = 1f,
         )
         toggleableItem(
             checked = period == UsagePeriod.MONTH,
-            label = stringResource(R.string.label_month),
+            label = monthLabel,
             onCheckedChange = { onPeriodChange(UsagePeriod.MONTH) },
             weight = 1f,
         )

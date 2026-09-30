@@ -80,7 +80,7 @@ class WifiNetworkReader(context: Context) {
             }.getOrNull(),
             dnsServers = runCatching {
                 linkProperties?.dnsServers?.mapNotNull { it.hostAddress }
-            }.getOrDefault(emptyList()),
+            }.getOrNull().orEmpty(),
             downstreamKbps = capabilities?.linkDownstreamBandwidthKbps?.takeIf { it > 0 },
             upstreamKbps = capabilities?.linkUpstreamBandwidthKbps?.takeIf { it > 0 },
         )

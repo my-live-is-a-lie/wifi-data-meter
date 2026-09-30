@@ -64,6 +64,10 @@ object TimeRanges {
         return TimeRange(startOfDay(start), startOfDay(end))
     }
 
+    /** عدد الأيام بين تاريخين (بحد أدنى يوم واحد). */
+    fun daysBetween(startMillis: Long, endMillis: Long): Int =
+        Format.daysBetween(startMillis, endMillis)
+
     /** عدد الأيام المتبقية حتى نهاية الدورة. */
     fun daysLeftInCycle(cycleStartDay: Int, now: Long = System.currentTimeMillis()): Int {
         val range = cycleRange(cycleStartDay, now)

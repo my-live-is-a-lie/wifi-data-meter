@@ -349,14 +349,13 @@ fun SettingsScreen(
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun IntervalSelector(intervalSeconds: Int, onIntervalChange: (Int) -> Unit) {
-    val options = remember {
-        listOf(
-            5 to R.string.settings_interval_5,
-            15 to R.string.settings_interval_15,
-            30 to R.string.settings_interval_30,
-            60 to R.string.settings_interval_60,
-        )
-    }
+    val labels = listOf(
+        stringResource(R.string.settings_interval_5),
+        stringResource(R.string.settings_interval_15),
+        stringResource(R.string.settings_interval_30),
+        stringResource(R.string.settings_interval_60),
+    )
+    val options = remember { listOf(5, 15, 30, 60) }
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
@@ -371,10 +370,10 @@ private fun IntervalSelector(intervalSeconds: Int, onIntervalChange: (Int) -> Un
             },
             modifier = Modifier.fillMaxWidth(),
         ) {
-            options.forEach { (seconds, labelRes) ->
+            options.forEachIndexed { index, seconds ->
                 toggleableItem(
                     checked = intervalSeconds == seconds,
-                    label = stringResource(labelRes),
+                    label = labels[index],
                     onCheckedChange = { onIntervalChange(seconds) },
                     weight = 1f,
                 )

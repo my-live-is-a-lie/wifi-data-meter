@@ -294,6 +294,10 @@ private fun QuickActions(
     onResetSession: () -> Unit,
     onOpenQuotaSettings: () -> Unit,
 ) {
+    val refreshLabel = stringResource(R.string.action_refresh)
+    val resetLabel = stringResource(R.string.action_reset_session)
+    val quotaLabel = stringResource(R.string.label_quota)
+
     ButtonGroup(
         overflowIndicator = { menuState ->
             ButtonGroupDefaults.OverflowIndicator(menuState = menuState)
@@ -302,7 +306,7 @@ private fun QuickActions(
     ) {
         clickableItem(
             onClick = onRefresh,
-            label = stringResource(R.string.action_refresh),
+            label = refreshLabel,
             icon = {
                 Icon(
                     imageVector = Icons.Rounded.Refresh,
@@ -314,7 +318,7 @@ private fun QuickActions(
         )
         clickableItem(
             onClick = onResetSession,
-            label = stringResource(R.string.action_reset_session),
+            label = resetLabel,
             icon = {
                 Icon(
                     imageVector = Icons.Rounded.RestartAlt,
@@ -326,7 +330,7 @@ private fun QuickActions(
         )
         clickableItem(
             onClick = onOpenQuotaSettings,
-            label = stringResource(R.string.label_quota),
+            label = quotaLabel,
             icon = {
                 Icon(
                     imageVector = Icons.Rounded.MonetizationOn,
