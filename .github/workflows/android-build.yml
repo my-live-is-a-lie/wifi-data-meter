@@ -142,6 +142,27 @@ jobs:
           echo "نوع البناء: $VARIANT | المهام: $TASKS"
           ./gradlew $TASKS --stacktrace --console=plain 2>&1 | tee build.log
 
+      # تحقق سريع من الناتج (الاسم، الحجم، المعمارية، التوقيع) يظهر كملاحظة في صفحة التشغيل
+      - name: Verify APK (signature + ABI)
+        run: |
+          APK="$(ls app/build/outputs/apk/*/*.apk 2>/dev/null | head -1)"
+          [ -n "$APK" ] || { echo "::error title=APK::لم يُعثر على ملف APK"; exit 1; }
+          NAME="$(basename "$APK")"
+          SIZE="$(du -h "$APK" | cut -f1)"
+          ABIS="$(unzip -l "$APK" | grep -o 'lib/[^/]*/' | sort -u | tr '\n' ' ' || true)"
+          TOOLS="$(ls -d "${ANDROID_SDK_ROOT:-$ANDROID_HOME}"/build-tools/* 2>/dev/null | sort -V | tail -1)"
+          SIGNED="غير موقّع"
+          if [ -n "$TOOLS" ] && [ -x "$TOOLS/apksigner" ]; then
+            if "$TOOLS/apksigner" verify --print-certs "$APK" > /tmp/apk-verify.txt 2>&1; then
+              SIGNED="موقّع ✓ ($(grep -m1 'certificate DN' /tmp/apk-verify.txt | sed 's/^ *//'))"
+            else
+              SIGNED="فشل التحقق: $(head -2 /tmp/apk-verify.txt | tr '\n' ' ')"
+            fi
+          fi
+          MSG="${NAME} | ${SIZE} | ${SIGNED} | مكتبات أصلية: ${ABIS:-none}"
+          echo "::notice title=APK::${MSG}"
+          echo "$MSG"
+
       # عند الفشل: أهم أسطر الخطأ تُنشر كتنبيهات (annotations) تظهر في صفحة التشغيل مباشرة.
       # الحد الأقصى 10 تنبيهات لكل خطوة، لذا نوزّع الأخطاء على خطوتين (حتى 20 خطأ).
       - name: Show failure details (errors 1-10)
