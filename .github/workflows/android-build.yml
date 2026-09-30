@@ -151,7 +151,7 @@ jobs:
             TASKS="$TASKS $TEST_TASK"
           fi
           echo "نوع البناء: $VARIANT | المهام: $TASKS"
-          ./gradlew $TASKS --stacktrace --console=plain 2>&1 | tee build.log
+          ./gradlew $TASKS --stacktrace --console=plain --no-configuration-cache -I .github/ci-timings.gradle 2>&1 | tee build.log
 
       # تحقق سريع من الناتج (الاسم، الحجم، المعمارية، التوقيع) يظهر كملاحظة في صفحة التشغيل
       - name: Verify APK (signature + ABI)
@@ -173,6 +173,12 @@ jobs:
           MSG="${NAME} | ${SIZE} | ${SIGNED} | مكتبات أصلية: ${ABIS:-none}"
           echo "::notice title=APK::${MSG}"
           echo "$MSG"
+
+      - name: Publish task timings [diagnostic]
+        if: always()
+        run: |
+          T="$(grep '^TIMING ' build.log | sort -t' ' -k2 -rn | head -12 | tr '\n' ' ')"
+          echo "::notice title=Timings::${T}"
 
       # عند الفشل: أهم أسطر الخطأ تُنشر كتنبيهات (annotations) تظهر في صفحة التشغيل مباشرة.
       # الحد الأقصى 10 تنبيهات لكل خطوة، لذا نوزّع الأخطاء على خطوتين (حتى 20 خطأ).
