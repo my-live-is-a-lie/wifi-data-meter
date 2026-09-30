@@ -2,7 +2,7 @@
 #
 # - يعتمد على الـ Wrapper المضمَّن في المشروع (Gradle 9.5.0) فلا حاجة لتثبيت Gradle يدويًا.
 # - يشغّل ثلاث مهام فقط: تجميع APK للتصحيح + اختبارات الوحدة + رفع الـ APK كـ Artifact.
-# - التسريع: تخزين مؤقت (Cache) لـ Gradle User Home ومخزن البناء + تخزين مؤقت للاعتماديات،
+# - التسريع: تخزين مؤقت (Cache) لـ Gradle User Home ومخزن البناء + الاعتماديات،
 #   وتشغيل كل شيء في أمر Gradle واحد، وإلغاء التشغيلات القديمة تلقائيًا.
 #
 # ملاحظات:
@@ -81,7 +81,10 @@ jobs:
           validate-wrappers: true # ملف gradle-wrapper.jar مأخوذ من مستودع Google الرسمي
           add-job-summary: always
 
-      # لا يفشل البناء إن كانت مكوّنات SDK غير قابلة للتثبيت مسبقًا؛ AGP سينزّلها تلقائيًا.
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+
+      # لا تُفشل البناء إن تعذّر التثبيت المسبق؛ سيكمل AGP بتنزيل ما ينقص.
       - name: Ensure Android SDK platform (android-37)
         run: |
           SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
@@ -89,22 +92,50 @@ jobs:
             echo "android-37 موجود مسبقًا في $SDK_ROOT"
             exit 0
           fi
-          if command -v sdkmanager >/dev/null 2>&1; then
-            yes | sdkmanager --licenses >/dev/null 2>&1 || true
-            sdkmanager --install "platforms;android-37" \
-              || echo "::warning::تعذّر تثبيت platforms;android-37 مسبقًا، سيتكفّل AGP بتنزيله خلال البناء"
-          else
-            echo "::warning::sdkmanager غير متوفّر، سيتكفّل AGP بتنزيل المكوّنات المطلوبة"
-          fi
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          sdkmanager --install "platforms;android-37" \
+            || echo "::warning::تعذّر تثبيت platforms;android-37 مسبقًا، سيتكفّل AGP بتنزيله خلال البناء"
 
-      # أمر واحد لكل المهام = تشغيل واحد لـ Gradle (أسرع من أمرين منفصلين)
+      # أمر واحد لكل المهام = تشغيل واحد لـ Gradle (أسرع من أمرين منفصلين).
+      # الناتج يُحفظ في build.log لتحليل الأخطاء عند الفشل.
       - name: Build debug APK and run unit tests
         run: |
+          set -o pipefail
           TASKS=":app:assembleDebug"
           if [ "$RUN_TESTS" = "true" ]; then
             TASKS="$TASKS :app:testDebugUnitTest"
           fi
-          ./gradlew $TASKS --stacktrace --console=plain
+          ./gradlew $TASKS --stacktrace --console=plain 2>&1 | tee build.log
+
+      # عند الفشل: أهم أسطر الخطأ تُنشر كتنبيهات (annotations) تظهر في صفحة التشغيل مباشرة
+      - name: Show failure details
+        if: failure()
+        run: |
+          [ -f build.log ] || { echo "لا يوجد سجل بناء"; exit 0; }
+          {
+            echo "### أسطر الخطأ"
+            echo '```'
+            grep -E "^e: |^w: file|error: |Execution failed for task|What went wrong|Caused by:|Could not (find|resolve|determine|install)" build.log | head -40 || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          mapfile -t ERRORS < <(grep -E "^e: |error: |Execution failed for task|What went wrong|Could not (find|resolve|determine|install)" build.log | head -10)
+          for line in "${ERRORS[@]}"; do
+            echo "::error title=Build::$(printf '%s' "$line" | sed 's/%/%25/g; s/\r//g')"
+          done
+          # آخر 30 سطرًا في تنبيه واحد (يحتوي عادةً على سبب الفشل النهائي)
+          TAIL="$(tail -n 30 build.log | sed 's/%/%25/g; s/\r//g' | sed ':a;N;$!ba;s/\n/%0A/g')"
+          echo "::error title=Tail::${TAIL}"
+
+      - name: Upload build log (on failure)
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: build-log
+          path: build.log
+          if-no-files-found: ignore
+          compression-level: 9
+          retention-days: 7
 
       - name: Upload debug APK
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -153,8 +184,31 @@ jobs:
           cache-read-only: false
           validate-wrappers: true
 
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+
+      - name: Ensure Android SDK platform (android-37)
+        run: |
+          SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          if [ ! -d "$SDK_ROOT/platforms/android-37" ]; then
+            yes | sdkmanager --licenses >/dev/null 2>&1 || true
+            sdkmanager --install "platforms;android-37" \
+              || echo "::warning::تعذّر تثبيت platforms;android-37 مسبقًا، سيتكفّل AGP بتنزيله خلال البناء"
+          fi
+
       - name: Build release APK (R8 + resource shrinking)
-        run: ./gradlew :app:assembleRelease --stacktrace --console=plain
+        run: ./gradlew :app:assembleRelease --stacktrace --console=plain 2>&1 | tee build.log
+
+      - name: Show failure details
+        if: failure()
+        run: |
+          [ -f build.log ] || exit 0
+          mapfile -t ERRORS < <(grep -E "^e: |error: |Execution failed for task|What went wrong|Could not (find|resolve|determine|install)" build.log | head -10)
+          for line in "${ERRORS[@]}"; do
+            echo "::error title=Build::$(printf '%s' "$line" | sed 's/%/%25/g; s/\r//g')"
+          done
+          TAIL="$(tail -n 30 build.log | sed 's/%/%25/g; s/\r//g' | sed ':a;N;$!ba;s/\n/%0A/g')"
+          echo "::error title=Tail::${TAIL}"
 
       - name: Upload release APK
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
