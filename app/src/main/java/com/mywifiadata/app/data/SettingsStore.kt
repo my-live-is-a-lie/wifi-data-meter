@@ -1,0 +1,90 @@
+package com.mywifiadata.app.data
+
+import android.content.Context
+import com.mywifiadata.app.data.model.AppSettings
+import com.mywifiadata.app.data.model.TrafficTotals
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+
+/**
+ * تخزين الإعدادات محليًا باستخدام SharedPreferences مع تعريضها كـ [StateFlow]
+ * ليتابعها الـ ViewModel والخدمة.
+ */
+class SettingsStore(context: Context) {
+
+    private val prefs = context.applicationContext
+        .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    private val _settings = MutableStateFlow(read())
+    val settings: StateFlow<AppSettings> = _settings.asStateFlow()
+
+    val current: AppSettings get() = _settings.value
+
+    fun update(transform: (AppSettings) -> AppSettings) {
+        val updated = transform(_settings.value)
+        write(updated)
+        _settings.value = updated
+    }
+
+    fun clearAll() {
+        prefs.edit().clear().apply()
+        _settings.value = AppSettings()
+    }
+
+    /** يضيف كمية إلى «خط الأساس» للجلسة (يُستخدم عند تصفير الجلسة). */
+    fun rebaseSession(baseline: TrafficTotals, startMillis: Long) = update {
+        it.copy(sessionBaseline = baseline, sessionStartMillis = startMillis)
+    }
+
+    private fun read(): AppSettings = AppSettings(
+        quotaBytes = prefs.getLong(KEY_QUOTA_BYTES, 0L),
+        cycleStartDay = prefs.getInt(KEY_CYCLE_DAY, 1),
+        notificationsEnabled = prefs.getBoolean(KEY_NOTIFICATIONS, true),
+        alertThresholdPercent = prefs.getInt(KEY_THRESHOLD, 80),
+        sampleIntervalSeconds = prefs.getInt(KEY_INTERVAL, 15),
+        dynamicColorEnabled = prefs.getBoolean(KEY_DYNAMIC_COLOR, true),
+        trackingEnabled = prefs.getBoolean(KEY_TRACKING, false),
+        sessionStartMillis = prefs.getLong(KEY_SESSION_START, System.currentTimeMillis()),
+        sessionBaseline = TrafficTotals(
+            rxBytes = prefs.getLong(KEY_SESSION_RX, 0L),
+            txBytes = prefs.getLong(KEY_SESSION_TX, 0L),
+        ),
+        alertCycleStartMillis = prefs.getLong(KEY_ALERT_CYCLE, 0L),
+        alertLevelReached = prefs.getInt(KEY_ALERT_LEVEL, 0),
+    )
+
+    private fun write(settings: AppSettings) {
+        prefs.edit()
+            .putLong(KEY_QUOTA_BYTES, settings.quotaBytes)
+            .putInt(KEY_CYCLE_DAY, settings.cycleStartDay)
+            .putBoolean(KEY_NOTIFICATIONS, settings.notificationsEnabled)
+            .putInt(KEY_THRESHOLD, settings.alertThresholdPercent)
+            .putInt(KEY_INTERVAL, settings.sampleIntervalSeconds)
+            .putBoolean(KEY_DYNAMIC_COLOR, settings.dynamicColorEnabled)
+            .putBoolean(KEY_TRACKING, settings.trackingEnabled)
+            .putLong(KEY_SESSION_START, settings.sessionStartMillis)
+            .putLong(KEY_SESSION_RX, settings.sessionBaseline.rxBytes)
+            .putLong(KEY_SESSION_TX, settings.sessionBaseline.txBytes)
+            .putLong(KEY_ALERT_CYCLE, settings.alertCycleStartMillis)
+            .putInt(KEY_ALERT_LEVEL, settings.alertLevelReached)
+            .apply()
+    }
+
+    companion object {
+        const val PREFS_NAME = "mywifi_settings"
+
+        private const val KEY_QUOTA_BYTES = "quota_bytes"
+        private const val KEY_CYCLE_DAY = "cycle_day"
+        private const val KEY_NOTIFICATIONS = "notifications"
+        private const val KEY_THRESHOLD = "alert_threshold"
+        private const val KEY_INTERVAL = "sample_interval"
+        private const val KEY_DYNAMIC_COLOR = "dynamic_color"
+        private const val KEY_TRACKING = "tracking_enabled"
+        private const val KEY_SESSION_START = "session_start"
+        private const val KEY_SESSION_RX = "session_baseline_rx"
+        private const val KEY_SESSION_TX = "session_baseline_tx"
+        private const val KEY_ALERT_CYCLE = "alert_cycle"
+        private const val KEY_ALERT_LEVEL = "alert_level"
+    }
+}
