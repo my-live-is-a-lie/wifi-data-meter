@@ -123,6 +123,17 @@ jobs:
           restore-keys: |
             gradle-config-cache-v1-${{ runner.os }}-
 
+      # كاش مخرجات المهام (Build Cache) بمفتاح ثابت: يعيد استخدام نتائج R8 وتصريف Kotlin
+      # بين التشغيلات حتى لا تُعاد من الصفر في كل مرة (يُخزَّن آخر تشغيل ويُقرأ في التالي).
+      - name: Cache Gradle build cache (task outputs)
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.gradle/caches/build-cache-1
+          key: gradle-build-cache-v1-${{ runner.os }}-${{ github.ref_name }}-${{ github.run_id }}
+          restore-keys: |
+            gradle-build-cache-v1-${{ runner.os }}-${{ github.ref_name }}-
+            gradle-build-cache-v1-${{ runner.os }}-
+
       # أمر Gradle واحد لكل المهام: هدف التجميع المطلوب فقط + اختبارات نفس النوع
       # (assembleRelease يشمل R8 وتقليص الموارد، ولا يشمل lint لأن checkReleaseBuilds=false).
       # الناتج يُحفظ في build.log لتحليل الأخطاء عند الفشل.
@@ -287,6 +298,17 @@ jobs:
           key: gradle-config-cache-v1-${{ runner.os }}-${{ hashFiles('**/*.gradle.kts', '**/gradle-wrapper.properties', 'gradle/libs.versions.toml', 'gradle.properties') }}
           restore-keys: |
             gradle-config-cache-v1-${{ runner.os }}-
+
+      # كاش مخرجات المهام (Build Cache) بمفتاح ثابت: يعيد استخدام نتائج R8 وتصريف Kotlin
+      # بين التشغيلات حتى لا تُعاد من الصفر في كل مرة (يُخزَّن آخر تشغيل ويُقرأ في التالي).
+      - name: Cache Gradle build cache (task outputs)
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.gradle/caches/build-cache-1
+          key: gradle-build-cache-v1-${{ runner.os }}-${{ github.ref_name }}-${{ github.run_id }}
+          restore-keys: |
+            gradle-build-cache-v1-${{ runner.os }}-${{ github.ref_name }}-
+            gradle-build-cache-v1-${{ runner.os }}-
 
       - name: Build release APK (R8 + resource shrinking)
         run: ./gradlew :app:assembleRelease --stacktrace --console=plain 2>&1 | tee build.log
