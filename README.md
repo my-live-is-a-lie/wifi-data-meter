@@ -43,31 +43,41 @@
 
 1. تجهيز Java 25 (Temurin الموجود مسبقًا في الـ tool cache للـ Runner، بلا أي تنزيل) + كاش Gradle بنظام
    **Enhanced Caching** (كاش مُجزّأ + إزالة تكرار + restore keys) مع توثيق `gradle-wrapper.jar`.
-2. بناء `:app:assembleDebug` + تشغيل `:app:testDebugUnitTest` في **أمر Gradle واحد**.
-3. رفع ملف `app-debug.apk` كـ Artifact يمكن تنزيله من صفحة التشغيل (وملف تقارير الاختبار عند الفشل).
-4. مهمة ثانية اختيارية تبني `app-release-unsigned.apk` عند إنشاء وسم `v*` أو عند التشغيل اليدوي، وتُرفقه بـ GitHub Release.
+2. بناء **APK إصدار (Release)**: `:app:assembleRelease` — مُصغَّر بـ R8 ومقلَّص الموارد —
+   **بمعمارية `arm64-v8a` فقط** (اسم الملف: `app-arm64-v8a-release.apk`) + اختبارات الوحدة
+   `:app:testReleaseUnitTest` في **أمر Gradle واحد**.
+3. توقيع الـ APK بمفتاح الإصدار الموجود في `release-keystore.p12` (بياناته في `keystore.properties`)،
+   فيكون جاهزًا للتثبيت مباشرة على الجهاز.
+4. رفعه كـ Artifact باسم `app-release-apk` من صفحة التشغيل (وملف `build.log` وتقارير الاختبار عند الفشل).
+5. مهمة ثانية تُرفق نفس الملف بـ **GitHub Release** عند إنشاء وسم `v*`.
 
 **التشغيل:** يُبنى المشروع تلقائيًا عند الدفع إلى `main` أو إلى أي فرع يبدأ بـ `arena/`، وعند أي Pull Request نحو `main`،
-ويمكن تشغيله يدويًا من تبويب **Actions → Android Build → Run workflow** (مع خيار `debug` أو `release` وتشغيل الاختبارات من عدمه).
+ويمكن تشغيله يدويًا من تبويب **Actions → Android Build → Run workflow** (مع اختيار `release` أو `debug` وتشغيل الاختبارات من عدمه).
 
-**للتسريع:** نستخدم **Enhanced Caching** (الافتراضي في `gradle/actions/setup-gradle@v6`): كاش مُجزّأ إلى
-مكوّنات (الاعتماديات، distribution الـ Wrapper، transforms، مخزن البناء، …) مع إزالة تكرار بين التشغيلات
-و`restore keys` بدل الكاش الأحادي في المزوّد البسيط الذي يفقد كل شيء عند أي تعديل في ملفات البناء.
-كما لا ننزّل JDK (Temurin 25 جاهز في الصورة) ولا نثبّت Android SDK (الصورة تأتي به مع `ANDROID_HOME`
-وتراخيص مقبولة)، والبناء يجري في **أمر Gradle واحد**، ويُلغى أي تشغيل قديم على نفس الفرع (`concurrency`)
-ويُتخطّى البناء عند تعديل ملفات التوثيق فقط (`paths-ignore`)، وتُرفع الـ APK بدون ضغط إضافي.
+**للتسريع** (كل بند مطبَّق فعليًا):
+
+| الإجراء | الأثر |
+|---|---|
+| `org.gradle.caching` + `org.gradle.parallel` + `org.gradle.configuration-cache` في `gradle.properties` | إعادة استخدام مخرجات المهام، تشغيل متوازٍ، وتخطّي مرحلة الإعداد |
+| كاش **configuration cache** عبر `actions/cache` (بدون أي أسرار) | اختصار فحص التكوين وبناء شجرة المهام في كل تشغيل |
+| Enhanced Caching لـ Gradle User Home (اعتماديات + transforms + مخزن البناء) | لا إعادة تنزيل للاعتماديات |
+| هدف واحد فقط `assembleRelease` بدل `build` | لا `check` ولا `lint` ولا اختبارات إضافية غير مطلوبة |
+| `lint { checkReleaseBuilds = false }` | تعطيل `lintVitalRelease` الذي يعمل تلقائيًا مع تجميع الإصدار |
+| `testReleaseUnitTest` بدل `testDebugUnitTest` | لا تُصرَّف نسخة debug كاملة إضافية |
+| `org.gradle.jvmargs=-Xmx4g` و `kotlin.daemon.jvmargs=-Xmx2g` | ذاكرة كافية للـ Runner (16GB) فتقل عمليات GC البطيئة |
+| `org.gradle.vfs.watch=false` | إيقاف مراقبة الملفات بلا فائدة في CI |
+| بلا تنزيل JDK وبلا تثبيت Android SDK | الصورة تأتي بهما جاهزين |
+| `concurrency` + `paths-ignore` + `compression-level: 0` | إلغاء التشغيلات القديمة، تخطي تغييرات التوثيق، ورفع أسرع للـ APK |
 
 أول تشغيل بعد أي تغيير جذري (أو أول مرة على مرجع جديد) يكون باردًا فيستغرق دقائق لتنزيل الاعتماديات،
-أما التشغيلات التالية على نفس المرجع فتكون أسرع بكثير. لتفعيل تخزين **configuration cache** في الكاش
-(اختياري) أضِف سرًّا باسم `GRADLE_ENCRYPTION_KEY`:
+أما التشغيلات التالية على نفس المرجع فتكون أسرع بكثير.
 
-```bash
-gh secret set GRADLE_ENCRYPTION_KEY --body "$(openssl rand -base64 16)"
-```
+**عن التوقيع:** الملفان `release-keystore.p12` و `keystore.properties` مُضمَّنان في المستودع (مستودع خاص) ليعمل
+البناء والتحديث بنفس المفتاح في كل مرة. لترقيتهما لاحقًا إلى أسرار: أضف `RELEASE_STORE_PASSWORD` و
+`RELEASE_KEY_ALIAS` و `RELEASE_KEY_PASSWORD` كـ Secrets ثم احذف `keystore.properties` — فملف
+`app/build.gradle.kts` يقرأ من متغيرات البيئة أولًا.
 
-> إن أردت المسار مفتوح المصدر بالكامل للكاش: اضبط `cache-provider: basic` في الـ Workflow.
-
-> ملاحظة: إن كانت ميزة Actions معطّلة في المستودع، فعّلها من **Settings → Actions → General → Allow all actions**.
+> ملاحظة: إن لم تتوفر بيانات التوقيع يُبنى الـ APK **غير موقّع** ويستمر البناء بلا فشل.
 
 ## التقنيات وإصداراتها
 

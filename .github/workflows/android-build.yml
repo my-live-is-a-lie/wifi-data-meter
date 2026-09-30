@@ -1,7 +1,8 @@
 # بناء تطبيق «مقياس الواي فاي» على GitHub Actions
 #
 # - يعتمد على الـ Wrapper المضمَّن في المشروع (Gradle 9.5.0) فلا حاجة لتثبيت Gradle يدويًا.
-# - يبني APK للتصحيح + يشغّل اختبارات الوحدة + يرفع الـ APK كـ Artifact.
+# - يبني APK **إصدار (Release) بمعمارية arm64-v8a** موقّعًا وجاهزًا للتثبيت + يشغّل اختبارات الوحدة.
+# - عند إنشاء وسم v* يُرفق الملف بـ GitHub Releases، ويمكن اختيار بناء debug يدويًا من Run workflow.
 #
 # أهم ما يجعل البناء سريعًا:
 #  1) Enhanced Caching من setup-gradle: كاش مُجزّأ (fine-grained) + إزالة تكرار (Deduplication)
@@ -15,14 +16,16 @@
 #  5) إلغاء التشغيلات القديمة تلقائيًا (concurrency) + تخطي البناء عند تعديل ملفات التوثيق فقط.
 #  6) الكتابة في الكاش من كل المراجع (كل فرع وكل PR له نطاق كاش مستقل)، فيصبح التشغيل التالي
 #     على نفس المرجع دافئًا؛ البارد مرة واحدة فقط عند أول تشغيل.
+#  7) كاش configuration cache عبر actions/cache، وتشغيل اختبارات نسخة الإصدار
+#     (testReleaseUnitTest) بدل نسخة التصحيح لتفادي تصريف نسختين من التطبيق.
 #
 # ملاحظات:
 # - الإصدارات مثبّتة بـ SHA (نفس النسخ المستخدمة في مستودع Google الرسمي android/snippets).
 # - يمكن تعديل قائمة الفروع التي تُشغّل البناء من قسم on.push.branches.
 # - إن كانت خاصية Actions معطّلة في المستودع: Settings → Actions → General → Allow all actions.
-# - لتفعيل تخزين "configuration cache" في كاش GitHub (اختياري، يوفّر زمن مرحلة الإعداد):
-#     gh secret set GRADLE_ENCRYPTION_KEY --body "$(openssl rand -base64 16)"
-#   وإن لم يُضَف السر، يعمل البناء عاديًا بدون تخزين الـ configuration cache.
+# - توقيع نسخة الإصدار يعتمد على الملفين release-keystore.p12 و keystore.properties في جذر المستودع،
+#   ويمكن لاحقًا استخدام أسرار بدلًا منهما: RELEASE_STORE_FILE / RELEASE_STORE_PASSWORD /
+#   RELEASE_KEY_ALIAS / RELEASE_KEY_PASSWORD (يقرأها build.gradle.kts قبل الملف).
 
 name: Android Build
 
@@ -43,10 +46,10 @@ on:
   workflow_dispatch:
     inputs:
       variant:
-        description: 'نوع البناء'
+        description: 'نوع البناء (release: موقّع ومعماري arm64-v8a)'
         type: choice
-        options: [debug, release]
-        default: debug
+        options: [release, debug]
+        default: release
       run_tests:
         description: 'تشغيل اختبارات الوحدة'
         type: boolean
@@ -63,14 +66,15 @@ permissions:
 jobs:
   # ———————————————————————————— بناء APK للتصحيح + الاختبارات ————————————————————————————
   build:
-    name: Debug APK + Unit tests
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.variant == 'debug' }}
+    name: Release APK (arm64-v8a) + Unit tests
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
     env:
       # يُستخدم داخل خطوة البناء لتفادي تشغيل الاختبارات عند اختيار المستخدم ذلك
       RUN_TESTS: ${{ github.event_name != 'workflow_dispatch' || inputs.run_tests }}
+      # الافتراضي: بناء الإصدار. اختيار debug متاح عند التشغيل اليدوي فقط.
+      VARIANT: ${{ github.event_name == 'workflow_dispatch' && inputs.variant || 'release' }}
 
     steps:
       - name: Checkout
@@ -95,8 +99,6 @@ jobs:
           # الكتابة في الكاش مفعّلة لكل المراجع: كاش كل مرجع (فرع أو PR) مستقل عن غيره،
           # فيستفيد التشغيل التالي على نفس المرجع من كاش دافئ (أول تشغيل على كل مرجع هو البارد فقط).
           cache-read-only: false
-          # مفتاح AES يتيح تخزين configuration cache في الكاش (اختياري — راجع الملاحظات أعلى الملف)
-          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
           cache-cleanup: on-success
           validate-wrappers: true # ملف gradle-wrapper.jar مأخوذ من مستودع Google الرسمي
           add-job-summary: always
@@ -111,15 +113,33 @@ jobs:
           echo "platforms:  $(ls "$SDK_ROOT/platforms" 2>/dev/null | tr '\n' ' ')"
           echo "build-tools: $(ls "$SDK_ROOT/build-tools" 2>/dev/null | tr '\n' ' ')"
 
-      # أمر واحد لكل المهام = تشغيل واحد لـ Gradle (أسرع من أمرين منفصلين).
+      # كاش configuration cache: يوفّر مرحلة إعداد المشروع (فحص التبعيات وبناء شجرة المهام)
+      # في التشغيلات التالية. يعمل بدون أي أسرار، ولا يعطّل البناء إن لم يوجد الكاش.
+      - name: Cache Gradle configuration cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .gradle/configuration-cache
+          key: gradle-config-cache-v1-${{ runner.os }}-${{ hashFiles('**/*.gradle.kts', '**/gradle-wrapper.properties', 'gradle/libs.versions.toml', 'gradle.properties') }}
+          restore-keys: |
+            gradle-config-cache-v1-${{ runner.os }}-
+
+      # أمر Gradle واحد لكل المهام: هدف التجميع المطلوب فقط + اختبارات نفس النوع
+      # (assembleRelease يشمل R8 وتقليص الموارد، ولا يشمل lint لأن checkReleaseBuilds=false).
       # الناتج يُحفظ في build.log لتحليل الأخطاء عند الفشل.
-      - name: Build debug APK and run unit tests
+      - name: Build APK and run unit tests
         run: |
           set -o pipefail
-          TASKS=":app:assembleDebug"
-          if [ "$RUN_TESTS" = "true" ]; then
-            TASKS="$TASKS :app:testDebugUnitTest"
+          if [ "$VARIANT" = "debug" ]; then
+            TASKS=":app:assembleDebug"
+            TEST_TASK=":app:testDebugUnitTest"
+          else
+            TASKS=":app:assembleRelease"
+            TEST_TASK=":app:testReleaseUnitTest"
           fi
+          if [ "$RUN_TESTS" = "true" ]; then
+            TASKS="$TASKS $TEST_TASK"
+          fi
+          echo "نوع البناء: $VARIANT | المهام: $TASKS"
           ./gradlew $TASKS --stacktrace --console=plain 2>&1 | tee build.log
 
       # عند الفشل: أهم أسطر الخطأ تُنشر كتنبيهات (annotations) تظهر في صفحة التشغيل مباشرة.
@@ -167,11 +187,11 @@ jobs:
           compression-level: 9
           retention-days: 7
 
-      - name: Upload debug APK
+      - name: Upload APK
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: app-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          name: app-${{ env.VARIANT }}-apk
+          path: app/build/outputs/apk/**/*.apk
           if-no-files-found: error
           compression-level: 0 # الـ APK مضغوط أصلًا، فالرفع يصبح أسرع
           retention-days: 7
@@ -185,10 +205,10 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-  # ————————————————————— بناء الإصدار (عند إنشاء وسم v* أو يدويًا) —————————————————————
-  # ينتج APK غير موقّع (app-release-unsigned.apk). أضف مفتاح التوقيع عبر Secrets إن أردت نسخة موقّعة.
+  # ———————————————— بناء الإصدار للوسوم (v*) ورفعه إلى GitHub Releases ————————————————
+  # نفس مخرجات مهمة build (app-arm64-v8a-release.apk موقّع) لكنها تُرفق بـ Release عند وسم v*.
   release:
-    name: Release APK (unsigned)
+    name: Release APK (arm64-v8a, signed)
     if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.variant == 'release') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -213,7 +233,6 @@ jobs:
           cache-provider: enhanced
           # الوسوم تُبنى مرات قليلة، فلا داعي للكتابة في الكاش منها (نطاق الكاش لا يصل للفروع)
           cache-read-only: ${{ startsWith(github.ref, 'refs/tags/v') }}
-          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
           cache-cleanup: on-success
           validate-wrappers: true
 
@@ -223,6 +242,16 @@ jobs:
           echo "ANDROID_HOME=$SDK_ROOT"
           echo "platforms:  $(ls "$SDK_ROOT/platforms" 2>/dev/null | tr '\n' ' ')"
           echo "build-tools: $(ls "$SDK_ROOT/build-tools" 2>/dev/null | tr '\n' ' ')"
+
+      # كاش configuration cache: يوفّر مرحلة إعداد المشروع (فحص التبعيات وبناء شجرة المهام)
+      # في التشغيلات التالية. يعمل بدون أي أسرار، ولا يعطّل البناء إن لم يوجد الكاش.
+      - name: Cache Gradle configuration cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .gradle/configuration-cache
+          key: gradle-config-cache-v1-${{ runner.os }}-${{ hashFiles('**/*.gradle.kts', '**/gradle-wrapper.properties', 'gradle/libs.versions.toml', 'gradle.properties') }}
+          restore-keys: |
+            gradle-config-cache-v1-${{ runner.os }}-
 
       - name: Build release APK (R8 + resource shrinking)
         run: ./gradlew :app:assembleRelease --stacktrace --console=plain 2>&1 | tee build.log
