@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Wi‑Fi Data Meter</string>
+    <string name="app_tagline">Measure your internet usage on Wi‑Fi networks</string>
+
+    <string name="tab_dashboard">Home</string>
+    <string name="tab_apps">Apps</string>
+    <string name="tab_history">History</string>
+    <string name="tab_settings">Settings</string>
+
+    <string name="status_connected">Connected to %1$s</string>
+    <string name="status_connected_unknown">Connected to Wi‑Fi</string>
+    <string name="status_disconnected">Not connected</string>
+    <string name="status_not_wifi">On mobile data (not Wi‑Fi)</string>
+
+    <string name="wifi_card_title">Network details</string>
+    <string name="label_ssid">Network name</string>
+    <string name="label_signal">Signal strength</string>
+    <string name="label_link_speed">Link speed</string>
+    <string name="label_band">Band</string>
+    <string name="label_standard">Wi‑Fi standard</string>
+    <string name="label_ip">IP address</string>
+    <string name="label_gateway">Gateway</string>
+    <string name="label_frequency">Frequency</string>
+    <string name="value_unknown">Unknown</string>
+    <string name="value_hidden">Hidden (needs nearby devices permission)</string>
+    <string name="band_2_4">2.4 GHz</string>
+    <string name="band_5">5 GHz</string>
+    <string name="band_6">6 GHz</string>
+    <string name="wifi_not_connected_title">Not connected to Wi‑Fi</string>
+    <string name="wifi_not_connected_body">Connect to a Wi‑Fi network to start measuring usage automatically.</string>
+
+    <string name="label_today">Today</string>
+    <string name="label_week">Last 7 days</string>
+    <string name="label_month">Last 30 days</string>
+    <string name="label_cycle">Billing cycle</string>
+    <string name="label_download">Download</string>
+    <string name="label_upload">Upload</string>
+    <string name="label_total">Total</string>
+    <string name="label_remaining">Remaining</string>
+    <string name="label_used">Used</string>
+    <string name="label_quota">Monthly plan</string>
+    <string name="label_current_speed">Current speed</string>
+    <string name="label_session">Current session</string>
+    <string name="label_period">Period</string>
+    <string name="label_average">Daily average</string>
+    <string name="label_peak">Busiest day</string>
+    <string name="label_days">Days</string>
+
+    <string name="quota_ring_title">Billing cycle usage</string>
+    <string name="quota_not_set">No monthly plan set yet</string>
+    <string name="quota_set_action">Set plan</string>
+    <string name="quota_remaining_of">%1$s left of %2$s</string>
+    <string name="quota_used_of">%1$s used of %2$s</string>
+    <string name="quota_exceeded">Over plan by %1$s</string>
+    <string name="percent_format">%1$d%%</string>
+
+    <string name="tracking_running">Monitoring is on</string>
+    <string name="tracking_stopped">Monitoring is off</string>
+    <string name="action_start_tracking">Start monitoring</string>
+    <string name="action_stop_tracking">Stop monitoring</string>
+    <string name="action_refresh">Refresh</string>
+    <string name="action_reset_session">Reset session</string>
+    <string name="action_open_usage_access">Open usage access</string>
+    <string name="session_since">Started at %1$s</string>
+    <string name="live_chart_title">Live network speed</string>
+    <string name="live_chart_empty">Not enough data yet…</string>
+
+    <string name="permission_needed_title">Usage access permission required</string>
+    <string name="permission_needed_body">The app needs the special system permission “Usage access” to read Wi‑Fi usage per app. Tap the button, pick “Wi‑Fi Data Meter” and enable the permission.</string>
+    <string name="permission_granted_title">Usage access granted</string>
+    <string name="permission_granted_body">The app can now read your actual usage.</string>
+
+    <string name="apps_screen_title">App usage</string>
+    <string name="apps_empty_title">No usage recorded</string>
+    <string name="apps_empty_body">No data for this period yet. Browse a bit and refresh.</string>
+    <string name="apps_loading">Calculating app usage…</string>
+    <string name="apps_no_permission">Enable usage access to see the per‑app breakdown.</string>
+    <string name="system_apps_label">System apps</string>
+    <string name="unknown_app_label">Unknown app</string>
+    <string name="apps_count">%1$d apps</string>
+
+    <string name="history_screen_title">Usage history</string>
+    <string name="history_empty_title">No history yet</string>
+    <string name="history_empty_body">The chart appears after a few days of collected data.</string>
+    <string name="history_selected_day">Selected day</string>
+    <string name="history_top_apps">Top apps</string>
+    <string name="history_days_shown">Last %1$d days</string>
+
+    <string name="settings_screen_title">Settings</string>
+    <string name="settings_section_quota">Plan and billing</string>
+    <string name="settings_quota_size">Monthly plan size (GB)</string>
+    <string name="settings_quota_hint">e.g. 100</string>
+    <string name="settings_cycle_day">Billing cycle start day</string>
+    <string name="settings_cycle_day_hint">1 to 28</string>
+    <string name="settings_section_alerts">Alerts</string>
+    <string name="settings_notifications">Enable notifications</string>
+    <string name="settings_notifications_desc">A persistent notification while monitoring plus an alert when your plan is nearly used up.</string>
+    <string name="settings_threshold">Alert threshold</string>
+    <string name="settings_section_monitor">Monitoring</string>
+    <string name="settings_interval">Sampling rate</string>
+    <string name="settings_interval_5">Every 5 seconds</string>
+    <string name="settings_interval_15">Every 15 seconds</string>
+    <string name="settings_interval_30">Every 30 seconds</string>
+    <string name="settings_interval_60">Every minute</string>
+    <string name="settings_dynamic_color">System colors (Material You)</string>
+    <string name="settings_dynamic_color_desc">Use wallpaper‑based colors on Android 12+.</string>
+    <string name="settings_section_data">Data</string>
+    <string name="settings_clear_data">Clear all data</string>
+    <string name="settings_clear_data_desc">Deletes settings and locally stored measurements.</string>
+    <string name="settings_usage_access">Usage access permission</string>
+    <string name="settings_usage_access_granted">Granted</string>
+    <string name="settings_usage_access_missing">Not granted — tap to grant</string>
+    <string name="settings_section_about">About</string>
+    <string name="settings_version">Version %1$s</string>
+    <string name="settings_about_body">An open‑source app that measures internet usage on Wi‑Fi, built with Kotlin, Jetpack Compose and Material 3 Expressive. Measurements come from Android’s NetworkStatsManager and nothing is uploaded anywhere.</string>
+
+    <string name="channel_monitor_name">Usage monitoring</string>
+    <string name="channel_monitor_desc">Persistent notification showing current Wi‑Fi usage.</string>
+    <string name="channel_alerts_name">Plan alerts</string>
+    <string name="channel_alerts_desc">Alerts when your monthly plan is nearly used up.</string>
+    <string name="notification_monitor_title">%1$s today</string>
+    <string name="notification_monitor_text">Current speed: %1$s • Remaining: %2$s</string>
+    <string name="notification_monitor_text_no_quota">Current speed: %1$s • Session total: %2$s</string>
+    <string name="notification_alert_threshold_title">Approaching your plan limit</string>
+    <string name="notification_alert_threshold_text">You used %1$s%% of your %2$s Wi‑Fi plan.</string>
+    <string name="notification_alert_exceeded_title">Monthly plan exceeded</string>
+    <string name="notification_alert_exceeded_text">Total usage %1$s of %2$s.</string>
+    <string name="notification_permission_denied">Notification permission was denied, so the monitoring notification will not appear.</string>
+    <string name="notification_timeout_title">Monitoring paused</string>
+    <string name="notification_timeout_text">The system stopped background monitoring. Open the app to restart it.</string>
+
+    <string name="cd_more_options">More options</string>
+    <string name="cd_refresh">Refresh</string>
+    <string name="cd_settings">Settings</string>
+    <string name="cd_toggle_tracking">Toggle monitoring</string>
+    <string name="cd_signal_bars">Signal strength</string>
+    <string name="cd_app_icon">App icon</string>
+    <string name="cd_decrease">Decrease</string>
+    <string name="cd_increase">Increase</string>
+    <string name="cd_back">Back</string>
+    <string name="cd_wifi">Wi‑Fi</string>
+    <string name="action_save">Save</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_close">Close</string>
+    <string name="action_confirm">Confirm</string>
+    <string name="unit_gb">GB</string>
+    <string name="unit_mbps">Mbps</string>
+    <string name="unit_dbm">dBm</string>
+</resources>
