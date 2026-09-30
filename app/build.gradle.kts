@@ -28,6 +28,10 @@ val releaseKeyAlias = signingValue("RELEASE_KEY_ALIAS", "keyAlias")
 val releaseKeyPassword = signingValue("RELEASE_KEY_PASSWORD", "keyPassword") ?: releaseStorePassword
 val canSignRelease = releaseStoreFile.exists() && releaseStorePassword != null && releaseKeyAlias != null
 
+// وضع البناء السريع: ./gradlew :app:assembleRelease -Pmywifi.minify=false
+// يتخطى R8 وتقليص الموارد (أسرع بمراحل، لكن ملف APK أكبر) — مفيد للبناءات التجريبية.
+val minifyRequested = (findProperty("mywifi.minify") as String?)?.toBoolean() ?: true
+
 android {
     namespace = "com.mywifiadata.app"
     compileSdk = 37
@@ -56,8 +60,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            isMinifyEnabled = minifyRequested
+            isShrinkResources = minifyRequested
             signingConfig = signingConfigs.findByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
