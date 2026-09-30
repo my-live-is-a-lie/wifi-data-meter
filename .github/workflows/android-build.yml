@@ -54,6 +54,10 @@ on:
         description: 'تشغيل اختبارات الوحدة'
         type: boolean
         default: true
+      fast_build:
+        description: 'بناء سريع بلا R8/تقليص موارد (ملف أكبر)'
+        type: boolean
+        default: false
 
 # منع تكرار التشغيلات على نفس الفرع وإلغاء الأقدم (يوفّر الوقت والدقائق)
 concurrency:
@@ -75,6 +79,7 @@ jobs:
       RUN_TESTS: ${{ github.event_name != 'workflow_dispatch' || inputs.run_tests }}
       # الافتراضي: بناء الإصدار. اختيار debug متاح عند التشغيل اليدوي فقط.
       VARIANT: ${{ github.event_name == 'workflow_dispatch' && inputs.variant || 'release' }}
+      FAST_BUILD: ${{ github.event_name == 'workflow_dispatch' && inputs.fast_build || 'false' }}
 
     steps:
       - name: Checkout
@@ -151,7 +156,12 @@ jobs:
             TASKS="$TASKS $TEST_TASK"
           fi
           echo "نوع البناء: $VARIANT | المهام: $TASKS"
-          ./gradlew $TASKS --stacktrace --console=plain --no-configuration-cache -I .github/ci-timings.gradle 2>&1 | tee build.log
+          EXTRA_FLAGS=""
+          if [ "$FAST_BUILD" = "true" ]; then
+            EXTRA_FLAGS="-Pmywifi.minify=false"
+            echo "وضع البناء السريع: بلا R8 وبلا تقليص موارد"
+          fi
+          ./gradlew $TASKS $EXTRA_FLAGS --stacktrace --console=plain 2>&1 | tee build.log
 
       # تحقق سريع من الناتج (الاسم، الحجم، المعمارية، التوقيع) يظهر كملاحظة في صفحة التشغيل
       - name: Verify APK (signature + ABI)
@@ -173,12 +183,6 @@ jobs:
           MSG="${NAME} | ${SIZE} | ${SIGNED} | مكتبات أصلية: ${ABIS:-none}"
           echo "::notice title=APK::${MSG}"
           echo "$MSG"
-
-      - name: Publish task timings [diagnostic]
-        if: always()
-        run: |
-          T="$(grep '^TIMING ' build.log | sort -t' ' -k2 -rn | head -12 | tr '\n' ' ')"
-          echo "::notice title=Timings::${T}"
 
       # عند الفشل: أهم أسطر الخطأ تُنشر كتنبيهات (annotations) تظهر في صفحة التشغيل مباشرة.
       # الحد الأقصى 10 تنبيهات لكل خطوة، لذا نوزّع الأخطاء على خطوتين (حتى 20 خطأ).
