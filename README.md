@@ -37,6 +37,24 @@
 
 ---
 
+## البناء التلقائي على GitHub Actions
+
+يوجد Workflow جاهز في `.github/workflows/android-build.yml` يقوم بـ:
+
+1. تجهيز Java 25 (Zulu) + تخزين مؤقت كامل لـ Gradle (الاعتماديات ومخزن البناء) و `gradle-wrapper.jar` موثّق.
+2. بناء `:app:assembleDebug` + تشغيل `:app:testDebugUnitTest` في **أمر Gradle واحد**.
+3. رفع ملف `app-debug.apk` كـ Artifact يمكن تنزيله من صفحة التشغيل (وملف تقارير الاختبار عند الفشل).
+4. مهمة ثانية اختيارية تبني `app-release-unsigned.apk` عند إنشاء وسم `v*` أو عند التشغيل اليدوي، وتُرفقه بـ GitHub Release.
+
+**التشغيل:** يُبنى المشروع تلقائيًا عند الدفع إلى `main` أو إلى أي فرع يبدأ بـ `arena/`، وعند أي Pull Request نحو `main`،
+ويمكن تشغيله يدويًا من تبويب **Actions → Android Build → Run workflow** (مع خيار `debug` أو `release` وتشغيل الاختبارات من عدمه).
+
+**للتسريع:** الـ Cache يُكتب حتى على الفروع غير الرئيسية (`cache-read-only: false`)، ويُلغى أي تشغيل قديم على نفس الفرع تلقائيًا
+(`concurrency`)، والبناء في أمر واحد، ومخزن Build Cache مُفعَّل في `gradle.properties`
+(`org.gradle.caching` + `org.gradle.configuration-cache`). أول تشغيل يستغرق دقائق لتنزيل الاعتماديات، والتشغيلات التالية أسرع بكثير.
+
+> ملاحظة: إن كانت ميزة Actions معطّلة في المستودع، فعّلها من **Settings → Actions → General → Allow all actions**.
+
 ## التقنيات وإصداراتها
 
 | المكوّن | الإصدار |
