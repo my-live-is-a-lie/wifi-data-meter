@@ -383,7 +383,14 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          APK="$(ls apk/*.apk | head -1)"
+          # الـ artifact يحتفظ ببنية المجلدات (release/...)، فنبحث بـ find
+          APK="$(find apk -type f -name '*.apk' | head -1)"
+          if [ -z "$APK" ]; then
+            echo "::error title=APK::لم يُعثر على ملف APK داخل الأرشيف"
+            find apk -type f -print || true
+            exit 1
+          fi
+          echo "الملف: $APK ($(du -h "$APK" | cut -f1))"
           STAGE="$(mktemp -d)"
           cp "$APK" "$STAGE/app-release.apk"
           cd "$STAGE"
