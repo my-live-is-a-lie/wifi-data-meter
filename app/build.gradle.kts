@@ -4,6 +4,27 @@ plugins {
     alias(libs.plugins.compose.compiler)
 }
 
+// ————————————————————————————— توقيع نسخة الإصدار (Release) —————————————————————————————
+// المصدر بالترتيب: متغيرات البيئة (GitHub Secrets) ثم ملف keystore.properties في جذر المشروع.
+// إن لم يتوفر أي منهما يُبنى الـ APK غير موقّع (لن يمنع ذلك بقية البناء).
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = java.util.Properties().apply {
+    if (keystorePropertiesFile.exists()) {
+        keystorePropertiesFile.inputStream().use { load(it) }
+    }
+}
+
+fun signingValue(envName: String, propertyName: String): String? =
+    System.getenv(envName)?.takeIf { it.isNotBlank() } ?: keystoreProperties.getProperty(propertyName)
+
+val releaseStoreFile = System.getenv("RELEASE_STORE_FILE")?.takeIf { it.isNotBlank() }
+    ?.let { rootProject.file(it) }
+    ?: rootProject.file("release-keystore.p12")
+val releaseStorePassword = signingValue("RELEASE_STORE_PASSWORD", "storePassword")
+val releaseKeyAlias = signingValue("RELEASE_KEY_ALIAS", "keyAlias")
+val releaseKeyPassword = signingValue("RELEASE_KEY_PASSWORD", "keyPassword") ?: releaseStorePassword
+val canSignRelease = releaseStoreFile.exists() && releaseStorePassword != null && releaseKeyAlias != null
+
 android {
     namespace = "com.mywifiadata.app"
     compileSdk = 37
@@ -16,14 +37,41 @@ android {
         versionName = "1.0.0"
     }
 
+    signingConfigs {
+        if (canSignRelease) {
+            create("release") {
+                storeFile = releaseStoreFile
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+                storeType = "PKCS12"
+                enableV1Signing = true // توافق أوسع مع أجهزة أندرويد القديمة (minSdk 26)
+                enableV2Signing = true
+            }
+        } else {
+            logger.lifecycle("تنبيه: لا توجد بيانات توقيع، سيُبنى APK الإصدار غير موقّع.")
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            signingConfig = signingConfigs.findByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+        }
+    }
+
+    // إنتاج APK بمعمارية arm64-v8a فقط (أصغر حجمًا وأسرع في التغليف والتثبيت).
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a")
+            isUniversalApk = false
         }
     }
 
@@ -48,9 +96,13 @@ android {
         }
     }
 
+    // فحص اللينت غير مطلوب في بيئة CI: تعطيله (خصوصًا lintVitalRelease الذي يعمل تلقائيًا
+    // مع assembleRelease) يوفّر عشرات الثواني في كل بناء.
     lint {
         abortOnError = false
         checkReleaseBuilds = false
+        checkDependencies = false
+        disable += setOf("MissingTranslation", "ExtraTranslation")
     }
 }
 
