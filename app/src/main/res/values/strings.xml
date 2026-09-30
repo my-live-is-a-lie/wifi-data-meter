@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- اسم التطبيق والعناصر العامة -->
+    <string name="app_name">مقياس الواي فاي</string>
+    <string name="app_tagline">حساب استهلاك الإنترنت على شبكة الواي فاي</string>
+
+    <!-- التنقل -->
+    <string name="tab_dashboard">الرئيسية</string>
+    <string name="tab_apps">التطبيقات</string>
+    <string name="tab_history">السجل</string>
+    <string name="tab_settings">الإعدادات</string>
+
+    <!-- حالات الشبكة -->
+    <string name="status_connected">متصل بـ %1$s</string>
+    <string name="status_connected_unknown">متصل بشبكة واي فاي</string>
+    <string name="status_disconnected">غير متصل بأي شبكة</string>
+    <string name="status_not_wifi">متصل بشبكة الجوال (ليست واي فاي)</string>
+
+    <!-- بطاقة الشبكة -->
+    <string name="wifi_card_title">تفاصيل الشبكة</string>
+    <string name="wifi_details_expand">توسيع تفاصيل الشبكة</string>
+    <string name="wifi_details_collapse">طيّ تفاصيل الشبكة</string>
+    <string name="label_ssid">اسم الشبكة</string>
+    <string name="label_signal">قوة الإشارة</string>
+    <string name="label_link_speed">سرعة الرابط</string>
+    <string name="label_band">النطاق الترددي</string>
+    <string name="label_standard">معيار الواي فاي</string>
+    <string name="label_ip">عنوان IP</string>
+    <string name="label_gateway">البوابة</string>
+    <string name="label_frequency">التردد</string>
+    <string name="value_unknown">غير معروف</string>
+    <string name="value_hidden">مخفي (يتطلب صلاحية الأجهزة القريبة)</string>
+    <string name="band_2_4">2.4 جيجاهرتز</string>
+    <string name="band_5">5 جيجاهرتز</string>
+    <string name="band_6">6 جيجاهرتز</string>
+    <string name="wifi_not_connected_title">لست متصلاً بشبكة واي فاي</string>
+    <string name="wifi_not_connected_body">اتصل بشبكة واي فاي ليبدأ قياس الاستهلاك تلقائيًا.</string>
+
+    <!-- الاستهلاك -->
+    <string name="label_today">اليوم</string>
+    <string name="label_week">آخر 7 أيام</string>
+    <string name="label_month">آخر 30 يومًا</string>
+    <string name="label_cycle">دورة الفاتورة</string>
+    <string name="label_download">تنزيل</string>
+    <string name="label_upload">رفع</string>
+    <string name="label_total">الإجمالي</string>
+    <string name="label_remaining">المتبقي</string>
+    <string name="label_used">المستهلك</string>
+    <string name="label_quota">الباقة الشهرية</string>
+    <string name="label_current_speed">السرعة الحالية</string>
+    <string name="label_session">الجلسة الحالية</string>
+    <string name="label_period">الفترة</string>
+    <string name="label_average">المتوسط اليومي</string>
+    <string name="label_peak">أعلى يوم</string>
+    <string name="label_days">عدد الأيام</string>
+
+    <!-- البطاقة الرئيسية (الحلقة) -->
+    <string name="quota_ring_title">استهلاك دورة الفاتورة</string>
+    <string name="quota_not_set">لم تُحدَّد باقة شهرية بعد</string>
+    <string name="quota_set_action">تحديد الباقة</string>
+    <string name="quota_remaining_of">متبقٍ %1$s من %2$s</string>
+    <string name="quota_used_of">استُهلك %1$s من %2$s</string>
+    <string name="quota_exceeded">تجاوزت الباقة بمقدار %1$s</string>
+    <string name="percent_format">%1$d%%</string>
+
+    <!-- المراقبة -->
+    <string name="tracking_running">المراقبة تعمل</string>
+    <string name="tracking_stopped">المراقبة متوقفة</string>
+    <string name="action_start_tracking">بدء المراقبة</string>
+    <string name="action_stop_tracking">إيقاف المراقبة</string>
+    <string name="action_refresh">تحديث البيانات</string>
+    <string name="action_reset_session">تصفير الجلسة</string>
+    <string name="action_open_usage_access">فتح صلاحية الاستخدام</string>
+    <string name="session_since">بدأت في %1$s</string>
+    <string name="live_chart_title">سرعة الشبكة اللحظية</string>
+    <string name="live_chart_empty">لا توجد بيانات كافية بعد…</string>
+
+    <!-- صلاحية الاستخدام -->
+    <string name="permission_needed_title">صلاحية «الوصول إلى الاستخدام» مطلوبة</string>
+    <string name="permission_needed_body">يحتاج التطبيق إلى صلاحية خاصة من النظام (وصول الاستخدام) لقراءة استهلاك شبكة الواي فاي لكل تطبيق على حدة. اضغط الزر ثم اختر «مقياس الواي فاي» وفعّل الصلاحية.</string>
+    <string name="permission_granted_title">صلاحية الاستخدام ممنوحة</string>
+    <string name="permission_granted_body">يمكن للتطبيق الآن قراءة الاستهلاك بالفعل.</string>
+
+    <!-- شاشة التطبيقات -->
+    <string name="apps_screen_title">استهلاك التطبيقات</string>
+    <string name="apps_empty_title">لا يوجد استهلاك مسجّل</string>
+    <string name="apps_empty_body">لم تُسجّل أي بيانات لهذه الفترة حتى الآن. جرّب تصفح الإنترنت أو تحديث القائمة.</string>
+    <string name="apps_loading">جارٍ حساب استهلاك التطبيقات…</string>
+    <string name="apps_no_permission">فعّل صلاحية الاستخدام لعرض التفاصيل حسب التطبيق.</string>
+    <string name="system_apps_label">تطبيقات النظام</string>
+    <string name="unknown_app_label">تطبيق غير معروف</string>
+    <string name="apps_count">%1$d تطبيقًا</string>
+    <string name="app_detail_title">استهلاك التطبيق</string>
+    <string name="app_detail_hint">اضغط على أي تطبيق لعرض استهلاكه في اليوم والأسبوع والشهر.</string>
+    <string name="app_detail_cd">تفاصيل استهلاك التطبيق</string>
+    <string name="app_detail_loading">جارٍ حساب الاستهلاك…</string>
+    <string name="app_detail_back">رجوع إلى قائمة التطبيقات</string>
+
+    <!-- السجل -->
+    <string name="history_screen_title">سجل الاستهلاك</string>
+    <string name="history_empty_title">لا يوجد سجل بعد</string>
+    <string name="history_empty_body">سيظهر الرسم البياني بعد تجميع بيانات الأيام السابقة.</string>
+    <string name="history_selected_day">تفاصيل اليوم المحدد</string>
+    <string name="history_top_apps">أكثر التطبيقات استهلاكًا</string>
+    <string name="history_days_shown">آخر %1$d يومًا</string>
+    <string name="history_today_title">سجل اليوم</string>
+
+    <!-- الإعدادات -->
+    <string name="settings_screen_title">الإعدادات</string>
+    <string name="settings_section_quota">الباقة والفاتورة</string>
+    <string name="settings_quota_size">حجم الباقة الشهرية (جيجابايت)</string>
+    <string name="settings_quota_hint">مثال: 100</string>
+    <string name="settings_cycle_day">يوم بدء دورة الفاتورة</string>
+    <string name="settings_cycle_day_hint">من 1 إلى 28</string>
+    <string name="settings_section_alerts">التنبيهات</string>
+    <string name="settings_notifications">تفعيل الإشعارات</string>
+    <string name="settings_notifications_desc">إشعار دائم أثناء المراقبة وتنبيه عند اقتراب انتهاء الباقة.</string>
+    <string name="settings_threshold">نسبة التنبيه</string>
+    <string name="settings_section_monitor">المراقبة</string>
+    <string name="settings_interval">مُعدّل القياس</string>
+    <string name="settings_interval_5">5 ث</string>
+    <string name="settings_interval_15">15 ث</string>
+    <string name="settings_interval_30">30 ث</string>
+    <string name="settings_interval_60">60 ث</string>
+    <string name="settings_dynamic_color">ألوان النظام (Material You)</string>
+    <string name="settings_dynamic_color_desc">استخدام ألوان خلفية الشاشة على أندرويد 12 وما بعده.</string>
+    <string name="settings_section_data">البيانات</string>
+    <string name="settings_clear_data">مسح جميع البيانات</string>
+    <string name="settings_clear_data_desc">يحذف الإعدادات ومخزون القياسات المحلية.</string>
+    <string name="settings_usage_access">صلاحية الوصول إلى الاستخدام</string>
+    <string name="settings_usage_access_granted">ممنوحة</string>
+    <string name="settings_usage_access_missing">غير ممنوحة — اضغط للمنح</string>
+    <string name="settings_section_about">حول التطبيق</string>
+    <string name="settings_version">الإصدار %1$s</string>
+    <string name="settings_about_body">تطبيق مفتوح المصدر لقياس استهلاك الإنترنت على شبكة الواي فاي، مبني بـ Kotlin و Jetpack Compose و Material 3 Expressive. تُقرأ القياسات من NetworkStatsManager في نظام أندرويد ولا تُرسل أي بيانات إلى الإنترنت.</string>
+
+    <!-- الإشعارات -->
+    <string name="channel_monitor_name">مراقبة الاستهلاك</string>
+    <string name="channel_monitor_desc">إشعار دائم يعرض استهلاك الواي فاي الحالي.</string>
+    <string name="channel_alerts_name">تنبيهات الباقة</string>
+    <string name="channel_alerts_desc">تنبيهات عند اقتراب استهلاك الباقة الشهرية من نهايتها.</string>
+    <string name="notification_monitor_title">%1$s اليوم</string>
+    <string name="notification_monitor_text">السرعة الحالية: %1$s • المتبقي: %2$s</string>
+    <string name="notification_monitor_text_no_quota">السرعة الحالية: %1$s • إجمالي الجلسة: %2$s</string>
+    <string name="notification_alert_threshold_title">اقتربت من حد الباقة</string>
+    <string name="notification_alert_threshold_text">استهلكت %1$s%% من باقة %2$s على شبكة الواي فاي.</string>
+    <string name="notification_alert_exceeded_title">تجاوزت الباقة الشهرية</string>
+    <string name="notification_alert_exceeded_text">إجمالي الاستهلاك %1$s من أصل %2$s.</string>
+    <string name="notification_permission_denied">لم يُسمح بالإشعارات، لذا لن يظهر إشعار المراقبة الدائم.</string>
+    <string name="notification_timeout_title">تم إيقاف المراقبة مؤقتًا</string>
+    <string name="notification_timeout_text">أوقف النظام المراقبة في الخلفية. افتح التطبيق لإعادة تشغيلها.</string>
+
+    <!-- نصوص مساعدة -->
+    <string name="cd_more_options">خيارات أكثر</string>
+    <string name="cd_refresh">تحديث</string>
+    <string name="cd_settings">الإعدادات</string>
+    <string name="cd_toggle_tracking">تشغيل أو إيقاف المراقبة</string>
+    <string name="cd_signal_bars">قوة الإشارة</string>
+    <string name="cd_app_icon">أيقونة التطبيق</string>
+    <string name="cd_decrease">نقصان</string>
+    <string name="cd_increase">زيادة</string>
+    <string name="cd_back">رجوع</string>
+    <string name="cd_wifi">واي فاي</string>
+    <string name="action_save">حفظ</string>
+    <string name="action_cancel">إلغاء</string>
+    <string name="action_close">إغلاق</string>
+    <string name="action_confirm">تأكيد</string>
+    <string name="unit_gb">جيجابايت</string>
+    <string name="unit_mbps">ميجابت/ث</string>
+    <string name="unit_dbm">ديسيبل</string>
+</resources>

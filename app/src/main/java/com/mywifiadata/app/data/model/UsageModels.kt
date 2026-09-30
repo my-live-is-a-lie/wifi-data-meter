@@ -1,0 +1,96 @@
+package com.mywifiadata.app.data.model
+
+/** إجماليات المرور (تنزيل/رفع). */
+data class TrafficTotals(
+    val rxBytes: Long = 0L,
+    val txBytes: Long = 0L,
+) {
+    val totalBytes: Long get() = rxBytes + txBytes
+
+    operator fun plus(other: TrafficTotals) = TrafficTotals(
+        rxBytes = rxBytes + other.rxBytes,
+        txBytes = txBytes + other.txBytes,
+    )
+
+    companion object {
+        val Empty = TrafficTotals()
+    }
+}
+
+/** نطاق ترددي لشبكة الواي فاي. */
+enum class WifiBand { GHZ_2_4, GHZ_5, GHZ_6, UNKNOWN }
+
+/** حالة شبكة الواي فاي الحالية وتفاصيلها. */
+data class WifiStatus(
+    val isWifiConnected: Boolean = false,
+    val isOnline: Boolean = false,
+    val ssid: String? = null,
+    val bssid: String? = null,
+    val rssiDbm: Int? = null,
+    /** 0..4 */
+    val signalLevel: Int = 0,
+    val linkSpeedMbps: Int? = null,
+    val rxLinkSpeedMbps: Int? = null,
+    val txLinkSpeedMbps: Int? = null,
+    val frequencyMhz: Int? = null,
+    val band: WifiBand = WifiBand.UNKNOWN,
+    /** مثال: "Wi‑Fi 6 (11ax)" */
+    val standard: String? = null,
+    val ipv4: String? = null,
+    val gateway: String? = null,
+    val dnsServers: List<String> = emptyList(),
+    val downstreamKbps: Int? = null,
+    val upstreamKbps: Int? = null,
+)
+
+/** قياس سرعة لحظي. */
+data class SpeedSample(
+    val timestampMillis: Long,
+    val rxBytesPerSecond: Double,
+    val txBytesPerSecond: Double,
+) {
+    val totalBytesPerSecond: Double get() = rxBytesPerSecond + txBytesPerSecond
+}
+
+/** حالة جلسة المراقبة الحالية. */
+data class SessionStats(
+    val startMillis: Long,
+    val baseline: TrafficTotals,
+    val totals: TrafficTotals,
+    val rxSpeed: Double = 0.0,
+    val txSpeed: Double = 0.0,
+    val samples: List<SpeedSample> = emptyList(),
+) {
+    val totalSpeed: Double get() = rxSpeed + txSpeed
+}
+
+/** استهلاك تطبيق واحد. */
+data class AppUsage(
+    val uid: Int,
+    val packageName: String?,
+    val label: String,
+    val isSystem: Boolean,
+    val totals: TrafficTotals,
+)
+
+/** استهلاك يوم كامل. */
+data class DayUsage(
+    val startMillis: Long,
+    val endMillis: Long,
+    val totals: TrafficTotals,
+)
+
+/** إعدادات التطبيق المخزّنة محليًا. */
+data class AppSettings(
+    val quotaBytes: Long = 0L,
+    val cycleStartDay: Int = 1,
+    val notificationsEnabled: Boolean = true,
+    val alertThresholdPercent: Int = 80,
+    val sampleIntervalSeconds: Int = 15,
+    val dynamicColorEnabled: Boolean = true,
+    val trackingEnabled: Boolean = false,
+    val sessionStartMillis: Long = System.currentTimeMillis(),
+    val sessionBaseline: TrafficTotals = TrafficTotals.Empty,
+    val alertCycleStartMillis: Long = 0L,
+    val alertLevelReached: Int = 0,
+)
