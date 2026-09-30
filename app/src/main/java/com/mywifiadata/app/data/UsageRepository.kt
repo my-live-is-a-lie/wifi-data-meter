@@ -51,6 +51,12 @@ class UsageRepository(
             .sortedByDescending { it.totals.totalBytes }
     }
 
+    /** استهلاك تطبيق واحد (uid) على الواي فاي في فترة زمنية محددة. */
+    suspend fun appTotals(uid: Int, range: TimeRange): TrafficTotals = withContext(Dispatchers.IO) {
+        if (!statsReader.hasUsageAccess()) return@withContext TrafficTotals.Empty
+        statsReader.wifiPerUidTotals(range.startMillis, range.endMillis)[uid] ?: TrafficTotals.Empty
+    }
+
     /** استهلاك الأيام الأخيرة (الأقدم أولاً). */
     suspend fun dailyUsage(days: Int): List<DayUsage> = withContext(Dispatchers.IO) {
         TimeRanges.lastDays(days).map { day ->

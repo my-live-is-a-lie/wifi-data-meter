@@ -47,6 +47,7 @@ data class UiState(
     val selectedDayIndex: Int? = null,
     val selectedDayApps: List<AppUsage> = emptyList(),
     val showSystemApps: Boolean = false,
+    val appDetail: AppDetailState? = null,
 ) {
     val quotaBytes: Long get() = settings.quotaBytes
 
@@ -87,6 +88,17 @@ data class UiState(
 
     val historyDays: Int get() = TimeRanges.daysOf(historyPeriod)
 }
+
+/**
+ * تفاصيل استهلاك تطبيق واحد في الفترات الثلاث (اليوم/الأسبوع/الشهر).
+ */
+data class AppDetailState(
+    val app: AppUsage,
+    val isLoading: Boolean = true,
+    val today: TrafficTotals = TrafficTotals.Empty,
+    val week: TrafficTotals = TrafficTotals.Empty,
+    val month: TrafficTotals = TrafficTotals.Empty,
+)
 
 /**
  * حامل حالة الشاشة الرئيسية: يحدّث القياسات دوريًا ويوفّر إجراءات المستخدم.
@@ -200,13 +212,49 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
 
     fun setHistoryPeriod(period: UsagePeriod) {
         if (period == _uiState.value.historyPeriod) return
+        val days = TimeRanges.daysOf(period)
         _uiState.update { it.copy(historyPeriod = period, selectedDayIndex = null, selectedDayApps = emptyList()) }
         viewModelScope.launch {
-            val daily = repository.dailyUsage(TimeRanges.daysOf(period))
-            dailyLoadedDays = TimeRanges.daysOf(period)
+            val daily = repository.dailyUsage(days)
+            dailyLoadedDays = days
             dailyLoadedAt = System.currentTimeMillis()
             _uiState.update { it.copy(daily = daily) }
+            // عرض «اليوم» = يوم واحد فقط، فنفتح تفاصيله مباشرة ليرى المستخدم استهلاكه وأكثر التطبيقات.
+            if (period == UsagePeriod.TODAY && daily.isNotEmpty()) {
+                selectDay(daily.lastIndex)
+            }
         }
+    }
+
+    /** فتح تفاصيل تطبيق واحد (اليوم/الأسبوع/الشهر). */
+    fun openAppDetail(app: AppUsage) {
+        _uiState.update { it.copy(appDetail = AppDetailState(app = app, isLoading = true)) }
+        viewModelScope.launch {
+            val now = System.currentTimeMillis()
+            val today = repository.appTotals(app.uid, TimeRanges.forPeriod(UsagePeriod.TODAY, now))
+            val week = repository.appTotals(app.uid, TimeRanges.forPeriod(UsagePeriod.WEEK, now))
+            val month = repository.appTotals(app.uid, TimeRanges.forPeriod(UsagePeriod.MONTH, now))
+            _uiState.update { state ->
+                val detail = state.appDetail
+                if (detail == null || detail.app.uid != app.uid) {
+                    state
+                } else {
+                    state.copy(
+                        appDetail = detail.copy(
+                            isLoading = false,
+                            today = today,
+                            week = week,
+                            month = month,
+                        ),
+                    )
+                }
+            }
+        }
+    }
+
+    /** إغلاق تفاصيل التطبيق. */
+    fun closeAppDetail() {
+        _uiState.update { it.copy(appDetail = null) }
     }
 
     fun selectDay(index: Int?) {

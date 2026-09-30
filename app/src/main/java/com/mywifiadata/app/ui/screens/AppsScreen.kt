@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import com.mywifiadata.app.R
 import com.mywifiadata.app.core.Format
 import com.mywifiadata.app.core.UsagePeriod
+import com.mywifiadata.app.data.model.AppUsage
 import com.mywifiadata.app.ui.UiState
 import com.mywifiadata.app.ui.components.AppUsageRow
 import com.mywifiadata.app.ui.components.EmptyState
@@ -55,6 +56,7 @@ fun AppsScreen(
     onPeriodChange: (UsagePeriod) -> Unit,
     onShowSystemAppsChange: (Boolean) -> Unit,
     onOpenUsageAccess: () -> Unit,
+    onAppClick: (AppUsage) -> Unit,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(16.dp),
 ) {
@@ -147,6 +149,15 @@ fun AppsScreen(
                         supportingText = stringResource(R.string.apps_count, apps.size),
                     )
                 }
+
+                item {
+                    Text(
+                        text = stringResource(R.string.app_detail_hint),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 4.dp),
+                    )
+                }
                 itemsIndexed(
                     items = apps,
                     key = { _, app -> app.uid },
@@ -155,6 +166,7 @@ fun AppsScreen(
                         app = app,
                         share = app.totals.totalBytes.toFloat() / totalBytes.toFloat(),
                         rank = index + 1,
+                        onClick = { onAppClick(app) },
                     )
                 }
             }

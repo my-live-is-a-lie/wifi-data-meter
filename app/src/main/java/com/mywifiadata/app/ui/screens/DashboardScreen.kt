@@ -1,6 +1,8 @@
 package com.mywifiadata.app.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -11,12 +13,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.DataUsage
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.MonetizationOn
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.ShowChart
@@ -27,18 +31,24 @@ import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material.icons.rounded.WifiOff
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.ButtonGroup
-import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mywifiadata.app.R
 import com.mywifiadata.app.core.Format
@@ -287,68 +297,96 @@ private fun LegendItem(color: Color, label: String, value: String) {
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun QuickActions(
     onRefresh: () -> Unit,
     onResetSession: () -> Unit,
     onOpenQuotaSettings: () -> Unit,
 ) {
-    val refreshLabel = stringResource(R.string.action_refresh)
-    val resetLabel = stringResource(R.string.action_reset_session)
-    val quotaLabel = stringResource(R.string.label_quota)
-
-    ButtonGroup(
-        overflowIndicator = { menuState ->
-            ButtonGroupDefaults.OverflowIndicator(menuState = menuState)
-        },
+    Row(
         modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        clickableItem(
+        QuickActionButton(
+            label = stringResource(R.string.action_refresh),
+            icon = Icons.Rounded.Refresh,
             onClick = onRefresh,
-            label = refreshLabel,
-            icon = {
-                Icon(
-                    imageVector = Icons.Rounded.Refresh,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-            },
-            weight = 1f,
+            modifier = Modifier.weight(1f),
         )
-        clickableItem(
+        QuickActionButton(
+            label = stringResource(R.string.action_reset_session),
+            icon = Icons.Rounded.RestartAlt,
             onClick = onResetSession,
-            label = resetLabel,
-            icon = {
-                Icon(
-                    imageVector = Icons.Rounded.RestartAlt,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-            },
-            weight = 1f,
+            modifier = Modifier.weight(1f),
         )
-        clickableItem(
+        QuickActionButton(
+            label = stringResource(R.string.label_quota),
+            icon = Icons.Rounded.MonetizationOn,
             onClick = onOpenQuotaSettings,
-            label = quotaLabel,
-            icon = {
-                Icon(
-                    imageVector = Icons.Rounded.MonetizationOn,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-            },
-            weight = 1f,
+            modifier = Modifier.weight(1f),
         )
+    }
+}
+
+/**
+ * زر إجراء سريع: الأيقونة فوق النص، مع قصّ النص بثلاث نقاط بدل تجاوزه حدود الزر
+ * (ButtonGroup كان يقصّ التسميات الطويلة فتظهر الأيقونة فوق النص).
+ */
+@Composable
+private fun QuickActionButton(
+    label: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    FilledTonalButton(
+        onClick = onClick,
+        modifier = modifier,
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
 @Composable
 private fun WifiDetailsCard(wifi: WifiStatus) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val chevronRotation by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        label = "wifi-details-chevron",
+    )
     val unknown = stringResource(R.string.value_unknown)
+    // نص الحالة: نمرّر اسم الشبكة داخل القالب، وإلا ظهرت العلامة %1$s كما هي.
+    val statusText = when {
+        wifi.isOnline && wifi.ssid != null -> stringResource(R.string.status_connected, wifi.ssid)
+        wifi.isOnline || wifi.isWifiConnected -> stringResource(R.string.status_connected_unknown)
+        else -> stringResource(R.string.status_disconnected)
+    }
+
     ExpressiveCard {
         Column(modifier = Modifier.fillMaxWidth()) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 SignalBarsIcon(
                     level = wifi.signalLevel,
                     modifier = Modifier.size(width = 34.dp, height = 26.dp),
@@ -361,9 +399,7 @@ private fun WifiDetailsCard(wifi: WifiStatus) {
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
-                        text = stringResource(
-                            if (wifi.isOnline) R.string.status_connected else R.string.status_disconnected,
-                        ),
+                        text = statusText,
                         style = MaterialTheme.typography.labelMedium,
                         color = if (wifi.isOnline) {
                             MaterialTheme.colorScheme.primary
@@ -377,57 +413,70 @@ private fun WifiDetailsCard(wifi: WifiStatus) {
                     contentDescription = stringResource(R.string.cd_wifi),
                     tint = MaterialTheme.colorScheme.primary,
                 )
+                Spacer(modifier = Modifier.width(4.dp))
+                Icon(
+                    imageVector = Icons.Rounded.ExpandMore,
+                    contentDescription = stringResource(
+                        if (expanded) R.string.wifi_details_collapse else R.string.wifi_details_expand,
+                    ),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.rotate(chevronRotation),
+                )
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
-            SectionHeader(title = stringResource(R.string.wifi_card_title))
+            AnimatedVisibility(visible = expanded) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    SectionHeader(title = stringResource(R.string.wifi_card_title))
 
-            InfoRow(
-                icon = Icons.Rounded.Speed,
-                label = stringResource(R.string.label_link_speed),
-                value = wifi.linkSpeedMbps?.let { "$it ${stringResource(R.string.unit_mbps)}" } ?: unknown,
-            )
-            InfoRow(
-                icon = Icons.Rounded.Router,
-                label = stringResource(R.string.label_band),
-                value = when (wifi.band) {
-                    WifiBand.GHZ_2_4 -> stringResource(R.string.band_2_4)
-                    WifiBand.GHZ_5 -> stringResource(R.string.band_5)
-                    WifiBand.GHZ_6 -> stringResource(R.string.band_6)
-                    WifiBand.UNKNOWN -> unknown
-                },
-            )
-            InfoRow(
-                icon = Icons.Rounded.Info,
-                label = stringResource(R.string.label_standard),
-                value = wifi.standard ?: unknown,
-            )
-            InfoRow(
-                icon = Icons.Rounded.Info,
-                label = stringResource(R.string.label_signal),
-                value = wifi.rssiDbm?.let { "$it ${stringResource(R.string.unit_dbm)}" } ?: unknown,
-            )
-            InfoRow(
-                icon = Icons.Rounded.Info,
-                label = stringResource(R.string.label_frequency),
-                value = wifi.frequencyMhz?.let { "$it MHz" } ?: unknown,
-            )
-            InfoRow(
-                icon = Icons.Rounded.Info,
-                label = stringResource(R.string.label_ip),
-                value = wifi.ipv4 ?: unknown,
-            )
-            InfoRow(
-                icon = Icons.Rounded.Info,
-                label = stringResource(R.string.label_gateway),
-                value = wifi.gateway ?: unknown,
-            )
-            if (wifi.dnsServers.isNotEmpty()) {
-                InfoRow(
-                    icon = Icons.Rounded.Info,
-                    label = "DNS",
-                    value = wifi.dnsServers.joinToString(", "),
-                )
+                    InfoRow(
+                        icon = Icons.Rounded.Speed,
+                        label = stringResource(R.string.label_link_speed),
+                        value = wifi.linkSpeedMbps?.let { "$it ${stringResource(R.string.unit_mbps)}" } ?: unknown,
+                    )
+                    InfoRow(
+                        icon = Icons.Rounded.Router,
+                        label = stringResource(R.string.label_band),
+                        value = when (wifi.band) {
+                            WifiBand.GHZ_2_4 -> stringResource(R.string.band_2_4)
+                            WifiBand.GHZ_5 -> stringResource(R.string.band_5)
+                            WifiBand.GHZ_6 -> stringResource(R.string.band_6)
+                            WifiBand.UNKNOWN -> unknown
+                        },
+                    )
+                    InfoRow(
+                        icon = Icons.Rounded.Info,
+                        label = stringResource(R.string.label_standard),
+                        value = wifi.standard ?: unknown,
+                    )
+                    InfoRow(
+                        icon = Icons.Rounded.Info,
+                        label = stringResource(R.string.label_signal),
+                        value = wifi.rssiDbm?.let { "$it ${stringResource(R.string.unit_dbm)}" } ?: unknown,
+                    )
+                    InfoRow(
+                        icon = Icons.Rounded.Info,
+                        label = stringResource(R.string.label_frequency),
+                        value = wifi.frequencyMhz?.let { "$it MHz" } ?: unknown,
+                    )
+                    InfoRow(
+                        icon = Icons.Rounded.Info,
+                        label = stringResource(R.string.label_ip),
+                        value = wifi.ipv4 ?: unknown,
+                    )
+                    InfoRow(
+                        icon = Icons.Rounded.Info,
+                        label = stringResource(R.string.label_gateway),
+                        value = wifi.gateway ?: unknown,
+                    )
+                    if (wifi.dnsServers.isNotEmpty()) {
+                        InfoRow(
+                            icon = Icons.Rounded.Info,
+                            label = "DNS",
+                            value = wifi.dnsServers.joinToString(", "),
+                        )
+                    }
+                }
             }
         }
     }

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -31,8 +32,13 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+
+/** أقصى عدد تسميات على محور المخطط. */
+private const val MAX_LABELS = 6
 
 /**
  * حلقة استهلاك متحرّكة تُستخدم لعرض نسبة الاستهلاك من الباقة.
@@ -189,10 +195,14 @@ fun DailyBarChart(
     onEntryClick: ((Int) -> Unit)? = null,
 ) {
     val maxValue = (entries.maxOfOrNull { it.value } ?: 0L).coerceAtLeast(1L)
+    // نعرض عددًا محدودًا من التسميات (٦ كحد أقصى) لأن عمود اليوم الواحد ضيّق جدًا
+    // عند عرض ٣٠ يومًا، فتتكسّر الكلمة العربية حرفًا في كل سطر.
+    val labelStride = ((entries.size + MAX_LABELS - 1) / MAX_LABELS).coerceAtLeast(1)
+    val spacing = if (entries.size > 14) 3.dp else 6.dp
 
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(spacing),
         verticalAlignment = Alignment.Bottom,
     ) {
         entries.forEachIndexed { index, entry ->
@@ -226,6 +236,8 @@ fun DailyBarChart(
                 ) {
                     Box(
                         modifier = Modifier
+                            // سقف لعرض العمود حتى لا يبدو ضخمًا عند عرض يوم واحد فقط
+                            .widthIn(max = 56.dp)
                             .fillMaxWidth()
                             .fillMaxHeight(animatedFraction)
                             .clip(
@@ -240,10 +252,16 @@ fun DailyBarChart(
                     )
                 }
                 Text(
-                    text = entry.label,
+                    text = if (index % labelStride == 0 || index == entries.lastIndex) entry.label else "",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 6.dp),
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Visible,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 6.dp),
                 )
             }
         }

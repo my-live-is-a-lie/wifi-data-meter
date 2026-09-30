@@ -18,6 +18,8 @@
 
     <!-- بطاقة الشبكة -->
     <string name="wifi_card_title">تفاصيل الشبكة</string>
+    <string name="wifi_details_expand">توسيع تفاصيل الشبكة</string>
+    <string name="wifi_details_collapse">طيّ تفاصيل الشبكة</string>
     <string name="label_ssid">اسم الشبكة</string>
     <string name="label_signal">قوة الإشارة</string>
     <string name="label_link_speed">سرعة الرابط</string>
@@ -88,6 +90,11 @@
     <string name="system_apps_label">تطبيقات النظام</string>
     <string name="unknown_app_label">تطبيق غير معروف</string>
     <string name="apps_count">%1$d تطبيقًا</string>
+    <string name="app_detail_title">استهلاك التطبيق</string>
+    <string name="app_detail_hint">اضغط على أي تطبيق لعرض استهلاكه في اليوم والأسبوع والشهر.</string>
+    <string name="app_detail_cd">تفاصيل استهلاك التطبيق</string>
+    <string name="app_detail_loading">جارٍ حساب الاستهلاك…</string>
+    <string name="app_detail_back">رجوع إلى قائمة التطبيقات</string>
 
     <!-- السجل -->
     <string name="history_screen_title">سجل الاستهلاك</string>
@@ -96,6 +103,7 @@
     <string name="history_selected_day">تفاصيل اليوم المحدد</string>
     <string name="history_top_apps">أكثر التطبيقات استهلاكًا</string>
     <string name="history_days_shown">آخر %1$d يومًا</string>
+    <string name="history_today_title">سجل اليوم</string>
 
     <!-- الإعدادات -->
     <string name="settings_screen_title">الإعدادات</string>
@@ -110,10 +118,10 @@
     <string name="settings_threshold">نسبة التنبيه</string>
     <string name="settings_section_monitor">المراقبة</string>
     <string name="settings_interval">مُعدّل القياس</string>
-    <string name="settings_interval_5">كل 5 ثوانٍ</string>
-    <string name="settings_interval_15">كل 15 ثانية</string>
-    <string name="settings_interval_30">كل 30 ثانية</string>
-    <string name="settings_interval_60">كل دقيقة</string>
+    <string name="settings_interval_5">5 ث</string>
+    <string name="settings_interval_15">15 ث</string>
+    <string name="settings_interval_30">30 ث</string>
+    <string name="settings_interval_60">60 ث</string>
     <string name="settings_dynamic_color">ألوان النظام (Material You)</string>
     <string name="settings_dynamic_color_desc">استخدام ألوان خلفية الشاشة على أندرويد 12 وما بعده.</string>
     <string name="settings_section_data">البيانات</string>

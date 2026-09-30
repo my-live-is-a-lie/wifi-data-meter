@@ -53,6 +53,17 @@ class FormatTest {
     }
 
     @Test
+    fun `day of month is a plain number`() {
+        // 15 يناير 2026 حسب توقيت الاختبار (منتصف اليوم لتفادي فروق المناطق الزمنية)
+        val millis = java.time.LocalDate.of(2026, 1, 15)
+            .atTime(12, 0)
+            .atZone(java.time.ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
+        assertEquals("15", Format.dayOfMonth(millis))
+    }
+
+    @Test
     fun `days between is at least one day`() {
         assertEquals(1, Format.daysBetween(0L, 0L))
         assertEquals(1, Format.daysBetween(0L, 3_600_000L))

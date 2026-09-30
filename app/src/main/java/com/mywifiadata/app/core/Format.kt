@@ -77,6 +77,12 @@ object Format {
     /** "أ" أو "Wed" — تُستخدم في محور المخططات. */
     fun weekdayShort(millis: Long): String = pattern("EE").format(Date(millis)).trim()
 
+    /**
+     * "12" — رقم اليوم في الشهر.
+     * يُستخدم في محور المخططات لأن أسماء الأيام العربية طويلة وتتكسّر داخل الأعمدة الضيقة.
+     */
+    fun dayOfMonth(millis: Long): String = pattern("d").format(Date(millis))
+
     /** "12 مارس 2026" */
     fun fullDate(millis: Long): String = pattern("d MMMM yyyy").format(Date(millis))
 
