@@ -1,4 +1,7 @@
 // موديول التطبيق
+
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.compose.compiler)
@@ -8,7 +11,7 @@ plugins {
 // المصدر بالترتيب: متغيرات البيئة (GitHub Secrets) ثم ملف keystore.properties في جذر المشروع.
 // إن لم يتوفر أي منهما يُبنى الـ APK غير موقّع (لن يمنع ذلك بقية البناء).
 val keystorePropertiesFile = rootProject.file("keystore.properties")
-val keystoreProperties = java.util.Properties().apply {
+val keystoreProperties = Properties().apply {
     if (keystorePropertiesFile.exists()) {
         keystorePropertiesFile.inputStream().use { load(it) }
     }
@@ -45,8 +48,6 @@ android {
                 keyAlias = releaseKeyAlias
                 keyPassword = releaseKeyPassword
                 storeType = "PKCS12"
-                enableV1Signing = true // توافق أوسع مع أجهزة أندرويد القديمة (minSdk 26)
-                enableV2Signing = true
             }
         } else {
             logger.lifecycle("تنبيه: لا توجد بيانات توقيع، سيُبنى APK الإصدار غير موقّع.")
