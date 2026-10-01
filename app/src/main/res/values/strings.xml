@@ -19,7 +19,6 @@
     <!-- بطاقة الشبكة -->
     <string name="wifi_card_title">تفاصيل الشبكة</string>
     <string name="wifi_details_expand">توسيع تفاصيل الشبكة</string>
-    <string name="wifi_ssid_hint">اسم الشبكة غير متاح — امنح إذن الأجهزة القريبة (أو الموقع) وفعّل خدمة الموقع ليظهر هنا.</string>
     <string name="wifi_permission_denied">تعذّر قراءة اسم شبكة الواي فاي: لم يُمنح إذن الأجهزة القريبة/الموقع.</string>
     <string name="wifi_details_collapse">طيّ تفاصيل الشبكة</string>
     <string name="label_ssid">اسم الشبكة</string>
@@ -181,6 +180,7 @@
     <string name="action_cancel">إلغاء</string>
     <string name="action_close">إغلاق</string>
     <string name="action_confirm">تأكيد</string>
+    <string name="reset_session_confirm">سيتم تصفير جلسة الاستخدام الحالية وتبدأ من جديد. لا يمكن التراجع عن هذا الإجراء. هل تريد المتابعة؟</string>
     <string name="unit_gb">جيجابايت</string>
     <string name="unit_mbps">ميجابت/ث</string>
     <string name="unit_dbm">ديسيبل</string>

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -316,7 +317,7 @@ private fun QuickActions(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        // زر المراقبة أولًا (الأهم): يبدأ ويوقف المراقبة، ويظهر ملوّنًا أثناء العمل.
+        // ارتفاع أدنى موحّد حتى يتساوى زر المراقبة (سطر واحد) مع بقية الأزرار.
         QuickActionButton(
             label = stringResource(
                 if (trackingEnabled) R.string.action_stop_tracking else R.string.action_start_tracking,
@@ -324,25 +325,19 @@ private fun QuickActions(
             icon = if (trackingEnabled) Icons.Rounded.Stop else Icons.Rounded.PlayArrow,
             onClick = onToggleTracking,
             active = trackingEnabled,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).heightIn(min = 84.dp),
         )
         QuickActionButton(
             label = stringResource(R.string.action_refresh),
             icon = Icons.Rounded.Refresh,
             onClick = onRefresh,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).heightIn(min = 84.dp),
         )
         QuickActionButton(
             label = stringResource(R.string.action_reset_session),
             icon = Icons.Rounded.RestartAlt,
             onClick = onResetSession,
-            modifier = Modifier.weight(1f),
-        )
-        QuickActionButton(
-            label = stringResource(R.string.label_quota),
-            icon = Icons.Rounded.MonetizationOn,
-            onClick = onOpenQuotaSettings,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).heightIn(min = 84.dp),
         )
     }
 }
@@ -451,18 +446,6 @@ private fun WifiDetailsCard(wifi: WifiStatus) {
                     ),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.rotate(chevronRotation),
-                )
-            }
-
-            // اسم الشبكة غير متاح: نشرح السبب (إذن الأجهزة القريبة/الموقع).
-            if (wifi.isWifiConnected && wifi.ssid == null) {
-                Text(
-                    text = stringResource(R.string.wifi_ssid_hint),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 4.dp),
                 )
             }
 
