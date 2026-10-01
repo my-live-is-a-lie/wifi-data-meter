@@ -53,7 +53,6 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mywifiadata.app.R
-import com.mywifiadata.app.core.Format
 import com.mywifiadata.app.core.SystemActions
 import com.mywifiadata.app.ui.AppViewModel
 import com.mywifiadata.app.ui.theme.AppButtonShape
@@ -193,20 +192,6 @@ fun MainScreen(viewModel: AppViewModel) {
         topBar = {
             TopAppBar(
                 title = { Text(text = stringResource(currentTab.labelRes)) },
-                subtitle = {
-                    val speedText = Format.speed(state.currentSpeed?.totalBytesPerSecond ?: 0.0)
-                    Text(
-                        text = when {
-                            // اسم الشبكة كما هو، وإن لم يتوفر نعرض نصًا جاهزًا بدل قالب %1$s
-                            state.wifi.isWifiConnected ->
-                                "${state.wifi.ssid ?: stringResource(R.string.status_connected_unknown)} • $speedText"
-
-                            state.wifi.isOnline -> "${stringResource(R.string.status_not_wifi)} • $speedText"
-
-                            else -> stringResource(R.string.wifi_not_connected_title)
-                        },
-                    )
-                },
                 actions = {
                     IconButton(onClick = { viewModel.refreshNow() }) {
                         Icon(
