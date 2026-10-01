@@ -1,5 +1,7 @@
 package com.mywifiadata.app.ui.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,29 +15,43 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
-import androidx.compose.material.icons.rounded.Android
+import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.DateRange
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mywifiadata.app.R
 import com.mywifiadata.app.core.Format
+import com.mywifiadata.app.core.TimeRange
 import com.mywifiadata.app.core.UsagePeriod
 import com.mywifiadata.app.data.model.AppUsage
+import com.mywifiadata.app.data.model.AppsFilter
+import com.mywifiadata.app.data.model.UsageSlice
 import com.mywifiadata.app.ui.UiState
 import com.mywifiadata.app.ui.components.AppUsageRow
 import com.mywifiadata.app.ui.components.EmptyState
@@ -47,14 +63,18 @@ import com.mywifiadata.app.ui.theme.LocalDownloadColor
 import com.mywifiadata.app.ui.theme.LocalUploadColor
 
 /**
- * شاشة التطبيقات: ترتيب التطبيقات حسب استهلاك الواي فاي في الفترة المختارة.
+ * شاشة التطبيقات: ترتيب التطبيقات حسب استهلاك الواي فاي في الفترة المختارة،
+ * مع تفصيل زمني (ساعات اليوم / أيام الأسبوع / آخر 4 أسابيع) يمكن الضغط عليه
+ * لعرض تطبيقات تلك الشريحة، وفلترة حسب نوع التطبيق.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun AppsScreen(
     state: UiState,
     onPeriodChange: (UsagePeriod) -> Unit,
-    onShowSystemAppsChange: (Boolean) -> Unit,
+    onAppsFilterChange: (AppsFilter) -> Unit,
+    onAppsWeekChange: (TimeRange) -> Unit,
+    onAppsSliceChange: (TimeRange) -> Unit,
     onOpenUsageAccess: () -> Unit,
     onAppClick: (AppUsage) -> Unit,
     modifier: Modifier = Modifier,
@@ -62,6 +82,17 @@ fun AppsScreen(
 ) {
     val apps = state.visibleApps
     val totalBytes = apps.sumOf { it.totals.totalBytes }.coerceAtLeast(1L)
+
+    // تسميات الشرائح: ساعة "14:00 – 15:00"، يوم "الأحد، 28 سبتمبر"، أسبوع "21 – 27 سبتمبر".
+    val hourLabel: (UsageSlice) -> String = { slice ->
+        "${Format.clock(slice.startMillis)} – ${Format.clock(slice.endMillis)}"
+    }
+    val dayLabel: (UsageSlice) -> String = { slice ->
+        "${Format.weekday(slice.startMillis)}، ${Format.shortDate(slice.startMillis)}"
+    }
+    val weekLabel: (UsageSlice) -> String = { slice ->
+        "${Format.shortDate(slice.startMillis)} – ${Format.shortDate(slice.endMillis - 1)}"
+    }
 
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
@@ -96,25 +127,69 @@ fun AppsScreen(
                 )
             }
 
+            // فلتر نوع التطبيقات: الكل (الافتراضي) أو المثبتة أو النظام.
             item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    FilterChip(
-                        selected = state.showSystemApps,
-                        onClick = { onShowSystemAppsChange(!state.showSystemApps) },
-                        label = { Text(text = stringResource(R.string.system_apps_label)) },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Rounded.Android,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
-                            )
-                        },
+                Column(modifier = Modifier.padding(horizontal = 4.dp)) {
+                    Text(
+                        text = stringResource(R.string.apps_filter_label),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    AppsFilterRow(
+                        filter = state.appsFilter,
+                        onFilterChange = onAppsFilterChange,
+                    )
+                }
+            }
+
+            // التفصيل الزمني حسب الفترة: ساعات اليوم، أيام الأسبوع، أو أسابيع الشهر.
+            when (state.appsPeriod) {
+                UsagePeriod.TODAY -> item {
+                    SliceCard(
+                        title = stringResource(R.string.apps_slices_hours),
+                        icon = Icons.Rounded.Schedule,
+                        slices = state.appsHours,
+                        label = hourLabel,
+                        selected = state.appsSlice,
+                        onSelect = onAppsSliceChange,
+                    )
+                }
+
+                UsagePeriod.WEEK -> item {
+                    SliceCard(
+                        title = stringResource(R.string.apps_slices_days),
+                        icon = Icons.Rounded.DateRange,
+                        slices = state.appsDays,
+                        label = dayLabel,
+                        selected = state.appsSlice,
+                        onSelect = onAppsSliceChange,
+                    )
+                }
+
+                UsagePeriod.MONTH -> {
+                    item {
+                        SliceCard(
+                            title = stringResource(R.string.apps_slices_weeks),
+                            icon = Icons.Rounded.CalendarMonth,
+                            slices = state.appsWeeks,
+                            label = weekLabel,
+                            selected = state.appsWeek,
+                            onSelect = onAppsWeekChange,
+                        )
+                    }
+                    if (state.appsWeek != null) {
+                        item {
+                            SliceCard(
+                                title = stringResource(R.string.apps_slices_days),
+                                icon = Icons.Rounded.DateRange,
+                                slices = state.appsWeekDays,
+                                label = dayLabel,
+                                selected = state.appsSlice,
+                                onSelect = onAppsSliceChange,
+                            )
+                        }
+                    }
                 }
             }
 
@@ -170,6 +245,108 @@ fun AppsScreen(
                     )
                 }
             }
+        }
+    }
+}
+
+/** صفوف فلتر نوع التطبيقات: الكل / المثبتة / النظام — بدون اختيار يعرض الكل. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun AppsFilterRow(
+    filter: AppsFilter,
+    onFilterChange: (AppsFilter) -> Unit,
+) {
+    val options = remember { AppsFilter.entries.toList() }
+    val labels = listOf(
+        stringResource(R.string.apps_filter_all),
+        stringResource(R.string.apps_filter_installed),
+        stringResource(R.string.apps_filter_system),
+    )
+
+    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+        options.forEachIndexed { index, option ->
+            SegmentedButton(
+                selected = filter == option,
+                onClick = { onFilterChange(option) },
+                shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
+                icon = {},
+                label = {
+                    Text(
+                        text = labels[index],
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                },
+            )
+        }
+    }
+}
+
+/**
+ * بطاقة شرائح زمنية (ساعات/أيام/أسابيع) مع إجمالي كل شريحة؛
+ * الضغط على شريحة يحدّد/يلغي تحديد تطبيقاتها (الصف المحدد يظهر مظلّلًا).
+ */
+@Composable
+private fun SliceCard(
+    title: String,
+    icon: ImageVector,
+    slices: List<UsageSlice>,
+    label: (UsageSlice) -> String,
+    selected: TimeRange?,
+    onSelect: (TimeRange) -> Unit,
+) {
+    if (slices.isEmpty()) return
+
+    ExpressiveCard {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            SectionHeader(title = title, supportingText = "${slices.size}")
+            slices.forEach { slice ->
+                val range = TimeRange(slice.startMillis, slice.endMillis)
+                val isSelected = selected == range
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            color = if (isSelected) {
+                                MaterialTheme.colorScheme.secondaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.surfaceContainerLow
+                            },
+                            shape = RoundedCornerShape(10.dp),
+                        )
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable { onSelect(range) }
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = if (isSelected) Icons.Rounded.Check else icon,
+                        contentDescription = null,
+                        tint = if (isSelected) {
+                            MaterialTheme.colorScheme.onSecondaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.primary
+                        },
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = label(slice),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        text = Format.bytes(slice.totals.totalBytes),
+                        style = MaterialTheme.typography.bodyMediumEmphasized,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(4.dp))
         }
     }
 }

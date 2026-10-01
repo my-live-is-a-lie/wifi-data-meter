@@ -8,6 +8,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -84,6 +85,7 @@ fun MainScreen(viewModel: AppViewModel) {
     val permissionMessage = stringResource(R.string.permission_needed_title)
     val openSettingsLabel = stringResource(R.string.action_open_usage_access)
     val notificationDeniedMessage = stringResource(R.string.notification_permission_denied)
+    val wifiDeniedMessage = stringResource(R.string.wifi_permission_denied)
 
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
@@ -93,6 +95,32 @@ fun MainScreen(viewModel: AppViewModel) {
             }
         },
     )
+
+    // إذن قراءة اسم شبكة الواي فاي: NEARBY_WIFI_DEVICES على 13+ وإلا الموقع.
+    val wifiPermissionName = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        Manifest.permission.NEARBY_WIFI_DEVICES
+    } else {
+        Manifest.permission.ACCESS_FINE_LOCATION
+    }
+    val wifiPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+        onResult = { granted ->
+            if (!granted) {
+                scope.launch { snackbarHostState.showSnackbar(wifiDeniedMessage) }
+            }
+        },
+    )
+    var wifiPermissionAsked by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(state.wifi.isWifiConnected, state.wifi.ssid) {
+        if (!wifiPermissionAsked && state.wifi.isWifiConnected && state.wifi.ssid == null) {
+            wifiPermissionAsked = true
+            val granted = ContextCompat.checkSelfPermission(context, wifiPermissionName) ==
+                PackageManager.PERMISSION_GRANTED
+            if (!granted) {
+                wifiPermissionLauncher.launch(wifiPermissionName)
+            }
+        }
+    }
 
     fun askForNotificationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -251,6 +279,13 @@ fun MainScreen(viewModel: AppViewModel) {
             }
         },
     ) { innerPadding ->
+        // مسافة سفلية إضافية لئلا يغطي زر FAB القائم محتوى الشاشات أسفله.
+        val screenContentPadding = PaddingValues(
+            start = 16.dp,
+            top = 16.dp,
+            end = 16.dp,
+            bottom = 96.dp,
+        )
         PullToRefreshBox(
             isRefreshing = state.isRefreshing,
             onRefresh = { viewModel.refreshNow() },
@@ -265,6 +300,7 @@ fun MainScreen(viewModel: AppViewModel) {
                     onOpenQuotaSettings = { selectedTabIndex = AppTab.SETTINGS.ordinal },
                     onRefresh = { viewModel.refreshNow() },
                     onResetSession = { viewModel.resetSession() },
+                    contentPadding = screenContentPadding,
                 )
 
                 AppTab.APPS -> {
@@ -273,14 +309,18 @@ fun MainScreen(viewModel: AppViewModel) {
                         AppDetailScreen(
                             detail = appDetail,
                             onBack = { viewModel.closeAppDetail() },
+                            contentPadding = screenContentPadding,
                         )
                     } else {
                         AppsScreen(
                             state = state,
                             onPeriodChange = { viewModel.setAppsPeriod(it) },
-                            onShowSystemAppsChange = { viewModel.setShowSystemApps(it) },
+                            onAppsFilterChange = { viewModel.setAppsFilter(it) },
+                            onAppsWeekChange = { viewModel.selectAppsWeek(it) },
+                            onAppsSliceChange = { viewModel.selectAppsSlice(it) },
                             onOpenUsageAccess = { SystemActions.openUsageAccessSettings(context) },
                             onAppClick = { viewModel.openAppDetail(it) },
+                            contentPadding = screenContentPadding,
                         )
                     }
                 }
@@ -291,6 +331,7 @@ fun MainScreen(viewModel: AppViewModel) {
                     onSelectDay = { viewModel.selectDay(it) },
                     onOpenUsageAccess = { SystemActions.openUsageAccessSettings(context) },
                     onAppClick = { viewModel.openAppDetail(it) },
+                    contentPadding = screenContentPadding,
                 )
 
                 AppTab.SETTINGS -> SettingsScreen(
@@ -306,6 +347,7 @@ fun MainScreen(viewModel: AppViewModel) {
                     onOpenUsageAccess = { SystemActions.openUsageAccessSettings(context) },
                     onOpenWifiSettings = { SystemActions.openWifiSettings(context) },
                     onClearData = { viewModel.clearData() },
+                    contentPadding = screenContentPadding,
                 )
             }
         }

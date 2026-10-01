@@ -81,6 +81,19 @@ data class DayUsage(
 )
 
 /**
+ * شريحة زمنية في قسم التطبيقات (ساعة، يوم، أو أسبوع) مع إجمالياتها،
+ * تُستخدم لعرض تفصيل الفترة ثم الضغط عليها لعرض تطبيقاتها.
+ */
+data class UsageSlice(
+    val startMillis: Long,
+    val endMillis: Long,
+    val totals: TrafficTotals,
+)
+
+/** فلتر عرض التطبيقات: الكل (عند عدم اختيار أي فلتر) أو المثبتة فقط أو النظام فقط. */
+enum class AppsFilter { ALL, INSTALLED, SYSTEM }
+
+/**
  * سمة التطبيق: اتباع النظام أو اختيار يدوي.
  *
  * [BLACK] هو وضع «مظلم» بخلفية AMOLED سوداء بالكامل لتوفير استهلاك الطاقة

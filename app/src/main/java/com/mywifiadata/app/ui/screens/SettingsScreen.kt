@@ -136,6 +136,7 @@ fun SettingsScreen(
                     FilledTonalButton(
                         onClick = { showQuotaDialog = true },
                         modifier = Modifier.fillMaxWidth(),
+                        shape = AppButtonShape,
                     ) {
                         Text(text = stringResource(R.string.quota_set_action))
                     }
@@ -252,7 +253,7 @@ fun SettingsScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        TextButton(onClick = onOpenUsageAccess) {
+                        TextButton(onClick = onOpenUsageAccess, shape = AppButtonShape) {
                             Text(text = stringResource(R.string.action_open_usage_access))
                         }
                     }
@@ -282,7 +283,7 @@ fun SettingsScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        TextButton(onClick = onOpenWifiSettings) {
+                        TextButton(onClick = onOpenWifiSettings, shape = AppButtonShape) {
                             Text(text = stringResource(R.string.action_open_usage_access))
                         }
                     }
@@ -291,6 +292,7 @@ fun SettingsScreen(
                     TextButton(
                         onClick = { showClearDialog = true },
                         modifier = Modifier.fillMaxWidth(),
+                        shape = AppButtonShape,
                     ) {
                         Text(
                             text = stringResource(R.string.settings_clear_data),
@@ -381,12 +383,13 @@ fun SettingsScreen(
                         showClearDialog = false
                         onClearData()
                     },
+                    shape = AppButtonShape,
                 ) {
                     Text(text = stringResource(R.string.action_confirm))
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showClearDialog = false }) {
+                TextButton(onClick = { showClearDialog = false }, shape = AppButtonShape) {
                     Text(text = stringResource(R.string.action_cancel))
                 }
             },
@@ -570,12 +573,13 @@ private fun QuotaDialog(
             Button(
                 onClick = { onConfirm(parsed ?: 0.0, cycleDay) },
                 enabled = gigabytesText.isBlank() || (parsed != null && parsed >= 0.0),
+                shape = AppButtonShape,
             ) {
                 Text(text = stringResource(R.string.action_save))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(onClick = onDismiss, shape = AppButtonShape) {
                 Text(text = stringResource(R.string.action_cancel))
             }
         },

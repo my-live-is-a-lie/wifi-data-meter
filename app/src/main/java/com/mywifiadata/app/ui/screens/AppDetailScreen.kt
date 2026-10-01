@@ -167,8 +167,6 @@ private fun PeriodUsageCard(
                 text = Format.bytes(totals.totalBytes),
                 style = MaterialTheme.typography.headlineSmallEmphasized,
                 color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
             )
             Spacer(modifier = Modifier.weight(1f))
             Icon(

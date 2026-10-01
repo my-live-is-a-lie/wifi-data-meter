@@ -41,6 +41,7 @@ import com.mywifiadata.app.ui.components.ExpressiveCard
 import com.mywifiadata.app.ui.components.InfoRow
 import com.mywifiadata.app.ui.components.PermissionCard
 import com.mywifiadata.app.ui.components.SectionHeader
+import com.mywifiadata.app.ui.theme.AppButtonShape
 import com.mywifiadata.app.ui.theme.LocalDownloadColor
 import com.mywifiadata.app.ui.theme.LocalUploadColor
 
@@ -241,7 +242,7 @@ private fun SelectedDayCard(day: DayUsage, onClose: () -> Unit) {
                 title = Format.fullDate(day.startMillis),
                 supportingText = Format.weekday(day.startMillis),
                 trailing = {
-                    TextButton(onClick = onClose) {
+                    TextButton(onClick = onClose, shape = AppButtonShape) {
                         Text(text = stringResource(R.string.action_close))
                     }
                 },

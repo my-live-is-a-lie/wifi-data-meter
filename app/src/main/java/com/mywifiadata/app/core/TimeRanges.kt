@@ -49,6 +49,52 @@ object TimeRanges {
         }
     }
 
+    /**
+     * ساعات اليوم منذ منتصف الليل حتى «الآن» — الأحدث أولًا.
+     * الساعة الحالية تنتهي عند «الآن» (جزئية)، ولا تُدرج ساعات مستقبلية فارغة.
+     */
+    fun hoursOfToday(now: Long = System.currentTimeMillis()): List<TimeRange> {
+        val start = startOfToday(now)
+        var cursor = Instant.ofEpochMilli(now).atZone(zone)
+            .toLocalDateTime()
+            .withMinute(0)
+            .withSecond(0)
+            .withNano(0)
+        val hours = mutableListOf<TimeRange>()
+        while (true) {
+            val hourStart = cursor.atZone(zone).toInstant().toEpochMilli()
+            if (hourStart < start) break
+            hours += TimeRange(hourStart, minOf(hourStart + 3_600_000L, now))
+            cursor = cursor.minusHours(1)
+        }
+        return hours
+    }
+
+    /**
+     * آخر [days] يومًا مقسّمة إلى أسابيع متدحرجة (الأحدث أولًا، كل مجموعة أسبوع
+     * كامل 7 أيام عدا الأقدم التي تستكمل ما تبقّى من الفترة).
+     * تُستخدم لعرض «آخر 4 أسابيع» من قسم التطبيقات.
+     */
+    fun lastWeeks(days: Int = 30, now: Long = System.currentTimeMillis()): List<TimeRange> =
+        lastDays(days, now)
+            .chunked(7)
+            .map { group -> TimeRange(group.first().startMillis, group.last().endMillis) }
+
+    /** الأيام الكاملة داخل [range] — الأحدث أولًا. */
+    fun daysInRange(range: TimeRange): List<TimeRange> {
+        val days = mutableListOf<TimeRange>()
+        var cursor = range.startMillis
+        while (cursor < range.endMillis) {
+            val date = Instant.ofEpochMilli(cursor).atZone(zone).toLocalDate()
+            val dayStart = startOfDay(date)
+            val dayEnd = startOfDay(date.plusDays(1))
+            if (dayStart >= range.endMillis) break
+            days += TimeRange(dayStart, minOf(dayEnd, range.endMillis))
+            cursor = dayEnd
+        }
+        return days.reversed()
+    }
+
     /** نطاق دورة الفاتورة الحالية انطلاقًا من يوم بدء الدورة. */
     fun cycleRange(cycleStartDay: Int, now: Long = System.currentTimeMillis()): TimeRange {
         val day = cycleStartDay.coerceIn(1, 28)

@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
+import com.mywifiadata.app.ui.theme.AppButtonShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -104,11 +104,9 @@ fun ExpressiveCard(
     }
 }
 
-/** مربّع إحصائي: أيقونة + رقم رئيسي + تسمية. */
 /**
- * بلاطة إحصاء مدمجة: القيمة في سطر أول بجانب الأيقونة (التي تملأ الطرف
- * الأيسر بدل أن تحتل سطرًا خاصًا بها)، ثم التسمية والتعليق أسفلها.
- * هذا يقلل ارتفاع البطاقة المحتوية عليها ويستغل العرض الفارغ.
+ * بلاطة إحصاء: القيمة بعرض كامل في السطر الأول (تلفّ النص بدل إخفائه
+ * بثلاث نقاط)، ثم التسمية بجانب الأيقونة في السطر الثاني، ثم التعليق.
  */
 @Composable
 fun StatTile(
@@ -126,40 +124,34 @@ fun StatTile(
         colors = CardDefaults.cardColors(containerColor = containerColor, contentColor = contentColor),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
+            // القيمة أول أبناء العمود فتحصل على العرض الكامل دون أي قصّ.
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleLargeEmphasized,
+            )
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(
-                    text = value,
-                    style = MaterialTheme.typography.titleLargeEmphasized,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
+                    text = label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = contentColor.copy(alpha = 0.8f),
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.weight(1f))
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
                     tint = contentColor.copy(alpha = 0.85f),
-                    modifier = Modifier.size(22.dp),
+                    modifier = Modifier.size(20.dp),
                 )
             }
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                color = contentColor.copy(alpha = 0.8f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
             if (caption != null) {
                 Spacer(modifier = Modifier.size(4.dp))
                 Text(
                     text = caption,
                     style = MaterialTheme.typography.labelSmall,
                     color = contentColor.copy(alpha = 0.7f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
@@ -198,8 +190,6 @@ fun InfoRow(
             text = value,
             style = MaterialTheme.typography.bodyMediumEmphasized,
             color = valueColor,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -283,7 +273,7 @@ fun EmptyState(
         )
         if (actionLabel != null && onAction != null) {
             Spacer(modifier = Modifier.size(16.dp))
-            Button(onClick = onAction) { Text(text = actionLabel) }
+            Button(onClick = onAction, shape = AppButtonShape) { Text(text = actionLabel) }
         }
     }
 }
@@ -321,10 +311,10 @@ fun PermissionCard(
             Text(text = message, style = MaterialTheme.typography.bodyMedium)
             Spacer(modifier = Modifier.size(16.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Button(onClick = onGrant, shape = RoundedCornerShape(50)) {
+                Button(onClick = onGrant, shape = AppButtonShape) {
                     Text(text = grantLabel)
                 }
-                OutlinedButton(onClick = onOpenSettings, shape = RoundedCornerShape(50)) {
+                OutlinedButton(onClick = onOpenSettings, shape = AppButtonShape) {
                     Text(text = settingsLabel)
                 }
             }

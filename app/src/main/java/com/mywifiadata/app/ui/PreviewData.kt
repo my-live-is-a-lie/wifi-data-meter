@@ -126,7 +126,9 @@ private fun AppsPreview() {
         AppsScreen(
             state = sampleState(),
             onPeriodChange = {},
-            onShowSystemAppsChange = {},
+            onAppsFilterChange = {},
+            onAppsWeekChange = {},
+            onAppsSliceChange = {},
             onOpenUsageAccess = {},
             onAppClick = {},
         )
