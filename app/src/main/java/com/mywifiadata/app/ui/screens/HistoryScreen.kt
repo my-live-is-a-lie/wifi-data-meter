@@ -14,10 +14,13 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.ShowChart
 import androidx.compose.material.icons.rounded.TrendingUp
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -165,7 +168,6 @@ private fun ChartCard(state: UiState, onSelectDay: (Int?) -> Unit) {
                 } else {
                     stringResource(R.string.history_days_shown, state.historyDays)
                 },
-                supportingText = stringResource(R.string.live_chart_title),
             )
             Spacer(modifier = Modifier.height(16.dp))
             if (entries.isEmpty()) {
@@ -242,8 +244,11 @@ private fun SelectedDayCard(day: DayUsage, onClose: () -> Unit) {
                 title = Format.fullDate(day.startMillis),
                 supportingText = Format.weekday(day.startMillis),
                 trailing = {
-                    TextButton(onClick = onClose, shape = AppButtonShape) {
-                        Text(text = stringResource(R.string.action_close))
+                    IconButton(onClick = onClose) {
+                        Icon(
+                            imageVector = Icons.Rounded.Close,
+                            contentDescription = stringResource(R.string.action_close),
+                        )
                     }
                 },
             )

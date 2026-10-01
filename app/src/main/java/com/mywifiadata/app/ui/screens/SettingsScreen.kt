@@ -493,7 +493,11 @@ private fun AlertThresholdSlider(value: Int, onValueChange: (Int) -> Unit) {
     )
     Slider(
         state = sliderState,
-        onValueChange = { onValueChange(it.roundToInt()) },
+        onValueChange = {
+            // ملاحظة material3: السحب لا يحدّث state وحده — نحدّثه يدويًا لتحريك المؤشر.
+            sliderState.value = it
+            onValueChange(it.roundToInt())
+        },
     )
 }
 

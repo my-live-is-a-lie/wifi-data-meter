@@ -127,22 +127,6 @@ fun AppsScreen(
                 )
             }
 
-            // فلتر نوع التطبيقات: الكل (الافتراضي) أو المثبتة أو النظام.
-            item {
-                Column(modifier = Modifier.padding(horizontal = 4.dp)) {
-                    Text(
-                        text = stringResource(R.string.apps_filter_label),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    AppsFilterRow(
-                        filter = state.appsFilter,
-                        onFilterChange = onAppsFilterChange,
-                    )
-                }
-            }
-
             // التفصيل الزمني حسب الفترة: ساعات اليوم، أيام الأسبوع، أو أسابيع الشهر.
             when (state.appsPeriod) {
                 UsagePeriod.TODAY -> item {
@@ -218,6 +202,22 @@ fun AppsScreen(
                     }
                 }
             } else {
+                // فلتر نوع التطبيقات: الكل (الافتراضي) أو المثبتة أو النظام — فوق قائمة التطبيقات.
+                item {
+                    Column(modifier = Modifier.padding(horizontal = 4.dp)) {
+                        Text(
+                            text = stringResource(R.string.apps_filter_label),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        AppsFilterRow(
+                            filter = state.appsFilter,
+                            onFilterChange = onAppsFilterChange,
+                        )
+                    }
+                }
+
                 item {
                     SectionHeader(
                         title = stringResource(R.string.tab_apps),

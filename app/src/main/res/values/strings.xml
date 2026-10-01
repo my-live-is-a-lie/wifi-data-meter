@@ -73,7 +73,6 @@
     <string name="action_reset_session">تصفير الجلسة</string>
     <string name="action_open_usage_access">فتح صلاحية الاستخدام</string>
     <string name="session_since">بدأت في %1$s</string>
-    <string name="live_chart_title">سرعة الشبكة اللحظية</string>
     <string name="live_chart_empty">لا توجد بيانات كافية بعد…</string>
 
     <!-- صلاحية الاستخدام -->
