@@ -22,14 +22,17 @@ import androidx.compose.material.icons.rounded.DataUsage
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.MonetizationOn
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.ShowChart
 import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material.icons.rounded.Router
 import androidx.compose.material.icons.rounded.Speed
+import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material.icons.rounded.WifiOff
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -81,6 +84,7 @@ fun DashboardScreen(
     onOpenQuotaSettings: () -> Unit,
     onRefresh: () -> Unit,
     onResetSession: () -> Unit,
+    onToggleTracking: () -> Unit,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(16.dp),
 ) {
@@ -110,6 +114,8 @@ fun DashboardScreen(
                 onRefresh = onRefresh,
                 onResetSession = onResetSession,
                 onOpenQuotaSettings = onOpenQuotaSettings,
+                trackingEnabled = state.settings.trackingEnabled,
+                onToggleTracking = onToggleTracking,
             )
         }
 
@@ -303,11 +309,23 @@ private fun QuickActions(
     onRefresh: () -> Unit,
     onResetSession: () -> Unit,
     onOpenQuotaSettings: () -> Unit,
+    trackingEnabled: Boolean,
+    onToggleTracking: () -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        // زر المراقبة أولًا (الأهم): يبدأ ويوقف المراقبة، ويظهر ملوّنًا أثناء العمل.
+        QuickActionButton(
+            label = stringResource(
+                if (trackingEnabled) R.string.action_stop_tracking else R.string.action_start_tracking,
+            ),
+            icon = if (trackingEnabled) Icons.Rounded.Stop else Icons.Rounded.PlayArrow,
+            onClick = onToggleTracking,
+            active = trackingEnabled,
+            modifier = Modifier.weight(1f),
+        )
         QuickActionButton(
             label = stringResource(R.string.action_refresh),
             icon = Icons.Rounded.Refresh,
@@ -332,6 +350,7 @@ private fun QuickActions(
 /**
  * زر إجراء سريع: الأيقونة فوق النص، مع قصّ النص بثلاث نقاط بدل تجاوزه حدود الزر
  * (ButtonGroup كان يقصّ التسميات الطويلة فتظهر الأيقونة فوق النص).
+ * [active] تلوّن الزر باللون الأساسي (يُستخدم لحالة المراقبة الجارية).
  */
 @Composable
 private fun QuickActionButton(
@@ -339,11 +358,20 @@ private fun QuickActionButton(
     icon: ImageVector,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    active: Boolean = false,
 ) {
     FilledTonalButton(
         onClick = onClick,
         modifier = modifier,
         shape = AppButtonShape,
+        colors = if (active) {
+            ButtonDefaults.filledTonalButtonColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+        } else {
+            ButtonDefaults.filledTonalButtonColors()
+        },
         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
     ) {
         Column(

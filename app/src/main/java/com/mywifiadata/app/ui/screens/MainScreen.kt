@@ -8,24 +8,17 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Apps
-import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FloatingActionButtonMenu
-import androidx.compose.material3.FloatingActionButtonMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -37,7 +30,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
-import androidx.compose.material3.ToggleFloatingActionButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -81,7 +73,6 @@ fun MainScreen(viewModel: AppViewModel) {
     val snackbarHostState = remember { SnackbarHostState() }
 
     var selectedTabIndex by rememberSaveable { mutableIntStateOf(0) }
-    var fabMenuExpanded by rememberSaveable { mutableStateOf(false) }
 
     val permissionMessage = stringResource(R.string.permission_needed_title)
     val openSettingsLabel = stringResource(R.string.action_open_usage_access)
@@ -160,8 +151,6 @@ fun MainScreen(viewModel: AppViewModel) {
         }
     }
 
-    BackHandler(enabled = fabMenuExpanded) { fabMenuExpanded = false }
-
     // زر الرجوع يغلق تفاصيل التطبيق قبل الخروج من الشاشة
     BackHandler(enabled = state.appDetail != null) { viewModel.closeAppDetail() }
 
@@ -216,77 +205,7 @@ fun MainScreen(viewModel: AppViewModel) {
             }
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-        floatingActionButton = {
-            FloatingActionButtonMenu(
-                expanded = fabMenuExpanded,
-                button = {
-                    ToggleFloatingActionButton(
-                        checked = fabMenuExpanded,
-                        onCheckedChange = { fabMenuExpanded = !fabMenuExpanded },
-                    ) {
-                        Icon(
-                            imageVector = if (checkedProgress > 0.5f) {
-                                Icons.Rounded.Close
-                            } else {
-                                Icons.Rounded.Add
-                            },
-                            contentDescription = stringResource(R.string.cd_more_options),
-                        )
-                    }
-                },
-            ) {
-                FloatingActionButtonMenuItem(
-                    onClick = {
-                        fabMenuExpanded = false
-                        toggleTracking(!state.settings.trackingEnabled)
-                    },
-                    text = {
-                        Text(
-                            text = stringResource(
-                                if (state.settings.trackingEnabled) {
-                                    R.string.action_stop_tracking
-                                } else {
-                                    R.string.action_start_tracking
-                                },
-                            ),
-                        )
-                    },
-                    icon = { Icon(imageVector = Icons.Rounded.Tune, contentDescription = null) },
-                )
-                FloatingActionButtonMenuItem(
-                    onClick = {
-                        fabMenuExpanded = false
-                        viewModel.refreshNow()
-                    },
-                    text = { Text(text = stringResource(R.string.action_refresh)) },
-                    icon = { Icon(imageVector = Icons.Rounded.Refresh, contentDescription = null) },
-                )
-                FloatingActionButtonMenuItem(
-                    onClick = {
-                        fabMenuExpanded = false
-                        viewModel.resetSession()
-                    },
-                    text = { Text(text = stringResource(R.string.action_reset_session)) },
-                    icon = { Icon(imageVector = Icons.Rounded.RestartAlt, contentDescription = null) },
-                )
-                FloatingActionButtonMenuItem(
-                    onClick = {
-                        fabMenuExpanded = false
-                        selectedTabIndex = AppTab.SETTINGS.ordinal
-                    },
-                    text = { Text(text = stringResource(R.string.tab_settings)) },
-                    icon = { Icon(imageVector = Icons.Rounded.Settings, contentDescription = null) },
-                )
-            }
-        },
     ) { innerPadding ->
-        // مسافة سفلية إضافية لئلا يغطي زر FAB القائم محتوى الشاشات أسفله.
-        val screenContentPadding = PaddingValues(
-            start = 16.dp,
-            top = 16.dp,
-            end = 16.dp,
-            bottom = 96.dp,
-        )
         PullToRefreshBox(
             isRefreshing = state.isRefreshing,
             onRefresh = { viewModel.refreshNow() },
@@ -301,7 +220,7 @@ fun MainScreen(viewModel: AppViewModel) {
                     onOpenQuotaSettings = { selectedTabIndex = AppTab.SETTINGS.ordinal },
                     onRefresh = { viewModel.refreshNow() },
                     onResetSession = { viewModel.resetSession() },
-                    contentPadding = screenContentPadding,
+                    onToggleTracking = { toggleTracking(!state.settings.trackingEnabled) },
                 )
 
                 AppTab.APPS -> {
@@ -310,7 +229,6 @@ fun MainScreen(viewModel: AppViewModel) {
                         AppDetailScreen(
                             detail = appDetail,
                             onBack = { viewModel.closeAppDetail() },
-                            contentPadding = screenContentPadding,
                         )
                     } else {
                         AppsScreen(
@@ -321,7 +239,6 @@ fun MainScreen(viewModel: AppViewModel) {
                             onAppsSliceChange = { viewModel.selectAppsSlice(it) },
                             onOpenUsageAccess = { SystemActions.openUsageAccessSettings(context) },
                             onAppClick = { viewModel.openAppDetail(it) },
-                            contentPadding = screenContentPadding,
                         )
                     }
                 }
@@ -332,7 +249,6 @@ fun MainScreen(viewModel: AppViewModel) {
                     onSelectDay = { viewModel.selectDay(it) },
                     onOpenUsageAccess = { SystemActions.openUsageAccessSettings(context) },
                     onAppClick = { viewModel.openAppDetail(it) },
-                    contentPadding = screenContentPadding,
                 )
 
                 AppTab.SETTINGS -> SettingsScreen(
@@ -348,7 +264,6 @@ fun MainScreen(viewModel: AppViewModel) {
                     onOpenUsageAccess = { SystemActions.openUsageAccessSettings(context) },
                     onOpenWifiSettings = { SystemActions.openWifiSettings(context) },
                     onClearData = { viewModel.clearData() },
-                    contentPadding = screenContentPadding,
                 )
             }
         }
