@@ -45,6 +45,8 @@ data class UiState(
     val samples: List<SpeedSample> = emptyList(),
     val daily: List<DayUsage> = emptyList(),
     val apps: List<AppUsage> = emptyList(),
+    // تطبيقات الفترة كاملة (لا تتأثر باختيار شريحة) لبطاقة «الفترة».
+    val periodApps: List<AppUsage> = emptyList(),
     val isAppsLoading: Boolean = false,
     val appsPeriod: UsagePeriod = UsagePeriod.MONTH,
     val historyPeriod: UsagePeriod = UsagePeriod.MONTH,
@@ -99,6 +101,13 @@ data class UiState(
             AppsFilter.ALL -> apps
             AppsFilter.INSTALLED -> apps.filterNot { it.isSystem }
             AppsFilter.SYSTEM -> apps.filter { it.isSystem }
+        }
+
+    val visiblePeriodApps: List<AppUsage>
+        get() = when (appsFilter) {
+            AppsFilter.ALL -> periodApps
+            AppsFilter.INSTALLED -> periodApps.filterNot { it.isSystem }
+            AppsFilter.SYSTEM -> periodApps.filter { it.isSystem }
         }
 
     val historyDays: Int get() = TimeRanges.daysOf(historyPeriod)
@@ -216,11 +225,16 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
     private suspend fun loadApps() {
         val period = _uiState.value.appsPeriod
         val slice = _uiState.value.appsSlice
-        val range = slice ?: TimeRanges.forPeriod(period)
+        val periodRange = TimeRanges.forPeriod(period)
+        val range = slice ?: periodRange
         _uiState.update { it.copy(isAppsLoading = true) }
-        val apps = repository.perAppUsage(range)
+        // تُحمَّل فترة كاملة دائمًا (لبطاقة «الفترة» الثابتة) + نطاق الشريحة إن وُجد.
+        val periodApps = repository.perAppUsage(periodRange)
+        val apps = if (range == periodRange) periodApps else repository.perAppUsage(range)
         appsLoadedAt = System.currentTimeMillis()
-        _uiState.update { it.copy(apps = apps, isAppsLoading = false) }
+        _uiState.update {
+            it.copy(apps = apps, periodApps = periodApps, isAppsLoading = false)
+        }
     }
 
     /**
@@ -287,22 +301,22 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         }
     }
 
-    /** اختيار/إلغاء اختيار أسبوع في عرض الشهر، مع تحميل أيامه. */
+    /** اختيار/إلغاء اختيار أسبوع في عرض الشهر، مع تحميل أيامه — بدون مسح
+     *  القوائم الحالية حتى لا تومض الشاشة أثناء التحميل. */
     fun selectAppsWeek(week: TimeRange) {
         val selected = if (_uiState.value.appsWeek == week) null else week
-        _uiState.update {
-            it.copy(appsWeek = selected, appsSlice = null, appsWeekDays = emptyList(), apps = emptyList())
-        }
+        _uiState.update { it.copy(appsWeek = selected, appsSlice = null) }
         viewModelScope.launch {
             selected?.let { loadAppsWeekDays(it) }
             loadApps()
         }
     }
 
-    /** اختيار/إلغاء اختيار شريحة (يوم أو ساعة) لعرض تطبيقاتها. */
+    /** اختيار/إلغاء اختيار شريحة (يوم أو ساعة) لعرض تطبيقاتها — بدون مسح
+     *  القائمة الحالية حتى لا تومض الشاشة أو تظهر دائرة تحميل عند كل ضغطة. */
     fun selectAppsSlice(slice: TimeRange) {
         val selected = if (_uiState.value.appsSlice == slice) null else slice
-        _uiState.update { it.copy(appsSlice = selected, apps = emptyList()) }
+        _uiState.update { it.copy(appsSlice = selected) }
         viewModelScope.launch { loadApps() }
     }
 
