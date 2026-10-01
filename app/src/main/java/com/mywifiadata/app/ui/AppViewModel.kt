@@ -243,29 +243,24 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
      * يوجد بها استهلاك حتى لا تُعرض صفوف فارغة.
      */
     private suspend fun loadAppsSlices() {
-        when (_uiState.value.appsPeriod) {
-            UsagePeriod.TODAY -> {
-                val hours = TimeRanges.hoursOfToday()
-                    .map { range -> range.toSlice(repository.deviceTotals(range)) }
-                    .filter { it.totals.totalBytes > 0L }
-                _uiState.update { it.copy(appsHours = hours) }
-            }
+        // تُحمَّل شرائح اليوم/الأسبوع/الشهر دومًا ليظهر بطاقة أي فترة فورًا
+        // عند التبديل بينها (بلا فراغ أو وميض)، مع تجديد الفترة الحالية.
+        val hours = TimeRanges.hoursOfToday()
+            .map { range -> range.toSlice(repository.deviceTotals(range)) }
+            .filter { it.totals.totalBytes > 0L }
+        _uiState.update { it.copy(appsHours = hours) }
 
-            UsagePeriod.WEEK -> {
-                val days = TimeRanges.lastDays(7)
-                    .map { range -> range.toSlice(repository.deviceTotals(range)) }
-                    .filter { it.totals.totalBytes > 0L }
-                _uiState.update { it.copy(appsDays = days) }
-            }
+        val days = TimeRanges.lastDays(7)
+            .map { range -> range.toSlice(repository.deviceTotals(range)) }
+            .filter { it.totals.totalBytes > 0L }
+        _uiState.update { it.copy(appsDays = days) }
 
-            UsagePeriod.MONTH -> {
-                val weeks = TimeRanges.lastWeeks()
-                    .map { range -> range.toSlice(repository.deviceTotals(range)) }
-                    .filter { it.totals.totalBytes > 0L }
-                _uiState.update { it.copy(appsWeeks = weeks) }
-                _uiState.value.appsWeek?.let { loadAppsWeekDays(it) }
-            }
-        }
+        val weeks = TimeRanges.lastWeeks()
+            .map { range -> range.toSlice(repository.deviceTotals(range)) }
+            .filter { it.totals.totalBytes > 0L }
+        _uiState.update { it.copy(appsWeeks = weeks) }
+
+        _uiState.value.appsWeek?.let { loadAppsWeekDays(it) }
     }
 
     /** أيام الأسبوع المحدد في عرض الشهر (الأحدث أولًا، بدون أيام فارغة). */
@@ -283,16 +278,13 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
 
     fun setAppsPeriod(period: UsagePeriod) {
         if (period == _uiState.value.appsPeriod) return
+        // نُبقي القوائم والشرائح الحالية ظاهرة حتى تصل بيانات الفترة الجديدة
+        // (بلا مسح يسبّب دائرة التحميل والوميض)؛ يُصفَّر الاختيار فقط.
         _uiState.update {
             it.copy(
                 appsPeriod = period,
-                apps = emptyList(),
                 appsWeek = null,
                 appsSlice = null,
-                appsWeeks = emptyList(),
-                appsDays = emptyList(),
-                appsWeekDays = emptyList(),
-                appsHours = emptyList(),
             )
         }
         viewModelScope.launch {
