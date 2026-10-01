@@ -115,6 +115,7 @@ private fun DashboardPreview() {
             onOpenQuotaSettings = {},
             onRefresh = {},
             onResetSession = {},
+            onToggleTracking = {},
         )
     }
 }
