@@ -95,6 +95,16 @@ fun HistoryScreen(
         } else {
             item { ChartCard(state = state, onSelectDay = onSelectDay) }
 
+            // بطاقة اليوم المحدد تظهر فورًا فوق سجل الاستهلاك.
+            if (selectedDay != null) {
+                item {
+                    SelectedDayCard(
+                        day = selectedDay,
+                        onClose = { onSelectDay(null) },
+                    )
+                }
+            }
+
             if (daily.isNotEmpty()) {
                 item { HistorySummaryCard(daily = daily) }
             } else {
@@ -110,12 +120,6 @@ fun HistoryScreen(
             }
 
             if (selectedDay != null) {
-                item {
-                    SelectedDayCard(
-                        day = selectedDay,
-                        onClose = { onSelectDay(null) },
-                    )
-                }
 
                 item {
                     SectionHeader(
