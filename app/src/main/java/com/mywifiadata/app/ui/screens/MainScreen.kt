@@ -15,8 +15,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -30,6 +33,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -52,6 +56,7 @@ import com.mywifiadata.app.R
 import com.mywifiadata.app.core.Format
 import com.mywifiadata.app.core.SystemActions
 import com.mywifiadata.app.ui.AppViewModel
+import com.mywifiadata.app.ui.theme.AppButtonShape
 import kotlinx.coroutines.launch
 
 private enum class AppTab(val labelRes: Int, val icon: ImageVector) {
@@ -154,6 +159,32 @@ fun MainScreen(viewModel: AppViewModel) {
     // زر الرجوع يغلق تفاصيل التطبيق قبل الخروج من الشاشة
     BackHandler(enabled = state.appDetail != null) { viewModel.closeAppDetail() }
 
+    // تأكيد تصفير الجلسة قبل تنفيذه (يغطي زر الأزرار السريعة وزر بطاقة الجلسة معًا)
+    var showResetDialog by rememberSaveable { mutableStateOf(false) }
+    if (showResetDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetDialog = false },
+            title = { Text(text = stringResource(R.string.action_reset_session)) },
+            text = { Text(text = stringResource(R.string.reset_session_confirm)) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showResetDialog = false
+                        viewModel.resetSession()
+                    },
+                    shape = AppButtonShape,
+                ) {
+                    Text(text = stringResource(R.string.action_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetDialog = false }, shape = AppButtonShape) {
+                    Text(text = stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
+
     val tabs = AppTab.entries
     val currentTab = tabs[selectedTabIndex.coerceIn(0, tabs.lastIndex)]
 
@@ -219,7 +250,7 @@ fun MainScreen(viewModel: AppViewModel) {
                     onOpenUsageAccess = { SystemActions.openUsageAccessSettings(context) },
                     onOpenQuotaSettings = { selectedTabIndex = AppTab.SETTINGS.ordinal },
                     onRefresh = { viewModel.refreshNow() },
-                    onResetSession = { viewModel.resetSession() },
+                    onResetSession = { showResetDialog = true },
                     onToggleTracking = { toggleTracking(!state.settings.trackingEnabled) },
                 )
 

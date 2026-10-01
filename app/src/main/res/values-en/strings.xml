@@ -15,7 +15,6 @@
 
     <string name="wifi_card_title">Network details</string>
     <string name="wifi_details_expand">Show network details</string>
-    <string name="wifi_ssid_hint">Network name unavailable — grant the Nearby devices (or Location) permission and turn on Location services to see it.</string>
     <string name="wifi_permission_denied">Couldn’t read the Wi‑Fi name: the Nearby devices/Location permission was denied.</string>
     <string name="wifi_details_collapse">Hide network details</string>
     <string name="label_ssid">Network name</string>
@@ -168,6 +167,7 @@
     <string name="action_cancel">Cancel</string>
     <string name="action_close">Close</string>
     <string name="action_confirm">Confirm</string>
+    <string name="reset_session_confirm">The current usage session will be reset and start over. This cannot be undone. Do you want to continue?</string>
     <string name="unit_gb">GB</string>
     <string name="unit_mbps">Mbps</string>
     <string name="unit_dbm">dBm</string>
