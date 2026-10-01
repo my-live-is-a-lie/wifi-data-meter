@@ -122,11 +122,7 @@ fun AppsScreen(
             }
         } else {
             item {
-                SummaryCard(
-                    state = state,
-                    totalBytes = apps.sumOf { it.totals.totalBytes },
-                    appsCount = apps.size,
-                )
+                SummaryCard(state = state)
             }
 
             // التفصيل الزمني حسب الفترة: ساعات اليوم، أيام الأسبوع، أو أسابيع الشهر.
@@ -382,32 +378,34 @@ internal fun PeriodSelector(
 }
 
 @Composable
-private fun SummaryCard(state: UiState, totalBytes: Long, appsCount: Int) {
-    val topApp = state.visibleApps.firstOrNull()
+private fun SummaryCard(state: UiState) {
+    // بطاقة «الفترة» تعكس الفترة كاملة مهما اختيرت شريحة — لا تتأثر بالأعمدة.
+    val periodApps = state.visiblePeriodApps
+    val topApp = periodApps.firstOrNull()
 
     ExpressiveCard {
         Column(modifier = Modifier.fillMaxWidth()) {
             SectionHeader(
                 title = stringResource(R.string.label_period),
-                supportingText = stringResource(R.string.apps_count, appsCount),
+                supportingText = stringResource(R.string.apps_count, periodApps.size),
             )
             Spacer(modifier = Modifier.height(8.dp))
             InfoRow(
                 icon = Icons.Rounded.ArrowDownward,
                 label = stringResource(R.string.label_download),
-                value = Format.bytes(state.visibleApps.sumOf { it.totals.rxBytes }),
+                value = Format.bytes(periodApps.sumOf { it.totals.rxBytes }),
                 valueColor = LocalDownloadColor.current,
             )
             InfoRow(
                 icon = Icons.Rounded.ArrowUpward,
                 label = stringResource(R.string.label_upload),
-                value = Format.bytes(state.visibleApps.sumOf { it.totals.txBytes }),
+                value = Format.bytes(periodApps.sumOf { it.totals.txBytes }),
                 valueColor = LocalUploadColor.current,
             )
             InfoRow(
                 icon = Icons.Rounded.Apps,
                 label = stringResource(R.string.label_total),
-                value = Format.bytes(totalBytes),
+                value = Format.bytes(periodApps.sumOf { it.totals.totalBytes }),
             )
             if (topApp != null) {
                 Spacer(modifier = Modifier.height(4.dp))
