@@ -219,7 +219,6 @@ private fun HeroCard(state: UiState, onOpenQuotaSettings: () -> Unit) {
                     text = stringResource(
                         R.string.quota_used_of,
                         Format.bytes(state.cycle.totalBytes),
-                        Format.bytes(state.quotaBytes),
                     ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -290,18 +289,17 @@ private fun LegendItem(color: Color, label: String, value: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Dot(color = color, size = 10.dp)
         Spacer(modifier = Modifier.width(8.dp))
-        Column {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = value,
-                style = MaterialTheme.typography.bodyMediumEmphasized,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMediumEmphasized,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 

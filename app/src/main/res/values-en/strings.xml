@@ -54,7 +54,7 @@
     <string name="quota_not_set">No monthly plan set yet</string>
     <string name="quota_set_action">Set plan</string>
     <string name="quota_remaining_of">%1$s left of %2$s</string>
-    <string name="quota_used_of">%1$s used of %2$s</string>
+    <string name="quota_used_of">%1$s used</string>
     <string name="quota_exceeded">Over plan by %1$s</string>
     <string name="percent_format">%1$d%%</string>
 

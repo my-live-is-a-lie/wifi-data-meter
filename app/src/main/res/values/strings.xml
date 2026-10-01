@@ -60,7 +60,7 @@
     <string name="quota_not_set">لم تُحدَّد باقة شهرية بعد</string>
     <string name="quota_set_action">تحديد الباقة</string>
     <string name="quota_remaining_of">متبقٍ %1$s من %2$s</string>
-    <string name="quota_used_of">استُهلك %1$s من %2$s</string>
+    <string name="quota_used_of">استُهلك %1$s</string>
     <string name="quota_exceeded">تجاوزت الباقة بمقدار %1$s</string>
     <string name="percent_format">%1$d%%</string>
 
