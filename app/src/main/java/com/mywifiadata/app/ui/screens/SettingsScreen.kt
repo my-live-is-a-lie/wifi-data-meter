@@ -66,6 +66,7 @@ import com.mywifiadata.app.ui.components.ExpressiveCard
 import com.mywifiadata.app.ui.components.InfoRow
 import com.mywifiadata.app.ui.components.SectionHeader
 import com.mywifiadata.app.ui.components.SettingSwitchRow
+import com.mywifiadata.app.ui.theme.AppButtonShape
 import kotlin.math.roundToInt
 
 /**
