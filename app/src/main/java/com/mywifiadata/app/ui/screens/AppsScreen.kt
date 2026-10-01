@@ -54,6 +54,8 @@ import com.mywifiadata.app.data.model.AppsFilter
 import com.mywifiadata.app.data.model.UsageSlice
 import com.mywifiadata.app.ui.UiState
 import com.mywifiadata.app.ui.components.AppUsageRow
+import com.mywifiadata.app.ui.components.BarEntry
+import com.mywifiadata.app.ui.components.DailyBarChart
 import com.mywifiadata.app.ui.components.EmptyState
 import com.mywifiadata.app.ui.components.ExpressiveCard
 import com.mywifiadata.app.ui.components.InfoRow
@@ -300,52 +302,42 @@ private fun SliceCard(
 ) {
     if (slices.isEmpty()) return
 
+    val selectedSlice = slices.find {
+        TimeRange(it.startMillis, it.endMillis) == selected
+    }
+    // تسمية مختصرة تحت الأعمدة: أول تسلسل أرقام من التسمية الكاملة (١٤ / ٢٨ / ٢).
+    val shortLabel: (UsageSlice) -> String = { slice ->
+        val text = label(slice)
+        val firstDigit = text.indexOfFirst { it.isDigit() }
+        if (firstDigit < 0) text else text.drop(firstDigit).takeWhile { it.isDigit() }
+    }
+
     ExpressiveCard {
         Column(modifier = Modifier.fillMaxWidth()) {
-            SectionHeader(title = title, supportingText = "${slices.size}")
-            slices.forEach { slice ->
-                val range = TimeRange(slice.startMillis, slice.endMillis)
-                val isSelected = selected == range
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(
-                            color = if (isSelected) {
-                                MaterialTheme.colorScheme.secondaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.surfaceContainerLow
-                            },
-                            shape = RoundedCornerShape(10.dp),
-                        )
-                        .clip(RoundedCornerShape(10.dp))
-                        .clickable { onSelect(range) }
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = if (isSelected) Icons.Rounded.Check else icon,
-                        contentDescription = null,
-                        tint = if (isSelected) {
-                            MaterialTheme.colorScheme.onSecondaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.primary
-                        },
-                        modifier = Modifier.size(20.dp),
+            // التفاصيل: عند الضغط على عمود تظهر تسميته واستهلاكه في الترويسة.
+            SectionHeader(
+                title = title,
+                supportingText = if (selectedSlice != null) {
+                    "${label(selectedSlice)} • ${Format.bytes(selectedSlice.totals.totalBytes)}"
+                } else {
+                    "${slices.size}"
+                },
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            DailyBarChart(
+                entries = slices.map { slice ->
+                    BarEntry(
+                        label = shortLabel(slice),
+                        value = slice.totals.totalBytes,
+                        highlight = TimeRange(slice.startMillis, slice.endMillis) == selected,
                     )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = label(slice),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Text(
-                        text = Format.bytes(slice.totals.totalBytes),
-                        style = MaterialTheme.typography.bodyMediumEmphasized,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-            }
+                },
+                barHeight = 120.dp,
+                onEntryClick = { index ->
+                    val slice = slices[index]
+                    onSelect(TimeRange(slice.startMillis, slice.endMillis))
+                },
+            )
             Spacer(modifier = Modifier.height(4.dp))
         }
     }
