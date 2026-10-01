@@ -19,6 +19,8 @@
     <!-- بطاقة الشبكة -->
     <string name="wifi_card_title">تفاصيل الشبكة</string>
     <string name="wifi_details_expand">توسيع تفاصيل الشبكة</string>
+    <string name="wifi_ssid_hint">اسم الشبكة غير متاح — امنح إذن الأجهزة القريبة (أو الموقع) وفعّل خدمة الموقع ليظهر هنا.</string>
+    <string name="wifi_permission_denied">تعذّر قراءة اسم شبكة الواي فاي: لم يُمنح إذن الأجهزة القريبة/الموقع.</string>
     <string name="wifi_details_collapse">طيّ تفاصيل الشبكة</string>
     <string name="label_ssid">اسم الشبكة</string>
     <string name="label_signal">قوة الإشارة</string>
@@ -88,6 +90,13 @@
     <string name="apps_loading">جارٍ حساب استهلاك التطبيقات…</string>
     <string name="apps_no_permission">فعّل صلاحية الاستخدام لعرض التفاصيل حسب التطبيق.</string>
     <string name="system_apps_label">تطبيقات النظام</string>
+    <string name="apps_filter_label">نوع التطبيقات</string>
+    <string name="apps_filter_all">الكل</string>
+    <string name="apps_filter_installed">المثبتة</string>
+    <string name="apps_filter_system">النظام</string>
+    <string name="apps_slices_days">الأيام</string>
+    <string name="apps_slices_weeks">الأسابيع</string>
+    <string name="apps_slices_hours">الساعات</string>
     <string name="unknown_app_label">تطبيق غير معروف</string>
     <string name="apps_count">%1$d تطبيقًا</string>
     <string name="app_detail_title">استهلاك التطبيق</string>

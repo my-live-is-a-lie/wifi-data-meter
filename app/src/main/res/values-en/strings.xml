@@ -15,6 +15,8 @@
 
     <string name="wifi_card_title">Network details</string>
     <string name="wifi_details_expand">Show network details</string>
+    <string name="wifi_ssid_hint">Network name unavailable — grant the Nearby devices (or Location) permission and turn on Location services to see it.</string>
+    <string name="wifi_permission_denied">Couldn’t read the Wi‑Fi name: the Nearby devices/Location permission was denied.</string>
     <string name="wifi_details_collapse">Hide network details</string>
     <string name="label_ssid">Network name</string>
     <string name="label_signal">Signal strength</string>
@@ -79,6 +81,13 @@
     <string name="apps_loading">Calculating app usage…</string>
     <string name="apps_no_permission">Enable usage access to see the per‑app breakdown.</string>
     <string name="system_apps_label">System apps</string>
+    <string name="apps_filter_label">App type</string>
+    <string name="apps_filter_all">All</string>
+    <string name="apps_filter_installed">Installed</string>
+    <string name="apps_filter_system">System</string>
+    <string name="apps_slices_days">Days</string>
+    <string name="apps_slices_weeks">Weeks</string>
+    <string name="apps_slices_hours">Hours</string>
     <string name="unknown_app_label">Unknown app</string>
     <string name="apps_count">%1$d apps</string>
     <string name="app_detail_title">App usage</string>

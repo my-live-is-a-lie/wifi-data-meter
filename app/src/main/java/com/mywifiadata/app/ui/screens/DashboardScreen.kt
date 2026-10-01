@@ -65,6 +65,7 @@ import com.mywifiadata.app.ui.components.SectionHeader
 import com.mywifiadata.app.ui.components.SignalBarsIcon
 import com.mywifiadata.app.ui.components.StatTile
 import com.mywifiadata.app.ui.components.UsageRing
+import com.mywifiadata.app.ui.theme.AppButtonShape
 import com.mywifiadata.app.ui.theme.LocalDownloadColor
 import com.mywifiadata.app.ui.theme.LocalUploadColor
 import kotlin.math.roundToInt
@@ -251,7 +252,7 @@ private fun HeroCard(state: UiState, onOpenQuotaSettings: () -> Unit) {
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                TextButton(onClick = onOpenQuotaSettings) {
+                TextButton(onClick = onOpenQuotaSettings, shape = AppButtonShape) {
                     Text(text = stringResource(R.string.quota_set_action))
                 }
             }
@@ -342,6 +343,7 @@ private fun QuickActionButton(
     FilledTonalButton(
         onClick = onClick,
         modifier = modifier,
+        shape = AppButtonShape,
         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
     ) {
         Column(
@@ -421,6 +423,18 @@ private fun WifiDetailsCard(wifi: WifiStatus) {
                     ),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.rotate(chevronRotation),
+                )
+            }
+
+            // اسم الشبكة غير متاح: نشرح السبب (إذن الأجهزة القريبة/الموقع).
+            if (wifi.isWifiConnected && wifi.ssid == null) {
+                Text(
+                    text = stringResource(R.string.wifi_ssid_hint),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp),
                 )
             }
 
@@ -570,7 +584,7 @@ private fun SessionCard(state: UiState, onResetSession: () -> Unit) {
                     Format.clock(state.settings.sessionStartMillis),
                 ),
                 trailing = {
-                    TextButton(onClick = onResetSession) {
+                    TextButton(onClick = onResetSession, shape = AppButtonShape) {
                         Text(text = stringResource(R.string.action_reset_session))
                     }
                 },
