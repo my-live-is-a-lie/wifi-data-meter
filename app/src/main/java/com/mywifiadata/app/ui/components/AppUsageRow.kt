@@ -13,6 +13,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ArrowDownward
+import androidx.compose.material.icons.rounded.ArrowUpward
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -121,7 +125,12 @@ fun AppUsageRow(
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Dot(color = downloadColor, size = 8.dp)
+                        Icon(
+                            imageVector = Icons.Rounded.ArrowDownward,
+                            contentDescription = null,
+                            tint = downloadColor,
+                            modifier = Modifier.size(14.dp),
+                        )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = Format.bytes(app.totals.rxBytes),
@@ -130,7 +139,12 @@ fun AppUsageRow(
                         )
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Dot(color = uploadColor, size = 8.dp)
+                        Icon(
+                            imageVector = Icons.Rounded.ArrowUpward,
+                            contentDescription = null,
+                            tint = uploadColor,
+                            modifier = Modifier.size(14.dp),
+                        )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = Format.bytes(app.totals.txBytes),
