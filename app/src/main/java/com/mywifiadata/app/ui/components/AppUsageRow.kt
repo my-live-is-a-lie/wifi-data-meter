@@ -123,51 +123,82 @@ fun AppUsageRow(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Rounded.ArrowDownward,
-                            contentDescription = null,
-                            tint = downloadColor,
-                            modifier = Modifier.size(14.dp),
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
+                // التنزيل والرفع والإجمالي: الأسماء في سطر واحد وتحت كل اسم أرقامه.
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Rounded.ArrowDownward,
+                                contentDescription = null,
+                                tint = downloadColor,
+                                modifier = Modifier.size(12.dp),
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = context.getString(R.string.label_download),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                         Text(
                             text = Format.bytes(app.totals.rxBytes),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = downloadColor,
+                        )
+                    }
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Rounded.ArrowUpward,
+                                contentDescription = null,
+                                tint = uploadColor,
+                                modifier = Modifier.size(12.dp),
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = context.getString(R.string.label_upload),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Text(
+                            text = Format.bytes(app.totals.txBytes),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = uploadColor,
+                        )
+                    }
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text(
+                            text = context.getString(R.string.label_total),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Rounded.ArrowUpward,
-                            contentDescription = null,
-                            tint = uploadColor,
-                            modifier = Modifier.size(14.dp),
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = Format.bytes(app.totals.txBytes),
+                            text = Format.bytes(app.totals.totalBytes),
+                            style = MaterialTheme.typography.bodyMediumEmphasized,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            text = context.getString(R.string.percent_format, (share * 100).toInt()),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
-            }
-
-            Spacer(modifier = Modifier.width(10.dp))
-
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    text = Format.bytes(app.totals.totalBytes),
-                    style = MaterialTheme.typography.bodyMediumEmphasized,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = context.getString(R.string.percent_format, (share * 100).toInt()),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
         }
 

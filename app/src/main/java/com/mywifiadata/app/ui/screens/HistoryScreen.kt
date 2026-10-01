@@ -28,6 +28,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.offset
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.mywifiadata.app.R
@@ -241,10 +242,15 @@ private fun SelectedDayCard(day: DayUsage, onClose: () -> Unit) {
     ExpressiveCard(containerColor = MaterialTheme.colorScheme.secondaryContainer) {
         Column(modifier = Modifier.fillMaxWidth()) {
             SectionHeader(
-                title = Format.fullDate(day.startMillis),
-                supportingText = Format.weekday(day.startMillis),
+                // اليوم والتاريخ في سطر واحد: الجمعة بجانب التاريخ.
+                title = "${Format.weekday(day.startMillis)} • ${Format.fullDate(day.startMillis)}",
                 trailing = {
-                    IconButton(onClick = onClose) {
+                    // إزاحة 16dp لليسار: محاذاة الأيقونة مع حاشية المحتوى (20dp)
+                    // بعد خصم نصف صندوق اللمس 48dp وحشوة صف العنوان 4dp.
+                    IconButton(
+                        onClick = onClose,
+                        modifier = Modifier.offset(x = (-16).dp),
+                    ) {
                         Icon(
                             imageVector = Icons.Rounded.Close,
                             contentDescription = stringResource(R.string.action_close),
