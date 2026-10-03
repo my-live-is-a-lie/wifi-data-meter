@@ -133,10 +133,8 @@ fun DashboardScreen(
             }
         }
 
-        item { TodayCard(state = state) }
-
         item {
-            SpeedTestCard(
+            TodayCard(
                 state = state,
                 onStart = onStartSpeedTest,
                 onStop = onStopSpeedTest,
@@ -530,7 +528,11 @@ private fun NotConnectedCard(isOnline: Boolean) {
 }
 
 @Composable
-private fun TodayCard(state: UiState) {
+private fun TodayCard(
+    state: UiState,
+    onStart: () -> Unit,
+    onStop: () -> Unit,
+) {
     val downloadColor = LocalDownloadColor.current
     val uploadColor = LocalUploadColor.current
 
@@ -581,122 +583,113 @@ private fun TodayCard(state: UiState) {
                     modifier = Modifier.weight(1f),
                 )
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
+            SpeedTestRow(state = state, onStart = onStart, onStop = onStop)
         }
     }
 }
 
 /**
- * بطاقة اختبار السرعة: زر تشغيل عبر fast.com ونتائجه (تنزيل/رفع).
+ * صف اختبار السرعة داخل بطاقة اليوم: الزر أولًا (يمين RTL) ثم العنوان
+ * ثم نتائج التنزيل/الرفع يسارًا — كما في التصميم المرجعي.
  */
 @Composable
-private fun SpeedTestCard(state: UiState, onStart: () -> Unit, onStop: () -> Unit) {
+private fun SpeedTestRow(state: UiState, onStart: () -> Unit, onStop: () -> Unit) {
     val downloadColor = LocalDownloadColor.current
     val uploadColor = LocalUploadColor.current
     val test = state.speedTest
     val running = test is SpeedTestState.Running
 
-    ExpressiveCard {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.speed_test_title),
-                        style = MaterialTheme.typography.bodyLargeEmphasized,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        text = stringResource(R.string.speed_test_subtitle),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Button(
-                    onClick = { if (running) onStop() else onStart() },
-                    shape = AppButtonShape,
-                ) {
-                    if (running) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.onPrimary,
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Rounded.PlayArrow,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
-                }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Button(
+            onClick = { if (running) onStop() else onStart() },
+            shape = AppButtonShape,
+        ) {
+            if (running) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Rounded.PlayArrow,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                )
             }
+        }
 
-            if (test is SpeedTestState.Done) {
-                Spacer(modifier = Modifier.height(12.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Rounded.ArrowDownward,
-                                contentDescription = null,
-                                tint = downloadColor,
-                                modifier = Modifier.size(12.dp),
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = stringResource(R.string.label_download),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        Text(
-                            text = Format.bits(test.downloadBitsPerSecond),
-                            style = MaterialTheme.typography.bodyMediumEmphasized,
-                            color = downloadColor,
-                        )
-                    }
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Rounded.ArrowUpward,
-                                contentDescription = null,
-                                tint = uploadColor,
-                                modifier = Modifier.size(12.dp),
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = stringResource(R.string.label_upload),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        Text(
-                            text = Format.bits(test.uploadBitsPerSecond),
-                            style = MaterialTheme.typography.bodyMediumEmphasized,
-                            color = uploadColor,
-                        )
-                    }
-                }
-            }
+        Spacer(modifier = Modifier.width(16.dp))
 
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = stringResource(R.string.speed_test_title),
+                style = MaterialTheme.typography.bodyLargeEmphasized,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = stringResource(R.string.speed_test_subtitle),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             if (test is SpeedTestState.Failed) {
-                Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = stringResource(R.string.speed_test_failed),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                 )
+            }
+        }
+
+        if (test is SpeedTestState.Done) {
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = Format.bits(test.downloadBitsPerSecond),
+                        style = MaterialTheme.typography.bodyMediumEmphasized,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Rounded.ArrowDownward,
+                            contentDescription = null,
+                            tint = downloadColor,
+                            modifier = Modifier.size(12.dp),
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = stringResource(R.string.label_download),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = Format.bits(test.uploadBitsPerSecond),
+                        style = MaterialTheme.typography.bodyMediumEmphasized,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Rounded.ArrowUpward,
+                            contentDescription = null,
+                            tint = uploadColor,
+                            modifier = Modifier.size(12.dp),
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = stringResource(R.string.label_upload),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
             }
         }
     }
