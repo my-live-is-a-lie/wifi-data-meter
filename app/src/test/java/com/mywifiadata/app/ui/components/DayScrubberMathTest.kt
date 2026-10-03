@@ -13,36 +13,51 @@ class DayScrubberMathTest {
     @Test
     fun `all bars share the same weight while the scrubber is idle`() {
         for (index in 0 until 30) {
-            assertEquals(1f, barWeight(index = index, activeIndex = null), 0f)
+            assertEquals(1f, barWeight(index = index, activeIndex = null, count = 30), 0f)
         }
     }
 
     @Test
-    fun `the active bar expands and its neighbours shrink gradually`() {
-        val active = 10
-        val expanded = barWeight(index = active, activeIndex = active)
-        val first = barWeight(index = active + 1, activeIndex = active)
-        val second = barWeight(index = active + 2, activeIndex = active)
-        val third = barWeight(index = active + 3, activeIndex = active)
-        val distant = barWeight(index = active + 4, activeIndex = active)
-
-        assertEquals(1f + BAR_EXPANSION, expanded, 0.0001f)
-        // الأقرب أكثر انكماشًا ثم يقل تدريجيًا: عدة أعمدة تنزاح لا عمود واحد.
-        assertEquals(1f - BAR_NEIGHBOR_SHRINK, first, 0.0001f)
-        assertEquals(true, second < 1f && second > first)
-        assertEquals(true, third < 1f && third > second)
-        assertEquals(1f, distant, 0f)
+    fun `the active bar expands`() {
+        assertEquals(
+            ACTIVE_BAR_WEIGHT,
+            barWeight(index = 10, activeIndex = 10, count = 30),
+            0.0001f,
+        )
     }
 
     @Test
-    fun `both sides of the active bar shift by the same gradient`() {
-        val active = 15
-        for (distance in 1..3) {
-            assertEquals(
-                barWeight(index = active - distance, activeIndex = active),
-                barWeight(index = active + distance, activeIndex = active),
-                0.0001f,
-            )
+    fun `every other bar shrinks so they all shift, not only the neighbours`() {
+        val active = 10
+        val count = 30
+        val neighbour = barWeight(index = active + 1, activeIndex = active, count = count)
+        val far = barWeight(index = 0, activeIndex = active, count = count)
+        val farRight = barWeight(index = count - 1, activeIndex = active, count = count)
+
+        // كل الأعمدة غير النشطة تتقلّص بنفس المقدار (فتنزاح جميعها) لا عمود واحد.
+        assertEquals(neighbour, far, 0.0001f)
+        assertEquals(neighbour, farRight, 0.0001f)
+        assertEquals(true, neighbour < 1f)
+    }
+
+    @Test
+    fun `the total weight stays constant so the chart width never changes`() {
+        for (count in listOf(7, 14, 30)) {
+            val total = (0 until count).sumOf { index ->
+                barWeight(index = index, activeIndex = count / 2, count = count).toDouble()
+            }
+            assertEquals(count.toDouble(), total, 0.0001)
+        }
+    }
+
+    @Test
+    fun `few bars never collapse to zero width`() {
+        for (count in 2..5) {
+            for (index in 0 until count) {
+                val weight = barWeight(index = index, activeIndex = 0, count = count)
+                assertEquals(true, weight >= MIN_OTHERS_WEIGHT)
+                assertEquals(true, weight > 0f)
+            }
         }
     }
 
@@ -72,7 +87,7 @@ class DayScrubberMathTest {
     @Test
     fun `bar weights never collapse to zero or negative`() {
         for (index in 0 until 30) {
-            val weight = barWeight(index = index, activeIndex = 29)
+            val weight = barWeight(index = index, activeIndex = 29, count = 30)
             assertEquals(true, weight > 0f)
         }
     }
