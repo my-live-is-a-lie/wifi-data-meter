@@ -102,6 +102,8 @@ data class SpeedTestRecord(
     val uploadBitsPerSecond: Double,
     val timestampMillis: Long,
     val usedFastCom: Boolean,
+    /** false إن تعذّر قياس الرفع في ذلك الاختبار. */
+    val uploadMeasured: Boolean = true,
 )
 
 /**

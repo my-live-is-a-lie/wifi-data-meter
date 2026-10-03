@@ -52,11 +52,14 @@ sealed interface SpeedTestState {
         val uploadBitsPerSecond: Double,
         val timestampMillis: Long = System.currentTimeMillis(),
         val usedFastCom: Boolean = true,
+        /** false إن تعذّر قياس الرفع (تُعرض شرطة بدل صفر). */
+        val uploadMeasured: Boolean = true,
     ) : SpeedTestState
 
-    /** فشل الاختبار مع سببه لعرض الرسالة المناسبة. */
+    /** فشل الاختبار مع سببه وتفاصيل المصادر التي جُرّبت. */
     data class Failed(
         val failure: SpeedTestEngine.Failure = SpeedTestEngine.Failure.ERROR,
+        val detail: String? = null,
     ) : SpeedTestState
 }
 
@@ -526,16 +529,24 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
                     uploadBitsPerSecond = result.uploadBitsPerSecond,
                     timestampMillis = System.currentTimeMillis(),
                     usedFastCom = result.usedFastCom,
+                    uploadMeasured = result.uploadMeasured,
                 )
                 repository.settingsStore.saveSpeedTest(record)
                 _uiState.update { it.copy(speedTest = record.toSpeedTestState()) }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: SpeedTestEngine.SpeedTestException) {
-                _uiState.update { it.copy(speedTest = SpeedTestState.Failed(e.failure)) }
+                _uiState.update {
+                    it.copy(speedTest = SpeedTestState.Failed(e.failure, e.detail))
+                }
             } catch (e: Exception) {
                 _uiState.update {
-                    it.copy(speedTest = SpeedTestState.Failed(SpeedTestEngine.Failure.ERROR))
+                    it.copy(
+                        speedTest = SpeedTestState.Failed(
+                            failure = SpeedTestEngine.Failure.ERROR,
+                            detail = e.message,
+                        ),
+                    )
                 }
             }
         }
@@ -577,5 +588,6 @@ private fun SpeedTestRecord?.toSpeedTestState(): SpeedTestState {
         uploadBitsPerSecond = record.uploadBitsPerSecond,
         timestampMillis = record.timestampMillis,
         usedFastCom = record.usedFastCom,
+        uploadMeasured = record.uploadMeasured,
     )
 }

@@ -58,6 +58,7 @@
     <string name="speed_test_finished">Test finished</string>
     <string name="speed_test_last_at">Last test via fast.com: %1$s</string>
     <string name="speed_test_last_at_fallback">Last test via fallback servers: %1$s</string>
+    <string name="speed_test_details">Source details: %1$s</string>
     <string name="speed_test_never">No test yet — tap the play button to measure your speed.</string>
     <string name="speed_test_start">Start speed test</string>
     <string name="speed_test_stop">Stop the test and close the download</string>

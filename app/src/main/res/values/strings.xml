@@ -69,6 +69,7 @@
     <string name="speed_test_finished">اكتمل الاختبار</string>
     <string name="speed_test_last_at">آخر اختبار عبر fast.com: %1$s</string>
     <string name="speed_test_last_at_fallback">آخر اختبار عبر خوادم بديلة: %1$s</string>
+    <string name="speed_test_details">تفاصيل المصادر: %1$s</string>
     <string name="speed_test_never">لم يُجرَ اختبار بعد — اضغط زر التشغيل لقياس سرعة الإنترنت.</string>
     <string name="speed_test_start">بدء اختبار السرعة</string>
     <string name="speed_test_stop">إيقاف الاختبار وإغلاق التحميل</string>

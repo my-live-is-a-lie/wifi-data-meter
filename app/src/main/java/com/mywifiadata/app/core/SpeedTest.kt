@@ -4,7 +4,9 @@ import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.SocketTimeoutException
 import java.net.URL
-import java.util.concurrent.atomic.AtomicInteger
+import java.util.Collections
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CancellationException
@@ -18,18 +20,20 @@ import org.json.JSONObject
 import kotlin.coroutines.coroutineContext
 
 /**
- * قياس سرعة الإنترنت بالخوادم خلف موقع fast.com (Netflix Open Connect)،
- * مع رجوع تلقائي إلى خوادم Cloudflare إذا حُجب api.fast.com في منطقة
- * المستخدم (بعض الدول تحجبه برمز 403).
+ * قياس سرعة الإنترنت بالخوادم خلف موقع fast.com (Netflix Open Connect) كمصدر
+ * أساسي، مع **معايرة متوازية** لعدد من المصادر البديلة (Google، jsDelivr، cdnjs،
+ * Cloudflare، Hetzner، Tele2، OVH، ThinkBroadband) وأخذ أسرعها إن كان fast.com
+ * محجوبًا أو متوقفًا على الشبكة الحالية.
  *
- * مزايا السلامة المضافة:
- * - **رسالة عند انقطاع الاتصال**: مرصد [SpeedTestWatchdog] يفحص الشبكة كل نصف
- *   ثانية أثناء الاختبار، وعند فقدانها يتوقف كل شيء فورًا مع سبب واضح.
- * - **رسالة عند مرور وقت طويل دون نتيجة**: إذا لم تصل أي بيانات خلال
- *   [Config.stallTimeoutMillis] أو تجاوز الاختبار [Config.overallTimeoutMillis]
- *   يُغلق التحميل (تُفصل الاتصالات) ويُعاد سبب الفشل إلى الواجهة.
+ * ضمانات السلامة المطلوبة:
+ * - **رسالة عند انقطاع الاتصال**: مرصد يفحص الشبكة كل نصف ثانية، وعند فقدانها
+ *   يتوقف كل شيء فورًا ويُفصل كل اتصال.
+ * - **رسالة عند مرور وقت طويل دون نتيجة**: إن توقف وصول البيانات خلال القياس
+ *   [Config.stallTimeoutMillis]، أو تجاوز الاختبار [Config.overallTimeoutMillis]
+ *   يُغلق التحميل ويُعاد سبب الفشل للواجهة.
  * - **إغلاق التحميل دائمًا**: كل اتصال يُفصل في `finally`، وإلغاء الـCoroutine
- *   (زر الإيقاف) يوقف القراءة/الكتابة بدل تركها في الخلفية.
+ *   (زر الإيقاف) يوقف القراءة/الكتابة فورًا.
+ * - **تفاصيل الفشل**: تُسجَّل نتيجة كل مصدر لتُعرض في الواجهة عند تعذّر الاختبار.
  */
 object SpeedTestEngine {
 
@@ -39,10 +43,11 @@ object SpeedTestEngine {
     /** أسباب فشل الاختبار (تُترجم إلى رسائل عربية في الواجهة). */
     enum class Failure { NO_CONNECTION, CONNECTION_LOST, STALLED, TIMEOUT, ERROR }
 
-    /** فشل اختبار السرعة مصحوبًا بسببه. */
+    /** فشل اختبار السرعة مصحوبًا بسببه وتفاصيل المحاولات. */
     class SpeedTestException(
         val failure: Failure,
         message: String,
+        val detail: String? = null,
         cause: Throwable? = null,
     ) : IOException(message, cause)
 
@@ -54,40 +59,128 @@ object SpeedTestEngine {
         val bitsPerSecond: Double,
     )
 
-    /** نتيجة الاختبار: قيمتان بالبت/ثانية + مصدر القياس. */
+    /** نتيجة الاختبار: قيمتان بالبت/ثانية + المصدر المستخدم. */
     data class Result(
         val downloadBitsPerSecond: Double,
         val uploadBitsPerSecond: Double,
         val usedFastCom: Boolean,
         val durationMillis: Long,
+        /** false إن تعذّر قياس الرفع (تُعرض شرطة بدل صفر). */
+        val uploadMeasured: Boolean = true,
+        /** معرّف المصدر الذي قِيس عليه التنزيل. */
+        val sourceLabel: String? = null,
     )
 
     /** إعدادات الاختبار والمراصد الزمنية. */
     data class Config(
         val overallTimeoutMillis: Long = SpeedTestWatchdog.DEFAULT_OVERALL_TIMEOUT_MILLIS,
         val stallTimeoutMillis: Long = SpeedTestWatchdog.DEFAULT_STALL_TIMEOUT_MILLIS,
-        val downloadMillis: Long = 10_000L,
+        /** مدة معايرة المصادر المتوازية. */
+        val probeMillis: Long = 4_500L,
+        /** عدد البايتات الذي يعتبر المصدر ناجحًا عند بلوغه أثناء المعايرة. */
+        val probeMinBytes: Long = 400_000L,
+        /** مهلة إضافية نمنحها لمصدر fast.com قبل اختيار مصدر آخر. */
+        val preferredGraceMillis: Long = 1_500L,
+        /** نافذة القياس الفعلية. */
+        val measureMillis: Long = 8_000L,
         val uploadMillis: Long = 6_000L,
+        val probeConnections: Int = 1,
         val streams: Int = 5,
-        val connectTimeoutMillis: Int = 10_000,
-        /** مهلة قراءة التدفقات: قصيرة ليتحرك المرصد سريعًا عند التوقف. */
+        val connectTimeoutMillis: Int = 8_000,
         val readTimeoutMillis: Int = 4_000,
-        /** مهلة الطلبات الصغيرة (صفحة fast.com وواجهة الرموز). */
         val metadataReadTimeoutMillis: Int = 12_000,
         val reportIntervalMillis: Long = 300L,
     )
 
+    /** مصدر تنزيل: معرّف + دالة تُرجع روابطه (بعضها يُجلب من واجهة خارجية). */
+    internal data class DownloadSource(
+        val id: String,
+        val urls: suspend (Config) -> List<String>,
+        val headers: Map<String, String> = emptyMap(),
+    )
+
+    /** مصدر رفع: عنوان خام أو multipart. */
+    internal data class UploadSource(
+        val id: String,
+        val url: String,
+        val multipart: Boolean = false,
+    )
+
+    private const val FAST_COM_ID = "fast.com"
     private const val FAST_HOME = "https://fast.com/"
     private const val REFERER = "https://fast.com/"
     private const val ORIGIN = "https://fast.com"
-    private const val CLOUDFLARE_DOWN =
-        "https://speed.cloudflare.com/__down?bytes=25000000"
-    private const val CLOUDFLARE_UP = "https://speed.cloudflare.com/__up"
     private const val USER_AGENT =
         "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
     private const val WATCH_INTERVAL_MILLIS = 500L
     private val TOKEN_REGEX = Regex("""token\s*[:=]\s*["']([^"']+)["']""")
     private val SCRIPT_REGEX = Regex("""src=["']([^"']*app-[^"']+\.js)["']""")
+
+    /**
+     * مصادر التنزيل بالترتيب: fast.com أولًا (المصدر المفضّل)، ثم خوادم عامة
+     * متنوعة على شبكات توصيل مختلفة لتجاوز الحجب الجزئي.
+     */
+    internal val DOWNLOAD_SOURCES: List<DownloadSource> = listOf(
+        DownloadSource(
+            id = FAST_COM_ID,
+            headers = mapOf("Referer" to REFERER, "Origin" to ORIGIN),
+            urls = { config -> fastComUrls(config) },
+        ),
+        DownloadSource(
+            id = "Google",
+            urls = {
+                listOf(
+                    "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+                )
+            },
+        ),
+        DownloadSource(
+            id = "jsDelivr",
+            urls = {
+                listOf(
+                    "https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/editor/editor.main.js",
+                )
+            },
+        ),
+        DownloadSource(
+            id = "cdnjs",
+            urls = {
+                listOf(
+                    "https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/editor/editor.main.js",
+                )
+            },
+        ),
+        DownloadSource(
+            id = "Cloudflare",
+            urls = { listOf("https://speed.cloudflare.com/__down?bytes=100000000") },
+        ),
+        DownloadSource(
+            id = "Hetzner-DE",
+            urls = { listOf("https://speed.hetzner.de/100MB.bin") },
+        ),
+        DownloadSource(
+            id = "Hetzner-US",
+            urls = { listOf("https://ash-speed.hetzner.com/100MB.bin") },
+        ),
+        DownloadSource(
+            id = "Tele2",
+            urls = { listOf("https://speedtest.tele2.net/100MB.zip") },
+        ),
+        DownloadSource(
+            id = "OVH",
+            urls = { listOf("https://proof.ovh.net/files/100Mb.dat") },
+        ),
+        DownloadSource(
+            id = "ThinkBroadband",
+            urls = { listOf("https://ipv4.download.thinkbroadband.com/50MB.zip") },
+        ),
+    )
+
+    /** مصادر الرفع بالترتيب (fast.com لا يوفّر واجهة رفع عامة موثوقة). */
+    internal val UPLOAD_SOURCES: List<UploadSource> = listOf(
+        UploadSource(id = "Cloudflare", url = "https://speed.cloudflare.com/__up"),
+        UploadSource(id = "Tele2", url = "https://speedtest.tele2.net/upload.php", multipart = true),
+    )
 
     /**
      * تنفيذ الاختبار كاملًا (تنزيل ثم رفع).
@@ -111,164 +204,332 @@ object SpeedTestEngine {
             stallTimeoutMillis = config.stallTimeoutMillis,
         )
         val tracker = Tracker(startedAt, config, watchdog, onProgress)
+        val log = AttemptLog()
 
-        // 1) التنزيل: fast.com أولًا، وإن فشل الخادم نفسه (حجب/403) ننتقل إلى Cloudflare.
-        //    أما انقطاع الاتصال أو توقّف البيانات فيوقف الاختبار فورًا برسالته.
-        var usedFastCom = true
-        val download = try {
-            phase(watchdog, isOnline) { fastDownload(config, tracker) }
-        } catch (e: SpeedTestException) {
-            if (e.failure != Failure.ERROR) throw e
-            usedFastCom = false
-            phase(watchdog, isOnline) { cloudflareDownload(config, tracker) }
-        }
-
-        // 2) الرفع عبر Cloudflare (fast.com لا يوفّر واجهة رفع عامة موثوقة).
-        val upload = try {
-            phase(watchdog, isOnline) { cloudflareUpload(config, tracker) }
-        } catch (e: SpeedTestException) {
-            when (e.failure) {
-                Failure.ERROR -> 0.0
-                else -> throw e
-            }
-        }
-
-        val finishedAt = System.currentTimeMillis()
-        tracker.finish()
-        Result(
-            downloadBitsPerSecond = download,
-            uploadBitsPerSecond = upload,
-            usedFastCom = usedFastCom,
-            durationMillis = (finishedAt - startedAt).coerceAtLeast(1L),
-        )
-    }
-
-    /**
-     * ينفّذ مرحلة واحدة مع مرصد يفحص الاتصال وتدفّق البيانات، ويحوّل أخطاء
-     * الشبكة إلى [SpeedTestException] بسبب واضح.
-     */
-    private suspend fun <T> phase(
-        watchdog: SpeedTestWatchdog,
-        isOnline: () -> Boolean,
-        block: suspend () -> T,
-    ): T = try {
         coroutineScope {
+            val stallArmed = AtomicBoolean(false)
             val watcher = launch {
                 while (true) {
                     delay(WATCH_INTERVAL_MILLIS)
-                    val failure = watchdog.check(
-                        nowMillis = System.currentTimeMillis(),
-                        isOnline = isOnlineSafely(isOnline),
-                    )
+                    val now = System.currentTimeMillis()
+                    val failure = when {
+                        !isOnlineSafely(isOnline) -> Failure.CONNECTION_LOST
+                        stallArmed.get() &&
+                            now - watchdog.lastProgressMillis >= config.stallTimeoutMillis ->
+                            Failure.STALLED
+
+                        now - startedAt >= config.overallTimeoutMillis -> Failure.TIMEOUT
+                        else -> null
+                    }
                     if (failure != null) {
-                        throw SpeedTestException(failure, "watchdog: $failure")
+                        throw SpeedTestException(failure, "watchdog: $failure", log.summary())
                     }
                 }
             }
+
             try {
-                block()
+                val download = download(config, tracker, stallArmed, log)
+                val upload = upload(config, tracker, stallArmed, log)
+                tracker.finish()
+                Result(
+                    downloadBitsPerSecond = download.rate,
+                    uploadBitsPerSecond = upload,
+                    usedFastCom = download.sourceId == FAST_COM_ID,
+                    durationMillis = (System.currentTimeMillis() - startedAt).coerceAtLeast(1L),
+                    uploadMeasured = upload > 0.0,
+                    sourceLabel = download.sourceId,
+                )
             } finally {
                 watcher.cancel()
             }
         }
-    } catch (e: SpeedTestException) {
-        throw e
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: SocketTimeoutException) {
-        throw SpeedTestException(Failure.STALLED, "socket timeout", e)
-    } catch (e: IOException) {
-        val failure = if (isOnlineSafely(isOnline)) Failure.ERROR else Failure.CONNECTION_LOST
-        throw SpeedTestException(failure, e.message ?: "io error", e)
     }
 
-    /** تنزيل من خوادم fast.com عبر عدة تدفقات متوازية. */
-    private suspend fun fastDownload(config: Config, tracker: Tracker): Double {
-        tracker.startPhase(Phase.PREPARING)
-        val token = fetchFastToken(config)
-        val api = "https://api.fast.com/netflix/speedtest/v2" +
-            "?https=true&token=$token&urlCount=${config.streams}"
-        val body = httpGet(api, config, mapOf("Referer" to REFERER, "Origin" to ORIGIN))
-        val urls = parseUrls(body)
-        if (urls.isEmpty()) throw SpeedTestException(Failure.ERROR, "fast.com: no test urls")
-        return multiStreamDownload(urls, config, tracker)
-    }
+    /** نتيجة التنزيل: السرعة المقيسة ومعرّف المصدر الذي قِيس عليه. */
+    private data class DownloadOutcome(val rate: Double, val sourceId: String)
 
-    /** قراءة عدة تدفقات حتى انتهاء المدة، وفشل تدفق واحد لا يوقف البقية. */
-    private suspend fun multiStreamDownload(
-        urls: List<String>,
+    /**
+     * التنزيل: فكّ روابط كل المصادر بالتوازي، ثم معايرة متوازية قصيرة لاختيار
+     * أسرع مصدر عامل، ثم قياس فعلي عليه بنافذة كاملة.
+     */
+    private suspend fun download(
         config: Config,
         tracker: Tracker,
-    ): Double {
-        tracker.startPhase(Phase.DOWNLOAD)
-        val deadline = System.currentTimeMillis() + config.downloadMillis
-        val failures = AtomicInteger(0)
+        stallArmed: AtomicBoolean,
+        log: AttemptLog,
+    ): DownloadOutcome {
+        tracker.startPhase(Phase.PREPARING)
 
+        // 1) فكّ الروابط (fast.com يحتاج جلب رمز من الواجهة).
+        val resolved = ConcurrentHashMap<String, List<String>>()
         coroutineScope {
-            urls.forEach { address ->
+            DOWNLOAD_SOURCES.forEach { source ->
                 launch(Dispatchers.IO) {
                     try {
-                        val bytes = stream(address, deadline, config, tracker)
-                        if (bytes <= 0L) failures.incrementAndGet()
+                        val urls = source.urls(config)
+                        if (urls.isEmpty()) log.record(source.id, REASON_NO_URLS) else resolved[source.id] = urls
                     } catch (e: CancellationException) {
                         throw e
-                    } catch (e: SpeedTestException) {
-                        // توقّف/انقطاع حقيقي: يوقف الاختبار كله برسالته.
-                        throw e
-                    } catch (e: IOException) {
-                        failures.incrementAndGet()
+                    } catch (e: Throwable) {
+                        log.record(source.id, reasonOf(e))
                     }
                 }
             }
         }
-
-        if (failures.get() >= urls.size) {
-            throw SpeedTestException(Failure.ERROR, "fast.com: all streams failed")
+        if (resolved.isEmpty()) {
+            throw SpeedTestException(Failure.ERROR, "no download source", log.summary())
         }
+
+        // 2) معايرة متوازية: من يصل أولًا (والأسرع) يحدَّد مصدر القياس.
+        val order = DOWNLOAD_SOURCES.map { it.id }.filter { resolved.containsKey(it) }
+        val probed = probe(resolved, order, config, tracker, log)
+
+        val winner = SourceSelector.pick(
+            order = order,
+            bytes = probed,
+            minBytes = config.probeMinBytes,
+            preferredId = FAST_COM_ID.takeIf { resolved.containsKey(it) },
+        ) ?: throw SpeedTestException(Failure.ERROR, "no reachable source", log.summary())
+
+        // 3) القياس الفعلي على المصدر الفائز.
+        val source = DOWNLOAD_SOURCES.first { it.id == winner }
+        val urls = resolved.getValue(winner)
+        stallArmed.set(true)
+        return try {
+            val rate = measure(source, urls, config, tracker, log)
+            DownloadOutcome(rate = rate, sourceId = winner)
+        } finally {
+            stallArmed.set(false)
+        }
+    }
+
+    /** معايرة كل المصادر في وقت واحد؛ تُلغى البقية فور تحديد الفائز. */
+    private suspend fun probe(
+        resolved: Map<String, List<String>>,
+        order: List<String>,
+        config: Config,
+        tracker: Tracker,
+        log: AttemptLog,
+    ): Map<String, Long> {
+        val bytes = ConcurrentHashMap<String, Long>()
+        val probeStartedAt = System.currentTimeMillis()
+
+        coroutineScope {
+            val jobs = order.map { id ->
+                launch(Dispatchers.IO) {
+                    val source = DOWNLOAD_SOURCES.first { it.id == id }
+                    val counter = AtomicLong(0L)
+                    try {
+                        val end = System.currentTimeMillis() + config.probeMillis
+                        readStreams(
+                            urls = resolved.getValue(id),
+                            connections = config.probeConnections,
+                            deadline = end,
+                            config = config,
+                            headers = source.headers,
+                            onBytes = { count -> counter.addAndGet(count); tracker.addBytes(count) },
+                        )
+                        if (counter.get() <= 0L) log.record(id, REASON_NO_BYTES)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        log.record(id, reasonOf(e))
+                    } finally {
+                        bytes[id] = counter.get()
+                    }
+                }
+            }
+
+            val limit = probeStartedAt + config.probeMillis + config.preferredGraceMillis
+            while (System.currentTimeMillis() < limit) {
+                delay(PROBE_POLL_MILLIS)
+                val preferred = FAST_COM_ID.takeIf { resolved.containsKey(it) }
+                val preferredReady = preferred != null &&
+                    (bytes[preferred] ?: 0L) >= config.probeMinBytes
+                val otherReady = SourceSelector.anyOtherReached(
+                    order = order,
+                    bytes = bytes,
+                    minBytes = config.probeMinBytes,
+                    preferredId = preferred,
+                )
+                // نتوقف فور جهوزية fast.com، أو بعد مهلة السماح إن جهز مصدر آخر.
+                val elapsed = System.currentTimeMillis() - probeStartedAt
+                if (preferredReady || (otherReady && elapsed >= config.preferredGraceMillis)) break
+            }
+
+            jobs.forEach { it.cancel() }
+        }
+
+        return bytes.toMap()
+    }
+
+    /** قياس فعلي على مصدر واحد بعدة اتصالات متوازية. */
+    private suspend fun measure(
+        source: DownloadSource,
+        urls: List<String>,
+        config: Config,
+        tracker: Tracker,
+        log: AttemptLog,
+    ): Double {
+        tracker.startPhase(Phase.DOWNLOAD)
+        val end = System.currentTimeMillis() + config.measureMillis
+        readStreams(
+            urls = urls,
+            connections = config.streams,
+            deadline = end,
+            config = config,
+            headers = source.headers,
+            onBytes = { count -> tracker.addBytes(count) },
+        )
         if (tracker.phaseByteCount <= 0L) {
-            throw SpeedTestException(Failure.ERROR, "fast.com: no bytes received")
+            log.record(source.id, REASON_NO_BYTES)
+            throw SpeedTestException(Failure.ERROR, "${source.id}: no bytes received", log.summary())
         }
         return tracker.currentBitsPerSecond()
     }
 
-    /** قراءة تدفق واحد حتى الموعد النهائي (يُفصل الاتصال دائمًا في finally). */
-    private suspend fun stream(
-        address: String,
+    /**
+     * يقرأ [connections] اتصالات متوازية من [urls] حتى [deadline]، ويبلّغ
+     * [onBytes] بكل قراءة. كل اتصال يُفصل في `finally` ولا يُوقف خطأ اتصال
+     * واحد بقية الاتصالات.
+     */
+    private suspend fun readStreams(
+        urls: List<String>,
+        connections: Int,
         deadline: Long,
         config: Config,
-        tracker: Tracker,
-    ): Long {
-        val target = if (address.contains("/range/")) {
-            address
-        } else {
-            address.trimEnd('/') + "/range/0-26214400"
-        }
-        val conn = open(target, config, mapOf("Referer" to REFERER, "Origin" to ORIGIN))
-        var count = 0L
-        try {
-            if (conn.responseCode != 200) throw IOException("HTTP ${conn.responseCode}")
-            conn.inputStream.use { input ->
-                val buffer = ByteArray(64 * 1024)
-                while (System.currentTimeMillis() < deadline) {
-                    coroutineContext.ensureActive()
-                    var read = 0
-                    var timedOut = false
-                    try {
-                        read = input.read(buffer)
-                    } catch (e: SocketTimeoutException) {
-                        timedOut = true
+        headers: Map<String, String>,
+        onBytes: (Long) -> Unit,
+    ) {
+        if (urls.isEmpty() || connections <= 0) return
+        coroutineScope {
+            repeat(connections) { index ->
+                launch(Dispatchers.IO) {
+                    val url = urls[index % urls.size]
+                    while (System.currentTimeMillis() < deadline) {
+                        coroutineContext.ensureActive()
+                        val conn = open(url, config, headers)
+                        try {
+                            val code = conn.responseCode
+                            if (code != 200 && code != 206) throw IOException("HTTP $code")
+                            conn.inputStream.use { input ->
+                                val buffer = ByteArray(64 * 1024)
+                                while (System.currentTimeMillis() < deadline) {
+                                    coroutineContext.ensureActive()
+                                    var read = 0
+                                    var timedOut = false
+                                    try {
+                                        read = input.read(buffer)
+                                    } catch (e: SocketTimeoutException) {
+                                        // لا بيانات الآن: المرصد يقرر، وإن كان كل شيء سليمًا نتابع.
+                                        timedOut = true
+                                    }
+                                    if (timedOut) continue
+                                    if (read <= 0) break
+                                    onBytes(read.toLong())
+                                }
+                            }
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: IOException) {
+                            // فشل هذا الاتصال وحده ولا يوقف بقية الاتصالات.
+                            if (System.currentTimeMillis() >= deadline) break
+                        } finally {
+                            conn.disconnect()
+                        }
                     }
-                    // لا بيانات الآن: المرصد يقرر (توقّف/مهلة)، وإن كان كل شيء سليمًا نتابع.
-                    if (timedOut) continue
-                    if (read <= 0) break
-                    count += read
-                    tracker.addBytes(read.toLong())
                 }
             }
+        }
+    }
+
+    /** الرفع: المحاولة على مصادر الرفع بالترتيب حتى ينجح أحدها. */
+    private suspend fun upload(
+        config: Config,
+        tracker: Tracker,
+        stallArmed: AtomicBoolean,
+        log: AttemptLog,
+    ): Double {
+        UPLOAD_SOURCES.forEach { source ->
+            tracker.startPhase(Phase.UPLOAD)
+            stallArmed.set(true)
+            try {
+                sendUpload(source, config, tracker)
+                if (tracker.phaseByteCount > 0L) return tracker.currentBitsPerSecond()
+                log.record(source.id, REASON_NO_BYTES)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                log.record(source.id, reasonOf(e))
+            } finally {
+                stallArmed.set(false)
+            }
+        }
+        return 0.0
+    }
+
+    /** إرسال بيانات الرفع حتى انتهاء المدة (خام أو multipart). */
+    private suspend fun sendUpload(source: UploadSource, config: Config, tracker: Tracker) {
+        val deadline = System.currentTimeMillis() + config.uploadMillis
+        val conn = URL(source.url).openConnection() as HttpURLConnection
+        try {
+            conn.requestMethod = "POST"
+            conn.doOutput = true
+            conn.connectTimeout = config.connectTimeoutMillis
+            conn.readTimeout = config.metadataReadTimeoutMillis
+            conn.setRequestProperty("User-Agent", USER_AGENT)
+            conn.setRequestProperty("Accept-Encoding", "identity")
+            conn.setChunkedStreamingMode(128 * 1024)
+            val boundary = "----mywifi${System.currentTimeMillis()}"
+            conn.setRequestProperty(
+                "Content-Type",
+                if (source.multipart) {
+                    "multipart/form-data; boundary=$boundary"
+                } else {
+                    "application/octet-stream"
+                },
+            )
+            val chunk = ByteArray(256 * 1024)
+            conn.outputStream.use { output ->
+                if (source.multipart) {
+                    output.write(
+                        (
+                            "--$boundary\r\n" +
+                                "Content-Disposition: form-data; name=\"file\"; " +
+                                "filename=\"speedtest.bin\"\r\n" +
+                                "Content-Type: application/octet-stream\r\n\r\n"
+                            ).toByteArray(),
+                    )
+                }
+                while (System.currentTimeMillis() < deadline) {
+                    coroutineContext.ensureActive()
+                    output.write(chunk)
+                    tracker.addBytes(chunk.size.toLong())
+                }
+                if (source.multipart) output.write("\r\n--$boundary--\r\n".toByteArray())
+                output.flush()
+            }
+            if (conn.responseCode !in 200..299) throw IOException("HTTP ${conn.responseCode}")
         } finally {
             conn.disconnect()
         }
-        return count
+    }
+
+    /** روابط fast.com: نجلب الرمز من الصفحة (أو سكربت التطبيق) ثم واجهة القياس. */
+    private suspend fun fastComUrls(config: Config): List<String> {
+        val token = fetchFastToken(config)
+        val api = "https://api.fast.com/netflix/speedtest/v2" +
+            "?https=true&token=$token&urlCount=${config.streams}"
+        val body = httpGet(
+            api,
+            config,
+            mapOf("Referer" to REFERER, "Origin" to ORIGIN),
+        )
+        val urls = runCatching { parseUrls(body) }.getOrElse { error ->
+            throw SpeedTestException(Failure.ERROR, "fast.com: bad response", "رد غير متوقع من api.fast.com", error)
+        }
+        if (urls.isEmpty()) throw SpeedTestException(Failure.ERROR, "fast.com: no urls")
+        return urls
     }
 
     /** جلب رمز fast.com من الصفحة ثم سكربت التطبيق. */
@@ -299,94 +560,25 @@ object SpeedTestEngine {
         }
     }
 
-    /** تنزيل احتياطي من Cloudflare عند تعذّر fast.com. */
-    private suspend fun cloudflareDownload(config: Config, tracker: Tracker): Double {
-        tracker.startPhase(Phase.DOWNLOAD)
-        val deadline = System.currentTimeMillis() + config.downloadMillis
-        while (System.currentTimeMillis() < deadline) {
-            coroutineContext.ensureActive()
-            val conn = open(CLOUDFLARE_DOWN, config)
-            try {
-                if (conn.responseCode != 200) throw IOException("HTTP ${conn.responseCode}")
-                conn.inputStream.use { input ->
-                    val buffer = ByteArray(64 * 1024)
-                    while (System.currentTimeMillis() < deadline) {
-                        coroutineContext.ensureActive()
-                        var read = 0
-                        var timedOut = false
-                        try {
-                            read = input.read(buffer)
-                        } catch (e: SocketTimeoutException) {
-                            timedOut = true
-                        }
-                        if (timedOut) continue
-                        if (read <= 0) break
-                        tracker.addBytes(read.toLong())
-                    }
-                }
-            } catch (e: SpeedTestException) {
-                throw e
-            } catch (e: IOException) {
-                // انتهت المدة أثناء المحاولة: نكتفي بما جُمع.
-                if (System.currentTimeMillis() >= deadline) break
-                throw e
-            } finally {
-                conn.disconnect()
-            }
-        }
-        if (tracker.phaseByteCount <= 0L) {
-            throw SpeedTestException(Failure.ERROR, "cloudflare: no bytes received")
-        }
-        return tracker.currentBitsPerSecond()
-    }
-
-    /** رفع عبر Cloudflare (fast.com لا يوفّر واجهة رفع عامة موثوقة). */
-    private suspend fun cloudflareUpload(config: Config, tracker: Tracker): Double {
-        tracker.startPhase(Phase.UPLOAD)
-        val deadline = System.currentTimeMillis() + config.uploadMillis
-        val chunk = ByteArray(256 * 1024)
-        val conn = URL(CLOUDFLARE_UP).openConnection() as HttpURLConnection
-        try {
-            conn.requestMethod = "POST"
-            conn.doOutput = true
-            conn.connectTimeout = config.connectTimeoutMillis
-            conn.readTimeout = config.metadataReadTimeoutMillis
-            conn.setRequestProperty("User-Agent", USER_AGENT)
-            conn.setRequestProperty("Content-Type", "application/octet-stream")
-            conn.setChunkedStreamingMode(64 * 1024)
-            conn.outputStream.use { output ->
-                while (System.currentTimeMillis() < deadline) {
-                    coroutineContext.ensureActive()
-                    output.write(chunk)
-                    tracker.addBytes(chunk.size.toLong())
-                }
-                output.flush()
-            }
-            if (conn.responseCode !in 200..299) throw IOException("HTTP ${conn.responseCode}")
-        } finally {
-            conn.disconnect()
-        }
-        if (tracker.phaseByteCount <= 0L) {
-            throw SpeedTestException(Failure.ERROR, "cloudflare: no bytes sent")
-        }
-        return tracker.currentBitsPerSecond()
-    }
-
     private fun httpGet(
         address: String,
         config: Config,
         headers: Map<String, String> = emptyMap(),
     ): String {
-        val conn = open(address, config, headers, config.metadataReadTimeoutMillis)
+        val conn = open(
+            address = address,
+            config = config,
+            headers = headers,
+            readTimeoutMillis = config.metadataReadTimeoutMillis,
+        )
         try {
-            if (conn.responseCode != 200) {
-                throw SpeedTestException(Failure.ERROR, "HTTP ${conn.responseCode}")
-            }
+            val code = conn.responseCode
+            if (code != 200) throw SpeedTestException(Failure.ERROR, "HTTP $code")
             return conn.inputStream.bufferedReader().use { it.readText() }
         } catch (e: SpeedTestException) {
             throw e
         } catch (e: IOException) {
-            throw SpeedTestException(Failure.ERROR, e.message ?: "http error", e)
+            throw SpeedTestException(Failure.ERROR, e.message ?: "http error", null, e)
         } finally {
             conn.disconnect()
         }
@@ -403,6 +595,7 @@ object SpeedTestEngine {
         conn.readTimeout = readTimeoutMillis
         conn.instanceFollowRedirects = true
         conn.setRequestProperty("User-Agent", USER_AGENT)
+        conn.setRequestProperty("Accept-Encoding", "identity")
         headers.forEach { (name, value) -> conn.setRequestProperty(name, value) }
         return conn
     }
@@ -414,6 +607,31 @@ object SpeedTestEngine {
         } catch (e: Exception) {
             true
         }
+
+    /** وصف مختصر لسبب فشل مصدر واحد، يُعرض في التفاصيل. */
+    private fun reasonOf(error: Throwable): String = when {
+        error is SpeedTestException && error.detail != null -> error.detail
+        error.message?.startsWith("HTTP ") == true -> error.message!!
+        error is SocketTimeoutException -> REASON_TIMEOUT
+        error is java.net.UnknownHostException -> REASON_DNS
+        error is IOException -> REASON_NETWORK
+        else -> REASON_FAILED
+    }
+
+    /** سجل محاولات المصادر (آمن من تعدد الخيوط) لعرضه عند الفشل. */
+    internal class AttemptLog {
+        private val entries = Collections.synchronizedList(mutableListOf<String>())
+
+        fun record(source: String, reason: String) {
+            entries.add("$source: $reason")
+        }
+
+        fun summary(max: Int = 5): String? {
+            val snapshot = synchronized(entries) { entries.toList() }
+            if (snapshot.isEmpty()) return null
+            return snapshot.takeLast(max).joinToString(" • ")
+        }
+    }
 
     /** متابعة كمّية البيانات في كل مرحلة لحساب السرعة الجارية. */
     private class Tracker(
@@ -474,4 +692,12 @@ object SpeedTestEngine {
             )
         }
     }
+
+    private const val PROBE_POLL_MILLIS = 120L
+    private const val REASON_NO_URLS = "بلا روابط"
+    private const val REASON_NO_BYTES = "بلا بيانات"
+    private const val REASON_TIMEOUT = "مهلة"
+    private const val REASON_NETWORK = "فشل الاتصال"
+    private const val REASON_DNS = "تعذّر تحليل العنوان"
+    private const val REASON_FAILED = "فشل الطلب"
 }
