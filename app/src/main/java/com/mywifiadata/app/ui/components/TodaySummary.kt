@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -112,7 +111,7 @@ fun TodayTotalRow(
     label: String,
     secondaryBytes: Long,
     modifier: Modifier = Modifier,
-    icon: ImageVector = Icons.Rounded.Refresh,
+    icon: ImageVector = RingRefreshIcon,
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -143,14 +142,14 @@ fun TodayTotalRow(
             Column(horizontalAlignment = Alignment.End) {
                 Text(
                     text = label,
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 ByteValue(
                     bytes = secondaryBytes,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }

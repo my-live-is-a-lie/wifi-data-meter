@@ -74,6 +74,7 @@ class SettingsStore(context: Context) {
             uploadBitsPerSecond = Double.fromBits(prefs.getLong(KEY_SPEED_UPLOAD, 0L)),
             timestampMillis = timestamp,
             usedFastCom = prefs.getBoolean(KEY_SPEED_FAST, true),
+            uploadMeasured = prefs.getBoolean(KEY_SPEED_UPLOAD_OK, true),
         )
     }
 
@@ -96,6 +97,7 @@ class SettingsStore(context: Context) {
             .putLong(KEY_SPEED_UPLOAD, settings.lastSpeedTest?.uploadBitsPerSecond?.toRawBits() ?: 0L)
             .putLong(KEY_SPEED_TIME, settings.lastSpeedTest?.timestampMillis ?: 0L)
             .putBoolean(KEY_SPEED_FAST, settings.lastSpeedTest?.usedFastCom ?: true)
+            .putBoolean(KEY_SPEED_UPLOAD_OK, settings.lastSpeedTest?.uploadMeasured ?: true)
             .apply()
     }
 
@@ -119,5 +121,6 @@ class SettingsStore(context: Context) {
         private const val KEY_SPEED_UPLOAD = "speed_test_upload"
         private const val KEY_SPEED_TIME = "speed_test_time"
         private const val KEY_SPEED_FAST = "speed_test_source_fast"
+        private const val KEY_SPEED_UPLOAD_OK = "speed_test_upload_ok"
     }
 }

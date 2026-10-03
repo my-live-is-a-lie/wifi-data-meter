@@ -184,6 +184,19 @@ fun SpeedTestPanel(
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
+
+                val detail = (state as? SpeedTestState.Failed)?.detail
+                if (!detail.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = stringResource(R.string.speed_test_details, detail),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth(),
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
     }
@@ -191,9 +204,11 @@ fun SpeedTestPanel(
 
 /** قيمة إحدى نتيجتي الاختبار (أو شرطة أثناء عدم توفّرها). */
 private fun speedTestValue(state: SpeedTestState, download: Boolean): String = when (state) {
-    is SpeedTestState.Done -> Format.bitsPlain(
-        if (download) state.downloadBitsPerSecond else state.uploadBitsPerSecond,
-    )
+    is SpeedTestState.Done -> when {
+        download -> Format.bitsPlain(state.downloadBitsPerSecond)
+        state.uploadMeasured -> Format.bitsPlain(state.uploadBitsPerSecond)
+        else -> NO_VALUE
+    }
 
     is SpeedTestState.Running -> {
         val measuredPhase =
