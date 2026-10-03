@@ -30,6 +30,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -46,6 +48,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import kotlin.math.abs
+import kotlin.math.roundToInt
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.input.pointer.pointerInput
 
@@ -217,122 +220,166 @@ fun DailyBarChart(
     val labelStride = ((entries.size + MAX_LABELS - 1) / MAX_LABELS).coerceAtLeast(1)
     val spacing = chartSpacing(entries.size)
 
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(spacing),
-        verticalAlignment = Alignment.Bottom,
-    ) {
-        entries.forEachIndexed { index, entry ->
-            val fraction = (entry.value.toFloat() / maxValue.toFloat()).coerceIn(0.03f, 1f)
-            val animatedFraction by animateFloatAsState(
-                targetValue = fraction,
-                animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
-                label = "bar-$index",
-            )
-            // عرض العمود يتبع المؤشر: المشار إليه يتّسع والمحيط به ينكمش وينزاح.
-            val weight by animateFloatAsState(
-                targetValue = barWeight(
-                    index = index,
-                    activeIndex = activeIndex,
-                    count = entries.size,
-                ),
-                animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
-                label = "bar-weight-$index",
-            )
-            val isActive = index == activeIndex
+    Column(modifier = modifier.fillMaxWidth()) {
+        // صف الأعمدة: عرض كل عمود يتبع المؤشر (المشار إليه يتّسع والبقية تنزاح).
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(spacing),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            entries.forEachIndexed { index, entry ->
+                val fraction = (entry.value.toFloat() / maxValue.toFloat()).coerceIn(0.03f, 1f)
+                val animatedFraction by animateFloatAsState(
+                    targetValue = fraction,
+                    animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+                    label = "bar-$index",
+                )
+                val weight by animateFloatAsState(
+                    targetValue = barWeight(
+                        index = index,
+                        activeIndex = activeIndex,
+                        count = entries.size,
+                    ),
+                    animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
+                    label = "bar-weight-$index",
+                )
+                val isActive = index == activeIndex
 
-            val clickModifier = if (onEntryClick != null) {
-                Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .clickable { onEntryClick(index) }
-            } else {
-                Modifier
-            }
+                val clickModifier = if (onEntryClick != null) {
+                    Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { onEntryClick(index) }
+                } else {
+                    Modifier
+                }
 
-            Column(
-                modifier = Modifier
-                    .weight(weight)
-                    .then(clickModifier),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Bottom,
-            ) {
-                Box(
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(barHeight),
-                    contentAlignment = Alignment.BottomCenter,
+                        .weight(weight)
+                        .then(clickModifier),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Bottom,
                 ) {
                     Box(
                         modifier = Modifier
-                            // سقف لعرض العمود حتى لا يبدو ضخمًا عند عرض يوم واحد فقط،
-                            // ويُرفع للعمود النشط ليتّسع أفقيًا كما في التصميم.
-                            .widthIn(max = if (isActive) ACTIVE_BAR_MAX_WIDTH else 56.dp)
                             .fillMaxWidth()
-                            .fillMaxHeight(animatedFraction)
-                            .clip(
-                                RoundedCornerShape(
-                                    topStart = 8.dp,
-                                    topEnd = 8.dp,
-                                    bottomStart = 4.dp,
-                                    bottomEnd = 4.dp,
-                                ),
-                            )
-                            .background(
-                                if (entry.highlight || isActive) highlightColor else barColor,
-                            ),
-                    )
-                }
-                // تسمية اليوم: صندوق ملوّن لليوم الذي يشير إليه المؤشر، ونص عادي لغيره.
-                // وتُخفى تسميات الجيران المباشرين أثناء السحب حتى لا تتراكب مع الصندوق.
-                val labelText = if (
-                    showDayLabel(
-                        index = index,
-                        count = entries.size,
-                        stride = labelStride,
-                        activeIndex = activeIndex,
-                    )
-                ) {
-                    entry.label
-                } else {
-                    ""
-                }
-                // ارتفاع صف التسميات ثابت حتى لا يقفز المخطط عند ظهور الصندوق.
-                Box(
-                    modifier = Modifier
-                        .padding(top = 6.dp)
-                        .height(LABEL_ROW_HEIGHT),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Box(
-                        modifier = if (isActive) {
-                            Modifier
-                                // wrapContentWidth(unbounded) يجعل الصندوق يُقاس بعرضه
-                                // الكامل ولا يتقيّد بخانة العمود الضيقة (خانة اليوم الواحد
-                                // من 30 يومًا نحو 11dp) — وهذا سبب اقتطاع الرقم سابقًا.
-                                .wrapContentWidth(unbounded = true)
-                                .defaultMinSize(minWidth = DAY_PILL_MIN_WIDTH)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(MaterialTheme.colorScheme.primaryContainer)
-                                .padding(horizontal = 12.dp, vertical = 2.dp)
-                        } else {
-                            Modifier
-                        },
+                            .height(barHeight),
+                        contentAlignment = Alignment.BottomCenter,
                     ) {
-                        Text(
-                            text = labelText,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (isActive) {
-                                MaterialTheme.colorScheme.onPrimaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                            textAlign = TextAlign.Center,
-                            maxLines = 1,
-                            softWrap = false,
-                            overflow = TextOverflow.Visible,
+                        Box(
+                            modifier = Modifier
+                                // سقف لعرض العمود حتى لا يبدو ضخمًا عند عرض يوم واحد
+                                // فقط، ويُرفع للعمود النشط ليتّسع أفقيًا.
+                                .widthIn(max = if (isActive) ACTIVE_BAR_MAX_WIDTH else 56.dp)
+                                .fillMaxWidth()
+                                .fillMaxHeight(animatedFraction)
+                                .clip(
+                                    RoundedCornerShape(
+                                        topStart = 8.dp,
+                                        topEnd = 8.dp,
+                                        bottomStart = 4.dp,
+                                        bottomEnd = 4.dp,
+                                    ),
+                                )
+                                .background(
+                                    if (entry.highlight || isActive) highlightColor else barColor,
+                                ),
                         )
                     }
                 }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        // تسميات الأيام في طبقة مستقلة أسفل الأعمدة: تُقاس بحرّية ولا تخضع لعرض
+        // خانة العمود الضيقة، فلا يُقص رقم اليوم ولا صندوقه.
+        DayLabelsRow(
+            entries = entries,
+            activeIndex = activeIndex,
+            spacing = spacing,
+            stride = labelStride,
+        )
+    }
+}
+
+/**
+ * صف تسميات الأيام: كل تسمية تُقاس بحرّية (بلا قيد عرض خانتها) وتُوسَّط على
+ * خانتها بالحساب، فيظهر رقم اليوم وصندوقه كاملين مهما ضاقت الأعمدة.
+ *
+ * يوازن هذا الصف صفَّ الأعمدة تمامًا: نفس التباعد ونفس الأوزان، لأن موضع كل
+ * تسمية يُحسب من نفس معادلة توزيع العرض.
+ */
+@Composable
+private fun DayLabelsRow(
+    entries: List<BarEntry>,
+    activeIndex: Int?,
+    spacing: Dp,
+    stride: Int,
+    modifier: Modifier = Modifier,
+) {
+    val pillColor = MaterialTheme.colorScheme.primaryContainer
+    val onPillColor = MaterialTheme.colorScheme.onPrimaryContainer
+    val normalColor = MaterialTheme.colorScheme.onSurfaceVariant
+
+    Layout(
+        modifier = modifier.fillMaxWidth(),
+        content = {
+            entries.forEachIndexed { index, entry ->
+                val isActive = index == activeIndex
+                if (showDayLabel(index, entries.size, stride, activeIndex)) {
+                    Text(
+                        text = entry.label,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (isActive) onPillColor else normalColor,
+                        maxLines = 1,
+                        softWrap = false,
+                        modifier = if (isActive) {
+                            // صندوق اليوم: عرض أدنى محسوس وحشوة أفقية واسعة.
+                            Modifier
+                                .defaultMinSize(minWidth = DAY_PILL_MIN_WIDTH)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(pillColor)
+                                .padding(horizontal = DAY_PILL_HORIZONTAL_PADDING, vertical = 3.dp)
+                        } else {
+                            Modifier
+                        },
+                    )
+                } else {
+                    Spacer(modifier = Modifier)
+                }
+            }
+        },
+    ) { measurables, constraints ->
+        val spacingPx = spacing.roundToPx()
+        val weights = entries.indices.map { index ->
+            barWeight(index = index, activeIndex = activeIndex, count = entries.size)
+        }
+        val totalWeight = weights.sum().coerceAtLeast(0.0001f)
+        val available = (constraints.maxWidth - spacingPx * (entries.size - 1))
+            .coerceAtLeast(1)
+        // قياس حر (0..∞) لكل تسمية حتى يتّسع صندوق اليوم بلا قصّ.
+        val placeables = measurables.map { measurable -> measurable.measure(Constraints()) }
+        // ارتفاع ثابت لا يقل عن ارتفاع صندوق اليوم، فلا يقفز المخطط عند ظهوره.
+        val rowHeight = maxOf(
+            placeables.maxOfOrNull { it.height } ?: 0,
+            DAY_LABEL_ROW_MIN_HEIGHT.roundToPx(),
+        )
+
+        layout(width = constraints.maxWidth, height = rowHeight) {
+            var cursor = 0f
+            weights.forEachIndexed { index, weight ->
+                val slot = available * weight / totalWeight
+                val placeable = placeables[index]
+                if (placeable.width > 0) {
+                    val center = cursor + slot / 2f
+                    // تثبيت التسمية داخل حدود المخطط: صندوق اليوم أعرض من خانته،
+                    // فيُزاح قليلًا عند أول/آخر يوم بدل أن يُقص عند حافة البطاقة.
+                    val maxX = (constraints.maxWidth - placeable.width).coerceAtLeast(0)
+                    val x = (center - placeable.width / 2f).roundToInt().coerceIn(0, maxX)
+                    placeable.placeRelative(x = x, y = (rowHeight - placeable.height) / 2)
+                }
+                cursor += slot + spacingPx
             }
         }
     }
@@ -522,8 +569,8 @@ internal fun scrubIndexAt(xPx: Float, widthPx: Float, count: Int, rtl: Boolean):
     return if (rtl) count - 1 - logical else logical
 }
 
-/** ارتفاع صف تسميات الأيام (ثابت حتى لا يقفز المخطط عند ظهور صندوق اليوم). */
-private val LABEL_ROW_HEIGHT = 18.dp
+/** أقل ارتفاع لصف تسميات الأيام = ارتفاع صندوق اليوم، فلا يقفز المخطط عند ظهوره. */
+private val DAY_LABEL_ROW_MIN_HEIGHT = 22.dp
 
 /** ارتفاع شريط التمرير (يستوعب النقطة والمثلث). */
 private val SCRUBBER_HEIGHT = 40.dp
@@ -542,6 +589,9 @@ internal const val MIN_OTHERS_WEIGHT = 0.25f
 
 /** عرض الصندوق الأزرق الذي يعرض رقم اليوم المشار إليه. */
 private val DAY_PILL_MIN_WIDTH = 46.dp
+
+/** الحشوة الأفقية داخل صندوق اليوم: توسّعه من الجانبين حول الرقم. */
+private val DAY_PILL_HORIZONTAL_PADDING = 13.dp
 
 /** نقطة ملوّنة صغيرة تُستخدم في وسائل الإيضاح. */
 @Composable
