@@ -106,7 +106,7 @@ fun HistoryScreen(
             }
 
             if (daily.isNotEmpty()) {
-                item { HistorySummaryCard(daily = daily) }
+                item { HistorySummaryCard(daily = daily, monthPeak = state.monthPeak) }
             } else {
                 item {
                     ExpressiveCard {
@@ -209,10 +209,12 @@ private fun ChartCard(state: UiState, onSelectDay: (Int?) -> Unit) {
 }
 
 @Composable
-private fun HistorySummaryCard(daily: List<DayUsage>) {
+private fun HistorySummaryCard(daily: List<DayUsage>, monthPeak: DayUsage?) {
     val total = daily.sumOf { it.totals.totalBytes }
     val average = if (daily.isEmpty()) 0L else total / daily.size
-    val peak = daily.maxByOrNull { it.totals.totalBytes }
+    // «أعلى يوم» مرجع من آخر 30 يومًا لا من الفترة المعروضة، فيبقى مفيدًا
+    // للمقارنة حتى عندما تكون الفترة المختارة يومًا واحدًا.
+    val peak = monthPeak
 
     ExpressiveCard {
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -234,7 +236,7 @@ private fun HistorySummaryCard(daily: List<DayUsage>) {
             if (peak != null) {
                 InfoRow(
                     icon = Icons.Rounded.TrendingUp,
-                    label = stringResource(R.string.label_peak),
+                    label = stringResource(R.string.label_peak_month),
                     value = "${Format.bytes(peak.totals.totalBytes)} • ${Format.shortDate(peak.startMillis)}",
                 )
             }

@@ -40,6 +40,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -58,7 +59,6 @@ import com.mywifiadata.app.ui.components.BarEntry
 import com.mywifiadata.app.ui.components.DailyBarChart
 import com.mywifiadata.app.ui.components.EmptyState
 import com.mywifiadata.app.ui.components.ExpressiveCard
-import com.mywifiadata.app.ui.components.InfoRow
 import com.mywifiadata.app.ui.components.PermissionCard
 import com.mywifiadata.app.ui.components.SectionHeader
 import com.mywifiadata.app.ui.theme.LocalDownloadColor
@@ -389,35 +389,90 @@ private fun SummaryCard(state: UiState) {
                 title = stringResource(R.string.label_period),
                 supportingText = stringResource(R.string.apps_count, periodApps.size),
             )
-            Spacer(modifier = Modifier.height(8.dp))
-            InfoRow(
-                icon = Icons.Rounded.ArrowDownward,
-                label = stringResource(R.string.label_download),
-                value = Format.bytes(periodApps.sumOf { it.totals.rxBytes }),
-                valueColor = LocalDownloadColor.current,
-            )
-            InfoRow(
-                icon = Icons.Rounded.ArrowUpward,
-                label = stringResource(R.string.label_upload),
-                value = Format.bytes(periodApps.sumOf { it.totals.txBytes }),
-                valueColor = LocalUploadColor.current,
-            )
-            InfoRow(
-                icon = Icons.Rounded.Apps,
-                label = stringResource(R.string.label_total),
-                value = Format.bytes(periodApps.sumOf { it.totals.totalBytes }),
-            )
+            Spacer(modifier = Modifier.height(14.dp))
+            // التنزيل والرفع والإجمالي في صف أفقي واحد، وتحت كل واحد قيمةه.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                PeriodStat(
+                    label = stringResource(R.string.label_download),
+                    value = Format.bytes(periodApps.sumOf { it.totals.rxBytes }),
+                    icon = Icons.Rounded.ArrowDownward,
+                    color = LocalDownloadColor.current,
+                    modifier = Modifier.weight(1f),
+                )
+                PeriodStat(
+                    label = stringResource(R.string.label_upload),
+                    value = Format.bytes(periodApps.sumOf { it.totals.txBytes }),
+                    icon = Icons.Rounded.ArrowUpward,
+                    color = LocalUploadColor.current,
+                    modifier = Modifier.weight(1f),
+                )
+                PeriodStat(
+                    label = stringResource(R.string.label_total),
+                    value = Format.bytes(periodApps.sumOf { it.totals.totalBytes }),
+                    icon = Icons.Rounded.Apps,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f),
+                )
+            }
             if (topApp != null) {
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Spacer(modifier = Modifier.width(2.dp))
                     Text(
                         text = "${stringResource(R.string.apps_screen_title)}: ${topApp.label}",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
         }
+    }
+}
+
+/**
+ * بلاطة واحدة في صف الفترة: الأيقونة والتسمية في الأعلى، والقيمة تحتهما
+ * مباشرة بلون دلالي (التنزيل أزرق، الرفع بنفسجي، الإجمالي بلون النص).
+ */
+@Composable
+private fun PeriodStat(
+    label: String,
+    value: String,
+    icon: ImageVector,
+    color: Color,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(16.dp),
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleMediumEmphasized,
+            color = color,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }

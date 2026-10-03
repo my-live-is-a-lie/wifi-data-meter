@@ -53,6 +53,7 @@
     <string name="label_period">الفترة</string>
     <string name="label_average">المتوسط اليومي</string>
     <string name="label_peak">أعلى يوم</string>
+    <string name="label_peak_month">أعلى يوم في الشهر</string>
     <string name="label_days">عدد الأيام</string>
 
     <!-- اختبار السرعة -->
