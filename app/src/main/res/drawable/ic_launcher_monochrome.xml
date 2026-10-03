@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  الطبقة الأحادية (الأيقونات المتوافقة مع ثيم النظام على أندرويد 13+):
+  نفس العلامة بلون واحد، والنظام يعيد تلوينها حسب ثيم المستخدم.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <path
+        android:pathData="M42.59,37.53 A27,27 0 1 1 65.41,37.53"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="6"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+
+    <path
+        android:pathData="M42.43,48.21 A18,18 0 0 1 65.57,48.21"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="5.5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+
+    <path
+        android:pathData="M47.7,52.99 A11,11 0 0 1 60.3,52.99"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="5.5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+
+    <path
+        android:pathData="M50,62 A4,4 0 1 1 58,62 A4,4 0 1 1 50,62 Z"
+        android:fillColor="#FFFFFF" />
+</vector>

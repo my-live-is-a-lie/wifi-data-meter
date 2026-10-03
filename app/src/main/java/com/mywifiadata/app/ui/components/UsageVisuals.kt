@@ -471,12 +471,13 @@ fun DayScrubber(
                 }
             },
     ) {
-        // خط المسار
+        // خط المسار: يجلس قريبًا من أسفل الشريط فيقلّ الفراغ أسفل البطاقة.
         Box(
             modifier = Modifier
-                .align(Alignment.Center)
+                .align(Alignment.BottomCenter)
+                .padding(bottom = SCRUBBER_TRACK_BOTTOM_GAP - TRACK_THICKNESS / 2)
                 .fillMaxWidth()
-                .height(4.dp)
+                .height(TRACK_THICKNESS)
                 .clip(RoundedCornerShape(50))
                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
         )
@@ -523,8 +524,8 @@ private fun Thumb(active: Boolean, color: Color) {
     )
     Canvas(modifier = Modifier.size(width = 30.dp, height = SCRUBBER_HEIGHT)) {
         val centerX = size.width / 2f
-        // مركز الدائرة = مركز الشريط = خط المسار نفسه.
-        val centerY = size.height / 2f
+        // مركز الدائرة على خط المسار نفسه (نفس الإزاحة المستخدمة في رسم الخط).
+        val centerY = size.height - SCRUBBER_TRACK_BOTTOM_GAP.toPx()
         val circleRadius = 5.5.dp.toPx() * scale
         val triangleHeight = 7.5.dp.toPx() * scale
         val triangleHalfWidth = 5.dp.toPx() * scale
@@ -588,8 +589,16 @@ internal fun scrubIndexAt(xPx: Float, widthPx: Float, count: Int, rtl: Boolean):
 /** أقل ارتفاع لصف تسميات الأيام = ارتفاع صندوق اليوم، فلا يقفز المخطط عند ظهوره. */
 private val DAY_LABEL_ROW_MIN_HEIGHT = 22.dp
 
-/** ارتفاع شريط التمرير (يستوعب النقطة والمثلث). */
-private val SCRUBBER_HEIGHT = 40.dp
+/**
+ * ارتفاع شريط التمرير: يكفي المثلث والنقطة فوق خط المسار دون فراغ زائد أسفله.
+ */
+private val SCRUBBER_HEIGHT = 28.dp
+
+/** المسافة من أسفل الشريط إلى مركز خط المسار. */
+private val SCRUBBER_TRACK_BOTTOM_GAP = 8.dp
+
+/** سمك خط المسار. */
+private val TRACK_THICKNESS = 4.dp
 
 /** مقدار تكبير نقطة المؤشر أثناء الضغط أو السحب. */
 private const val THUMB_ACTIVE_SCALE = 1.3f
