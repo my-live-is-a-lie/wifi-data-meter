@@ -7,7 +7,7 @@ package com.mywifiadata.app.core
  * المنطق نقي تمامًا (لا أندرويد ولا شبكة) ليعمل في اختبارات الوحدة.
  */
 class SpeedTestWatchdog(
-    startedAtMillis: Long,
+    private val startedAtMillis: Long,
     private val overallTimeoutMillis: Long = DEFAULT_OVERALL_TIMEOUT_MILLIS,
     private val stallTimeoutMillis: Long = DEFAULT_STALL_TIMEOUT_MILLIS,
 ) {
