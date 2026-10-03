@@ -94,6 +94,17 @@ data class UsageSlice(
 enum class AppsFilter { ALL, INSTALLED, SYSTEM }
 
 /**
+ * آخر نتيجة اختبار سرعة محفوظة على الجهاز لتظهر في لوحة اليوم حتى بعد
+ * إغلاق التطبيق وتشغيله من جديد.
+ */
+data class SpeedTestRecord(
+    val downloadBitsPerSecond: Double,
+    val uploadBitsPerSecond: Double,
+    val timestampMillis: Long,
+    val usedFastCom: Boolean,
+)
+
+/**
  * سمة التطبيق: اتباع النظام أو اختيار يدوي.
  *
  * [BLACK] هو وضع «مظلم» بخلفية AMOLED سوداء بالكامل لتوفير استهلاك الطاقة
@@ -115,4 +126,6 @@ data class AppSettings(
     val sessionBaseline: TrafficTotals = TrafficTotals.Empty,
     val alertCycleStartMillis: Long = 0L,
     val alertLevelReached: Int = 0,
+    /** آخر نتيجة اختبار سرعة (fast.com) محفوظة محليًا. */
+    val lastSpeedTest: SpeedTestRecord? = null,
 )

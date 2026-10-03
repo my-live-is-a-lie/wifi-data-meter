@@ -23,6 +23,10 @@ import androidx.core.view.WindowCompat
 val LocalDownloadColor = staticCompositionLocalOf { Color(0xFF3F51D8) }
 val LocalUploadColor = staticCompositionLocalOf { Color(0xFF9C27B0) }
 
+/** لونا زر اختبار السرعة (أزرق فاتح بأيقونة داكنة كما في التصميم). */
+val LocalSpeedButtonContainerColor = staticCompositionLocalOf { Color(0xFF8FB2F7) }
+val LocalSpeedButtonContentColor = staticCompositionLocalOf { Color(0xFF101C3A) }
+
 /**
  * ثيم التطبيق المبني على Material 3 Expressive.
  *
@@ -68,6 +72,8 @@ fun AppTheme(
 
     val downloadColor = if (darkTheme) Color(0xFFB7C4FF) else Color(0xFF2A3EB1)
     val uploadColor = if (darkTheme) Color(0xFFE3C4F5) else Color(0xFF7B1FA2)
+    val speedButtonContainer = if (darkTheme) Color(0xFF33518F) else Color(0xFF8FB2F7)
+    val speedButtonContent = if (darkTheme) Color(0xFFDCE6FF) else Color(0xFF101C3A)
 
     val view = LocalView.current
     if (!view.isInEditMode) {
@@ -82,6 +88,8 @@ fun AppTheme(
     CompositionLocalProvider(
         LocalDownloadColor provides downloadColor,
         LocalUploadColor provides uploadColor,
+        LocalSpeedButtonContainerColor provides speedButtonContainer,
+        LocalSpeedButtonContentColor provides speedButtonContent,
     ) {
         MaterialExpressiveTheme(
             colorScheme = colorScheme,

@@ -11,10 +11,40 @@
 
 | الشاشة | ما تقدّمه |
 |---|---|
-| **لوحة المعلومات** | حلقة استهلاك متحرّكة تُظهر نسبة ما استُهلك من الباقة، المتبقّي، السرعة اللحظية، تفاصيل شبكة الواي فاي (الاسم، قوة الإشارة، سرعة الرابط، النطاق 2.4/5/6 جيجاهرتز، معيار الواي فاي، عنوان IP والبوابة)، إجماليات اليوم والجلسة، وأزرار سريعة (تحديث / تصفير الجلسة / ضبط الباقة). |
+| **لوحة المعلومات** | حلقة استهلاك متحرّكة تُظهر نسبة ما استُهلك من الباقة، وبطاقة «اليوم» بالتخطيط المرجعي: بلاطتان كبيرتان للتنزيل (أزرق) والرفع (بنفسجي)، صف الإجمالي مع إجمالي الدورة، ولوحة اختبار السرعة عبر fast.com. إضافةً إلى تفاصيل شبكة الواي فاي (الاسم، قوة الإشارة، سرعة الرابط، النطاق 2.4/5/6 جيجاهرتز، معيار الواي فاي، عنوان IP والبوابة)، إجماليات الجلسة، وأزرار سريعة (تحديث / تصفير الجلسة / ضبط الباقة). |
 | **التطبيقات** | ترتيب التطبيقات حسب استهلاكها على الواي فاي (اليوم / الأسبوع / الشهر) مع أيقونة كل تطبيق ونسبة مساهمته، وإمكانية إظهار تطبيقات النظام. |
 | **السجل** | مخطط أعمدة لاستهلاك آخر 7 أو 30 يومًا، مع تفاصيل اليوم عند اختياره وأكثر التطبيقات استهلاكًا فيه. |
 | **الإعدادات** | حجم الباقة ويوم بدء الدورة، التنبيهات ونسبة التحذير، مُعدّل القياس، تشغيل/إيقاف المراقبة، الألوان الديناميكية، حالة صلاحية «الوصول إلى الاستخدام»، ومسح البيانات. |
+
+### بطاقة «اليوم» واختبار السرعة عبر fast.com
+
+تتطابق بطاقة اليوم مع التصميم المرجعي المطلوب:
+
+- **بلاطتان كبيرتان** جنبًا إلى جنب: التنزيل بالأزرق والرفع بالبنفسجي، القيمة بالوحدات
+  العشرية كما تكتبها شركات الاتصال، وتحتها التسمية مع سهم الاتجاه.
+- **صف الإجمالي**: إجمالي اليوم مع أيقونة دورية، وإلى جانبه «الإجمالي» لإجمالي دورة الفاتورة
+  بالجيجابايت.
+- **لوحة اختبار السرعة**: زر تشغيل أزرق في البداية (يمينًا)، العنوان «اختبار السرعة»
+  وسطر «يستخدم موقع fast.com»، ثم نتائج التنزيل والرفع في الطرف الآخر. على الشاشات
+  الضيقة تُنقل النتائج إلى سطر ثانٍ تلقائيًا حتى لا يُقتطع أي نص.
+
+**اختبار السرعة (fast.com):**
+
+- القياس يجري على خوادم fast.com الحقيقية (Netflix Open Connect) عبر عدة تدفقات متوازية،
+  ومع حجب `api.fast.com` (رمز 403 في بعض الدول) ينتقل التطبيق تلقائيًا إلى خوادم Cloudflare.
+- **تُحفظ النتيجة محليًا** (تنزيل/رفع/الوقت/المصدر) فتبقى ظاهرة في اللوحة حتى بعد إغلاق
+  التطبيق وإعادة تشغيله، مع طابع وقت آخر اختبار.
+- أثناء القياس تظهر المرحلة الجارية والسرعة اللحظية، وزر التشغيل يتحول إلى إيقاف.
+
+**رسائل الانقطاع والمهلة وإغلاق التحميل:**
+
+| الحالة | ما يحدث |
+|---|---|
+| لا اتصال قبل البدء | تظهر رسالة فورية ولا يبدأ أي تحميل. |
+| انقطاع الاتصال أثناء الاختبار | يرصد المرصد الشبكة كل نصف ثانية، فيُغلق التحميل (تُفصل كل الاتصالات) وتظهر رسالة «انقطع الاتصال أثناء الاختبار». |
+| توقّف وصول البيانات من الخادم | إن لم تصل أي بيانات لمدة 12 ثانية يُغلق التحميل برسالة «توقّف وصول البيانات». |
+| مرور وقت طويل دون نتيجة | سقف زمني كامل للاختبار (45 ثانية) يُغلق التحميل بعده برسالة «مرّ وقت طويل دون الحصول على أي نتيجة». |
+| ضغط زر الإيقاف | يُلغى الـCoroutine وتُفصل الاتصالات فورًا، وتعود آخر نتيجة محفوظة. |
 
 بالإضافة إلى:
 
@@ -153,16 +183,18 @@ app/src/main/java/com/mywifiadata/app/
 ├── MyWifiApplication.kt          # تهيئة المستودع وقنوات الإشعارات
 ├── MainActivity.kt               # نقطة الدخول (Compose + edge-to-edge + RTL)
 ├── core/                         # Format (وحدات/تواريخ) و TimeRanges و SystemActions
+│                                 # و SpeedTest + SpeedTestWatchdog (قياس fast.com والمهلات)
 ├── data/                         # SettingsStore، NetworkStatsReader، WifiNetworkReader، UsageRepository
 ├── data/model/                   # نماذج البيانات (TrafficTotals، WifiStatus، AppUsage …)
 ├── monitor/                      # MonitorService (خدمة أمامية) و Notifier
 └── ui/
     ├── AppViewModel.kt           # حالة الواجهة والمنطق العرضي
     ├── theme/                    # AppTheme، Shapes، Typography
-    ├── components/               # UsageRing، DailyBarChart، StatTile، AppUsageRow …
+    ├── components/               # UsageRing، DailyBarChart، StatTile، TrafficTile،
+    │                             # TodayTotalRow، SpeedTestPanel، AppUsageRow …
     ├── screens/                  # Main / Dashboard / Apps / History / Settings
     └── PreviewData.kt            # معاينات Android Studio
-app/src/test/java/…               # اختبارات الوحدة (Format، TimeRanges، النماذج)
+app/src/test/java/…               # اختبارات الوحدة (Format، TimeRanges، النماذج، SpeedTestWatchdog)
 ```
 
 ---
@@ -190,6 +222,9 @@ built with **Kotlin + Jetpack Compose + Material 3 Expressive**.
 - History: 7‑ or 30‑day bar chart with per‑day details and that day's top apps.
 - Settings: quota + cycle start day, alert threshold, sampling interval, background tracking, dynamic color.
 - Background monitoring through a `dataSync` foreground service with an ongoing notification and threshold alerts.
+- A reference-matching “Today” card (blue download / purple upload tiles, total row, fast.com speed-test panel) and a
+  fast.com speed test that saves its last result on-device and aborts the transfer with a clear message when the
+  connection drops or no data arrives for too long (12 s stall window, 45 s overall cap).
 
 Build with `./gradlew assembleDebug` (AGP 9.3.1 · Kotlin 2.4.10 · Gradle 9.5.0 · Compose BOM 2026.09.00 ·
 Material 3 1.5.0‑alpha29 · compileSdk 37 · minSdk 26). Grant **Usage Access** on first run to enable per‑app stats.
