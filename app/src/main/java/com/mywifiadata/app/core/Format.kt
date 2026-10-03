@@ -58,6 +58,36 @@ object Format {
         else -> String.format(numbers, "%.0f bit/s", bitsPerSecond)
     }
 
+    /**
+     * مثل [bits] لكن بلا «/ث»: "‎125 kbit" أو "‎40 kbit".
+     *
+     * يُستخدم في لوحة اختبار السرعة كما في التصميم المرجعي، حيث تشرح
+     * تسمية «تنزيل/رفع» تحت القيمة أن الرقم سرعة.
+     */
+    fun bitsPlain(bitsPerSecond: Double): String = when {
+        bitsPerSecond.isNaN() || bitsPerSecond <= 0.0 -> String.format(numbers, "0 kbit")
+        bitsPerSecond >= 1_000_000_000.0 -> String.format(numbers, "%.2f Gbit", bitsPerSecond / 1_000_000_000.0)
+        bitsPerSecond >= 1_000_000.0 -> String.format(numbers, "%.1f Mbit", bitsPerSecond / 1_000_000.0)
+        bitsPerSecond >= 1_000.0 -> String.format(numbers, "%.0f kbit", bitsPerSecond / 1_000.0)
+        else -> String.format(numbers, "%.0f bit", bitsPerSecond)
+    }
+
+    /**
+     * يفصل المقدار عن وحدته: ("‎532.9", "MB") — لعرضهما كنصين متجاورين
+     * بترتيب «الوحدة ثم الرقم» كما في التصميم المرجعي، دون أن تعيد خوارزمية
+     * الاتجاهين ترتيبهما.
+     */
+    fun bytesParts(value: Long): Pair<String, String> {
+        val safe = value.coerceAtLeast(0L)
+        return when {
+            safe >= TB -> String.format(numbers, "%.2f", safe / TB) to "TB"
+            safe >= GB -> String.format(numbers, "%.2f", safe / GB) to "GB"
+            safe >= MB -> String.format(numbers, "%.1f", safe / MB) to "MB"
+            safe >= KB -> String.format(numbers, "%.0f", safe / KB) to "KB"
+            else -> String.format(numbers, "%d", safe) to "B"
+        }
+    }
+
     /** تحويل البايت/ثانية إلى ميجابت/ثانية (لتفاصيل الشبكة). */
     fun megabits(bytesPerSecond: Double): String =
         String.format(numbers, "%.1f", bytesPerSecond * 8.0 / 1_000_000.0)

@@ -36,6 +36,23 @@ class FormatTest {
     }
 
     @Test
+    fun `plain bit rate drops the per second suffix`() {
+        assertEquals("125 kbit", Format.bitsPlain(125_000.0))
+        assertEquals("40 kbit", Format.bitsPlain(40_000.0))
+        assertEquals("1.5 Mbit", Format.bitsPlain(1_500_000.0))
+        assertEquals("0 kbit", Format.bitsPlain(0.0))
+        assertEquals("0 kbit", Format.bitsPlain(Double.NaN))
+    }
+
+    @Test
+    fun `byte values split into amount and unit for the reference layout`() {
+        assertEquals("532.9" to "MB", Format.bytesParts(532_900_000))
+        assertEquals("2.75" to "GB", Format.bytesParts(2_750_000_000))
+        assertEquals("512" to "B", Format.bytesParts(512))
+        assertEquals("0" to "B", Format.bytesParts(-10))
+    }
+
+    @Test
     fun `megabits conversion uses the metric definition`() {
         assertEquals("8.0", Format.megabits(1_000_000.0))
     }
