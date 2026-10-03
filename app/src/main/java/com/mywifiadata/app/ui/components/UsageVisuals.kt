@@ -17,8 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -45,6 +44,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import kotlin.math.abs
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.input.pointer.pointerInput
 
@@ -278,7 +278,15 @@ fun DailyBarChart(
                     )
                 }
                 // تسمية اليوم: صندوق ملوّن لليوم الذي يشير إليه المؤشر، ونص عادي لغيره.
-                val labelText = if (index % labelStride == 0 || index == entries.lastIndex || isActive) {
+                // وتُخفى تسميات الجيران المباشرين أثناء السحب حتى لا تتراكب مع الصندوق.
+                val labelText = if (
+                    showDayLabel(
+                        index = index,
+                        count = entries.size,
+                        stride = labelStride,
+                        activeIndex = activeIndex,
+                    )
+                ) {
                     entry.label
                 } else {
                     ""
@@ -293,9 +301,11 @@ fun DailyBarChart(
                     Box(
                         modifier = if (isActive) {
                             Modifier
-                                .clip(RoundedCornerShape(8.dp))
+                                // عرض أدنى + حشوة أوسع: صندوق اليوم أوضح أفقيًا.
+                                .defaultMinSize(minWidth = 34.dp)
+                                .clip(RoundedCornerShape(9.dp))
                                 .background(MaterialTheme.colorScheme.primaryContainer)
-                                .padding(horizontal = 6.dp, vertical = 1.dp)
+                                .padding(horizontal = 11.dp, vertical = 2.dp)
                         } else {
                             Modifier
                         },
@@ -436,13 +446,13 @@ private fun Thumb(active: Boolean, color: Color) {
         animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
         label = "thumb-scale",
     )
-    Canvas(modifier = Modifier.size(width = 22.dp, height = SCRUBBER_HEIGHT)) {
+    Canvas(modifier = Modifier.size(width = 30.dp, height = SCRUBBER_HEIGHT)) {
         val centerX = size.width / 2f
         // مركز الدائرة = مركز الشريط = خط المسار نفسه.
         val centerY = size.height / 2f
-        val circleRadius = 4.dp.toPx() * scale
-        val triangleHeight = 6.dp.toPx() * scale
-        val triangleHalfWidth = 4.dp.toPx() * scale
+        val circleRadius = 5.5.dp.toPx() * scale
+        val triangleHeight = 7.5.dp.toPx() * scale
+        val triangleHalfWidth = 5.dp.toPx() * scale
         val baseY = centerY - circleRadius - 1.dp.toPx()
 
         val triangle = Path().apply {
@@ -458,13 +468,31 @@ private fun Thumb(active: Boolean, color: Color) {
 
 /**
  * وزن عمود واحد في المخطط وشريط التمرير:
- * 1 للعادي، أكبر للعمود المشار إليه (يتّسع أفقيًا)، وأقل لمجاوريه (ينكمشان).
+ * 1 للعادي، وأكبر للعمود المشار إليه (يتّسع أفقيًا)، بينما تنكمش الأعمدة
+ * المجاورة **بشكل متدرّج** (أقرب عمود أكثر انكماشًا) فتنزاح عدة أعمدة من
+ * الجانبين بدل عمود واحد فقط.
  */
-internal fun barWeight(index: Int, activeIndex: Int?): Float = when {
-    activeIndex == null -> 1f
-    index == activeIndex -> 1f + BAR_EXPANSION
-    index == activeIndex - 1 || index == activeIndex + 1 -> 1f - BAR_NEIGHBOR_SHRINK
-    else -> 1f
+internal fun barWeight(index: Int, activeIndex: Int?): Float {
+    if (activeIndex == null) return 1f
+    if (index == activeIndex) return 1f + BAR_EXPANSION
+    val distance = abs(index - activeIndex)
+    if (distance > BAR_SHRINK_BY_DISTANCE.size) return 1f
+    return 1f - BAR_SHRINK_BY_DISTANCE[distance - 1]
+}
+
+/**
+ * هل تُعرض تسمية هذا اليوم؟
+ *
+ * التسميات المنتظمة (كل [stride]) تظهر دائمًا، لكن أثناء سحب المؤشر تُخفى
+ * تسمية اليوم المشار إليه وجيرانه المباشرين، لأن صندوق اليوم يتّسع أفقيًا
+ * فتتراكب الأرقام كما لو كانت رقمًا واحدًا مقطوعًا.
+ */
+internal fun showDayLabel(index: Int, count: Int, stride: Int, activeIndex: Int?): Boolean {
+    val isRegular = index % stride == 0 || index == count - 1
+    if (activeIndex == null) return isRegular
+    if (index == activeIndex) return true
+    if (abs(index - activeIndex) <= 1) return false
+    return isRegular
 }
 
 /** مسافة الأعمدة كما في المخطط (نفسها في شريط التمرير للتوافق التام). */
@@ -485,7 +513,7 @@ internal fun scrubIndexAt(xPx: Float, widthPx: Float, count: Int, rtl: Boolean):
 private val LABEL_ROW_HEIGHT = 18.dp
 
 /** ارتفاع شريط التمرير (يستوعب النقطة والمثلث). */
-private val SCRUBBER_HEIGHT = 34.dp
+private val SCRUBBER_HEIGHT = 40.dp
 
 /** مقدار تكبير نقطة المؤشر أثناء الضغط أو السحب. */
 private const val THUMB_ACTIVE_SCALE = 1.3f
@@ -496,8 +524,14 @@ private val ACTIVE_BAR_MAX_WIDTH = 84.dp
 /** زيادة وزن العمود المشار إليه (اتساع أفقي). */
 internal const val BAR_EXPANSION = 0.9f
 
-/** نقصان وزن العمودين المجاورين للمشار إليه (انكماش وإزاحة). */
-internal const val BAR_NEIGHBOR_SHRINK = 0.35f
+/**
+ * مقدار انكماش الأعمدة المجاورة حسب بُعدها عن العمود المشار إليه:
+ * العمود الملاصق أكثر انكماشًا، ثم يقل الانكماش تدريجيًا حتى ثلاث خطوات.
+ */
+private val BAR_SHRINK_BY_DISTANCE = floatArrayOf(0.42f, 0.24f, 0.10f)
+
+/** مقدار انكماش العمود الملاصق (للاختبارات والتوثيق). */
+internal const val BAR_NEIGHBOR_SHRINK = 0.42f
 
 /** نقطة ملوّنة صغيرة تُستخدم في وسائل الإيضاح. */
 @Composable

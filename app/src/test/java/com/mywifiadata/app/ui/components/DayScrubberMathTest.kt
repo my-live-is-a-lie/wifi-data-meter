@@ -18,17 +18,55 @@ class DayScrubberMathTest {
     }
 
     @Test
-    fun `the active bar expands and its neighbours shrink`() {
+    fun `the active bar expands and its neighbours shrink gradually`() {
         val active = 10
         val expanded = barWeight(index = active, activeIndex = active)
-        val neighbour = barWeight(index = active + 1, activeIndex = active)
-        val otherNeighbour = barWeight(index = active - 1, activeIndex = active)
+        val first = barWeight(index = active + 1, activeIndex = active)
+        val second = barWeight(index = active + 2, activeIndex = active)
+        val third = barWeight(index = active + 3, activeIndex = active)
         val distant = barWeight(index = active + 4, activeIndex = active)
 
         assertEquals(1f + BAR_EXPANSION, expanded, 0.0001f)
-        assertEquals(1f - BAR_NEIGHBOR_SHRINK, neighbour, 0.0001f)
-        assertEquals(1f - BAR_NEIGHBOR_SHRINK, otherNeighbour, 0.0001f)
+        // الأقرب أكثر انكماشًا ثم يقل تدريجيًا: عدة أعمدة تنزاح لا عمود واحد.
+        assertEquals(1f - BAR_NEIGHBOR_SHRINK, first, 0.0001f)
+        assertEquals(true, second < 1f && second > first)
+        assertEquals(true, third < 1f && third > second)
         assertEquals(1f, distant, 0f)
+    }
+
+    @Test
+    fun `both sides of the active bar shift by the same gradient`() {
+        val active = 15
+        for (distance in 1..3) {
+            assertEquals(
+                barWeight(index = active - distance, activeIndex = active),
+                barWeight(index = active + distance, activeIndex = active),
+                0.0001f,
+            )
+        }
+    }
+
+    @Test
+    fun `day labels next to the active day are hidden to avoid overlap`() {
+        val count = 30
+        val stride = 5
+        val active = 20
+        // تسمية اليوم المشار إليه تظهر دائمًا.
+        assertEquals(true, showDayLabel(index = active, count = count, stride = stride, activeIndex = active))
+        // جيرانه المباشرون يُخفون حتى لا يتراكبوا مع صندوقه العريض.
+        assertEquals(false, showDayLabel(index = active - 1, count = count, stride = stride, activeIndex = active))
+        assertEquals(false, showDayLabel(index = active + 1, count = count, stride = stride, activeIndex = active))
+        // تسمية منتظمة بعيدة تظهر.
+        assertEquals(true, showDayLabel(index = 0, count = count, stride = stride, activeIndex = active))
+        // بلا مؤشر: التسميات المنتظمة فقط.
+        assertEquals(true, showDayLabel(index = 10, count = count, stride = stride, activeIndex = null))
+        assertEquals(false, showDayLabel(index = 11, count = count, stride = stride, activeIndex = null))
+        assertEquals(true, showDayLabel(index = count - 1, count = count, stride = stride, activeIndex = null))
+    }
+
+    @Test
+    fun `active day label is shown even when it is not on a stride position`() {
+        assertEquals(true, showDayLabel(index = 17, count = 30, stride = 5, activeIndex = 17))
     }
 
     @Test
