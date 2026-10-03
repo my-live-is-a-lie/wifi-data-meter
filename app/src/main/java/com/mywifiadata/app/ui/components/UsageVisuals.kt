@@ -542,3 +542,14 @@ internal const val MIN_OTHERS_WEIGHT = 0.25f
 
 /** عرض الصندوق الأزرق الذي يعرض رقم اليوم المشار إليه. */
 private val DAY_PILL_MIN_WIDTH = 46.dp
+
+/** نقطة ملوّنة صغيرة تُستخدم في وسائل الإيضاح. */
+@Composable
+fun Dot(color: Color, modifier: Modifier = Modifier, size: Dp = 10.dp) {
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(RoundedCornerShape(50))
+            .background(color),
+    )
+}
