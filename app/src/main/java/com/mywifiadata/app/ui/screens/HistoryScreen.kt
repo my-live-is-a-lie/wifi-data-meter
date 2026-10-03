@@ -194,7 +194,10 @@ private fun ChartCard(state: UiState, onSelectDay: (Int?) -> Unit) {
         )
     }
 
-    ExpressiveCard {
+    // حشوة سفلية أصغر لهذه البطاقة لأن شريط التمرير يجلس قريبًا من حاشيتها.
+    ExpressiveCard(
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 10.dp),
+    ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             SectionHeader(
                 title = if (state.historyDays <= 1) {
@@ -233,7 +236,7 @@ private fun ChartCard(state: UiState, onSelectDay: (Int?) -> Unit) {
                     },
                 )
                 if (entries.size > 1) {
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     // شريط تمرير لاختيار اليوم: يتحرك بالنقطة، ويتّسع عمود اليوم
                     // المشار إليه ويظهر رقمه في صندوق فوقه أثناء السحب.
                     DayScrubber(
