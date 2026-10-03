@@ -88,6 +88,12 @@ private fun sampleState(): UiState {
                 txBytesPerSecond = 40_000.0,
             )
         },
+        speedTest = SpeedTestState.Done(
+            downloadBitsPerSecond = 125_400_000.0,
+            uploadBitsPerSecond = 40_200_000.0,
+            timestampMillis = now - 600_000L,
+            usedFastCom = true,
+        ),
         daily = daily,
         apps = apps,
         appsPeriod = UsagePeriod.MONTH,

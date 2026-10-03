@@ -19,7 +19,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
-import androidx.compose.material.icons.rounded.DataUsage
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.MonetizationOn
@@ -35,7 +34,6 @@ import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material.icons.rounded.WifiOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -60,7 +58,6 @@ import com.mywifiadata.app.R
 import com.mywifiadata.app.core.Format
 import com.mywifiadata.app.data.model.WifiBand
 import com.mywifiadata.app.data.model.WifiStatus
-import com.mywifiadata.app.ui.SpeedTestState
 import com.mywifiadata.app.ui.UiState
 import com.mywifiadata.app.ui.components.Dot
 import com.mywifiadata.app.ui.components.EmptyState
@@ -70,7 +67,9 @@ import com.mywifiadata.app.ui.components.PermissionCard
 import com.mywifiadata.app.ui.components.QuotaBar
 import com.mywifiadata.app.ui.components.SectionHeader
 import com.mywifiadata.app.ui.components.SignalBarsIcon
-import com.mywifiadata.app.ui.components.StatTile
+import com.mywifiadata.app.ui.components.SpeedTestPanel
+import com.mywifiadata.app.ui.components.TodayTotalRow
+import com.mywifiadata.app.ui.components.TrafficTile
 import com.mywifiadata.app.ui.components.UsageRing
 import com.mywifiadata.app.ui.theme.AppButtonShape
 import com.mywifiadata.app.ui.theme.LocalDownloadColor
@@ -542,155 +541,38 @@ private fun TodayCard(
                 title = stringResource(R.string.label_today),
                 supportingText = Format.fullDate(state.now),
             )
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(14.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                StatTile(
+                TrafficTile(
                     label = stringResource(R.string.label_download),
-                    value = Format.bytes(state.today.rxBytes),
+                    bytes = state.today.rxBytes,
                     icon = Icons.Rounded.ArrowDownward,
+                    accent = downloadColor,
                     modifier = Modifier.weight(1f),
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                    contentColor = downloadColor,
                 )
-                StatTile(
+                TrafficTile(
                     label = stringResource(R.string.label_upload),
-                    value = Format.bytes(state.today.txBytes),
+                    bytes = state.today.txBytes,
                     icon = Icons.Rounded.ArrowUpward,
+                    accent = uploadColor,
                     modifier = Modifier.weight(1f),
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                    contentColor = uploadColor,
                 )
             }
             Spacer(modifier = Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                StatTile(
-                    label = stringResource(R.string.label_total),
-                    value = Format.bytes(state.today.totalBytes),
-                    icon = Icons.Rounded.DataUsage,
-                    modifier = Modifier.weight(1f),
-                    caption = Format.bytes(state.averagePerDay),
-                )
-                StatTile(
-                    label = stringResource(R.string.label_current_speed),
-                    value = Format.speed((state.currentSpeed?.totalBytesPerSecond ?: 0.0) / 2.0),
-                    icon = Icons.Rounded.Speed,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            SpeedTestRow(state = state, onStart = onStart, onStop = onStop)
-        }
-    }
-}
-
-/**
- * صف اختبار السرعة داخل بطاقة اليوم: الزر أولًا (يمين RTL) ثم العنوان
- * ثم نتائج التنزيل/الرفع يسارًا — كما في التصميم المرجعي.
- */
-@Composable
-private fun SpeedTestRow(state: UiState, onStart: () -> Unit, onStop: () -> Unit) {
-    val downloadColor = LocalDownloadColor.current
-    val uploadColor = LocalUploadColor.current
-    val test = state.speedTest
-    val running = test is SpeedTestState.Running
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Button(
-            onClick = { if (running) onStop() else onStart() },
-            shape = AppButtonShape,
-        ) {
-            if (running) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(18.dp),
-                    strokeWidth = 2.dp,
-                    color = MaterialTheme.colorScheme.onPrimary,
-                )
-            } else {
-                Icon(
-                    imageVector = Icons.Rounded.PlayArrow,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.width(16.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = stringResource(R.string.speed_test_title),
-                style = MaterialTheme.typography.bodyLargeEmphasized,
-                color = MaterialTheme.colorScheme.onSurface,
+            TodayTotalRow(
+                bytes = state.today.totalBytes,
+                label = stringResource(R.string.label_total),
+                secondaryBytes = state.cycle.totalBytes,
             )
-            Text(
-                text = stringResource(R.string.speed_test_subtitle),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            Spacer(modifier = Modifier.height(12.dp))
+            SpeedTestPanel(
+                state = state.speedTest,
+                onStart = onStart,
+                onStop = onStop,
             )
-            if (test is SpeedTestState.Failed) {
-                Text(
-                    text = stringResource(R.string.speed_test_failed),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-        }
-
-        if (test is SpeedTestState.Done) {
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = Format.bits(test.downloadBitsPerSecond),
-                        style = MaterialTheme.typography.bodyMediumEmphasized,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Rounded.ArrowDownward,
-                            contentDescription = null,
-                            tint = downloadColor,
-                            modifier = Modifier.size(12.dp),
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = stringResource(R.string.label_download),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = Format.bits(test.uploadBitsPerSecond),
-                        style = MaterialTheme.typography.bodyMediumEmphasized,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Rounded.ArrowUpward,
-                            contentDescription = null,
-                            tint = uploadColor,
-                            modifier = Modifier.size(12.dp),
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = stringResource(R.string.label_upload),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
         }
     }
 }

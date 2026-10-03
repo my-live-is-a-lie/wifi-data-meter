@@ -2,6 +2,7 @@ package com.mywifiadata.app.data
 
 import android.content.Context
 import com.mywifiadata.app.data.model.AppSettings
+import com.mywifiadata.app.data.model.SpeedTestRecord
 import com.mywifiadata.app.data.model.ThemeMode
 import com.mywifiadata.app.data.model.TrafficTotals
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,6 +39,11 @@ class SettingsStore(context: Context) {
         it.copy(sessionBaseline = baseline, sessionStartMillis = startMillis)
     }
 
+    /** يحفظ آخر نتيجة اختبار سرعة لتظهر بعد إعادة تشغيل التطبيق. */
+    fun saveSpeedTest(record: SpeedTestRecord) = update {
+        it.copy(lastSpeedTest = record)
+    }
+
     private fun read(): AppSettings = AppSettings(
         quotaBytes = prefs.getLong(KEY_QUOTA_BYTES, 0L),
         cycleStartDay = prefs.getInt(KEY_CYCLE_DAY, 1),
@@ -56,7 +62,20 @@ class SettingsStore(context: Context) {
         ),
         alertCycleStartMillis = prefs.getLong(KEY_ALERT_CYCLE, 0L),
         alertLevelReached = prefs.getInt(KEY_ALERT_LEVEL, 0),
+        lastSpeedTest = readSpeedTest(),
     )
+
+    /** قراءة آخر نتيجة اختبار سرعة محفوظة، أو null إن لم يُجرَ اختبار بعد. */
+    private fun readSpeedTest(): SpeedTestRecord? {
+        val timestamp = prefs.getLong(KEY_SPEED_TIME, 0L)
+        if (timestamp <= 0L) return null
+        return SpeedTestRecord(
+            downloadBitsPerSecond = Double.fromBits(prefs.getLong(KEY_SPEED_DOWNLOAD, 0L)),
+            uploadBitsPerSecond = Double.fromBits(prefs.getLong(KEY_SPEED_UPLOAD, 0L)),
+            timestampMillis = timestamp,
+            usedFastCom = prefs.getBoolean(KEY_SPEED_FAST, true),
+        )
+    }
 
     private fun write(settings: AppSettings) {
         prefs.edit()
@@ -73,6 +92,10 @@ class SettingsStore(context: Context) {
             .putLong(KEY_SESSION_TX, settings.sessionBaseline.txBytes)
             .putLong(KEY_ALERT_CYCLE, settings.alertCycleStartMillis)
             .putInt(KEY_ALERT_LEVEL, settings.alertLevelReached)
+            .putLong(KEY_SPEED_DOWNLOAD, settings.lastSpeedTest?.downloadBitsPerSecond?.toRawBits() ?: 0L)
+            .putLong(KEY_SPEED_UPLOAD, settings.lastSpeedTest?.uploadBitsPerSecond?.toRawBits() ?: 0L)
+            .putLong(KEY_SPEED_TIME, settings.lastSpeedTest?.timestampMillis ?: 0L)
+            .putBoolean(KEY_SPEED_FAST, settings.lastSpeedTest?.usedFastCom ?: true)
             .apply()
     }
 
@@ -92,5 +115,9 @@ class SettingsStore(context: Context) {
         private const val KEY_ALERT_CYCLE = "alert_cycle"
         private const val KEY_ALERT_LEVEL = "alert_level"
         private const val KEY_THEME_MODE = "theme_mode"
+        private const val KEY_SPEED_DOWNLOAD = "speed_test_download"
+        private const val KEY_SPEED_UPLOAD = "speed_test_upload"
+        private const val KEY_SPEED_TIME = "speed_test_time"
+        private const val KEY_SPEED_FAST = "speed_test_source_fast"
     }
 }
