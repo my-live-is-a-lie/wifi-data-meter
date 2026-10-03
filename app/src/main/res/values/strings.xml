@@ -131,14 +131,14 @@
     <string name="settings_interval_60">60 ث</string>
     <string name="settings_dynamic_color">ألوان النظام (Material You)</string>
     <string name="settings_dynamic_color_desc">استخدام ألوان خلفية الشاشة على أندرويد 12 وما بعده.</string>
-    <string name="settings_section_data">البيانات</string>
+    <string name="settings_section_data">الصلاحيات</string>
     <string name="settings_section_appearance">المظهر</string>
     <string name="theme_system">النظام</string>
     <string name="theme_light">فاتح</string>
     <string name="theme_dark">داكن</string>
     <string name="theme_black">مظلم</string>
     <string name="settings_clear_data">مسح جميع البيانات</string>
-    <string name="settings_clear_data_desc">يحذف الإعدادات ومخزون القياسات المحلية.</string>
+    <string name="settings_clear_data_desc">يحذف الإعدادات ومخزون القياسات المحلية. لا يمكن التراجع عن هذا الإجراء.</string>
     <string name="settings_usage_access">صلاحية الوصول إلى الاستخدام</string>
     <string name="settings_usage_access_granted">ممنوحة</string>
     <string name="settings_usage_access_missing">غير ممنوحة — اضغط للمنح</string>

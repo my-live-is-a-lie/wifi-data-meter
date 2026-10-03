@@ -120,14 +120,14 @@
     <string name="settings_interval_60">60s</string>
     <string name="settings_dynamic_color">System colors (Material You)</string>
     <string name="settings_dynamic_color_desc">Use wallpaper‑based colors on Android 12+.</string>
-    <string name="settings_section_data">Data</string>
+    <string name="settings_section_data">Permissions</string>
     <string name="settings_section_appearance">Appearance</string>
     <string name="theme_system">System</string>
     <string name="theme_light">Light</string>
     <string name="theme_dark">Dark</string>
     <string name="theme_black">Black</string>
     <string name="settings_clear_data">Clear all data</string>
-    <string name="settings_clear_data_desc">Deletes settings and locally stored measurements.</string>
+    <string name="settings_clear_data_desc">Deletes settings and locally stored measurements. This cannot be undone.</string>
     <string name="settings_usage_access">Usage access permission</string>
     <string name="settings_usage_access_granted">Granted</string>
     <string name="settings_usage_access_missing">Not granted — tap to grant</string>

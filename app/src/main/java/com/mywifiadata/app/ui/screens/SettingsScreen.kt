@@ -29,6 +29,7 @@ import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
@@ -259,36 +260,6 @@ fun SettingsScreen(
                         }
                     }
 
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Wifi,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(22.dp),
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = stringResource(R.string.wifi_card_title),
-                                style = MaterialTheme.typography.bodyLargeEmphasized,
-                            )
-                            Text(
-                                text = state.wifi.ssid
-                                    ?: stringResource(R.string.wifi_not_connected_title),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        TextButton(onClick = onOpenWifiSettings, shape = AppButtonShape) {
-                            Text(text = stringResource(R.string.action_open_usage_access))
-                        }
-                    }
-
                     Spacer(modifier = Modifier.height(8.dp))
                     TextButton(
                         onClick = { showClearDialog = true },
@@ -385,6 +356,10 @@ fun SettingsScreen(
                         onClearData()
                     },
                     shape = AppButtonShape,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError,
+                    ),
                 ) {
                     Text(text = stringResource(R.string.action_confirm))
                 }
