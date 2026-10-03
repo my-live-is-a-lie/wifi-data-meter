@@ -144,7 +144,6 @@ private fun HeroCard(state: UiState, onOpenQuotaSettings: () -> Unit) {
     }
     val downloadColor = LocalDownloadColor.current
     val uploadColor = LocalUploadColor.current
-    val speed = state.currentSpeed?.totalBytesPerSecond ?: 0.0
 
     ExpressiveCard(
         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -194,7 +193,7 @@ private fun HeroCard(state: UiState, onOpenQuotaSettings: () -> Unit) {
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = Format.speed(speed),
+                        text = Format.bytes(state.cycle.totalBytes),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
                     )
@@ -212,16 +211,6 @@ private fun HeroCard(state: UiState, onOpenQuotaSettings: () -> Unit) {
                     ),
                     style = MaterialTheme.typography.bodyLargeEmphasized,
                     color = MaterialTheme.colorScheme.onSurface,
-                    textAlign = TextAlign.Center,
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = stringResource(
-                        R.string.quota_used_of,
-                        Format.bytes(state.cycle.totalBytes),
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                 )
                 if (state.quotaExceeded) {
