@@ -116,6 +116,8 @@ private fun DashboardPreview() {
             onRefresh = {},
             onResetSession = {},
             onToggleTracking = {},
+            onStartSpeedTest = {},
+            onStopSpeedTest = {},
         )
     }
 }

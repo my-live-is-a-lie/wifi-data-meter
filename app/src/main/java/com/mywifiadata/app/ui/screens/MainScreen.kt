@@ -237,6 +237,8 @@ fun MainScreen(viewModel: AppViewModel) {
                     onRefresh = { viewModel.refreshNow() },
                     onResetSession = { showResetDialog = true },
                     onToggleTracking = { toggleTracking(!state.settings.trackingEnabled) },
+                    onStartSpeedTest = { viewModel.startSpeedTest() },
+                    onStopSpeedTest = { viewModel.stopSpeedTest() },
                 )
 
                 AppTab.APPS -> {

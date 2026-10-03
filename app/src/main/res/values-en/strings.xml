@@ -45,6 +45,9 @@
     <string name="label_quota">Monthly plan</string>
     <string name="label_current_speed">Current speed</string>
     <string name="label_session">Current session</string>
+    <string name="speed_test_title">Speed test</string>
+    <string name="speed_test_subtitle">Powered by fast.com</string>
+    <string name="speed_test_failed">Speed test failed. Check your connection and try again.</string>
     <string name="label_period">Period</string>
     <string name="label_average">Daily average</string>
     <string name="label_peak">Busiest day</string>

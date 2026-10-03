@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.mywifiadata.app.core.Format
+import com.mywifiadata.app.core.SpeedTestEngine
 import com.mywifiadata.app.core.TimeRange
 import com.mywifiadata.app.core.TimeRanges
 import com.mywifiadata.app.core.UsagePeriod
@@ -27,7 +28,28 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+
+/**
+ * حالة اختبار السرعة في بطاقة الرئيسية.
+ */
+sealed interface SpeedTestState {
+    /** لم يبدأ الاختبار (أو أُلغي). */
+    data object Idle : SpeedTestState
+
+    /** الاختبار قيد التشغيل. */
+    data object Running : SpeedTestState
+
+    /** اكتمل: القيم بالبت/ثانية. */
+    data class Done(
+        val downloadBitsPerSecond: Double,
+        val uploadBitsPerSecond: Double,
+    ) : SpeedTestState
+
+    /** تعذّر إجراء الاختبار. */
+    data object Failed : SpeedTestState
+}
 
 /**
  * حالة الواجهة الكاملة.
@@ -43,6 +65,7 @@ data class UiState(
     val cycle: TrafficTotals = TrafficTotals.Empty,
     val session: TrafficTotals = TrafficTotals.Empty,
     val samples: List<SpeedSample> = emptyList(),
+    val speedTest: SpeedTestState = SpeedTestState.Idle,
     val daily: List<DayUsage> = emptyList(),
     val apps: List<AppUsage> = emptyList(),
     // تطبيقات الفترة كاملة (لا تتأثر باختيار شريحة) لبطاقة «الفترة».
@@ -447,6 +470,38 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
             )
         }
         refreshNow()
+    }
+
+    private var speedTestJob: Job? = null
+
+    /** بدء اختبار السرعة (fast.com مع رجوع تلقائي إذا حُجب). */
+    fun startSpeedTest() {
+        if (_uiState.value.speedTest is SpeedTestState.Running) return
+        speedTestJob = viewModelScope.launch {
+            _uiState.update { it.copy(speedTest = SpeedTestState.Running) }
+            try {
+                val result = SpeedTestEngine.run()
+                _uiState.update {
+                    it.copy(
+                        speedTest = SpeedTestState.Done(
+                            downloadBitsPerSecond = result.downloadBitsPerSecond,
+                            uploadBitsPerSecond = result.uploadBitsPerSecond,
+                        ),
+                    )
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _uiState.update { it.copy(speedTest = SpeedTestState.Failed) }
+            }
+        }
+    }
+
+    /** إيقاف الاختبار الجارٍ. */
+    fun stopSpeedTest() {
+        speedTestJob?.cancel()
+        speedTestJob = null
+        _uiState.update { it.copy(speedTest = SpeedTestState.Idle) }
     }
 
     /** نص سرعة جاهز للعرض في الشريط العلوي. */

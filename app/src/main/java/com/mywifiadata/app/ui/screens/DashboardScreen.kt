@@ -33,7 +33,9 @@ import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material.icons.rounded.WifiOff
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -58,6 +60,7 @@ import com.mywifiadata.app.R
 import com.mywifiadata.app.core.Format
 import com.mywifiadata.app.data.model.WifiBand
 import com.mywifiadata.app.data.model.WifiStatus
+import com.mywifiadata.app.ui.SpeedTestState
 import com.mywifiadata.app.ui.UiState
 import com.mywifiadata.app.ui.components.Dot
 import com.mywifiadata.app.ui.components.EmptyState
@@ -86,6 +89,8 @@ fun DashboardScreen(
     onRefresh: () -> Unit,
     onResetSession: () -> Unit,
     onToggleTracking: () -> Unit,
+    onStartSpeedTest: () -> Unit,
+    onStopSpeedTest: () -> Unit,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(16.dp),
 ) {
@@ -129,6 +134,14 @@ fun DashboardScreen(
         }
 
         item { TodayCard(state = state) }
+
+        item {
+            SpeedTestCard(
+                state = state,
+                onStart = onStartSpeedTest,
+                onStop = onStopSpeedTest,
+            )
+        }
 
         item { SessionCard(state = state, onResetSession = onResetSession) }
     }
@@ -566,6 +579,123 @@ private fun TodayCard(state: UiState) {
                     value = Format.speed((state.currentSpeed?.totalBytesPerSecond ?: 0.0) / 2.0),
                     icon = Icons.Rounded.Speed,
                     modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * بطاقة اختبار السرعة: زر تشغيل عبر fast.com ونتائجه (تنزيل/رفع).
+ */
+@Composable
+private fun SpeedTestCard(state: UiState, onStart: () -> Unit, onStop: () -> Unit) {
+    val downloadColor = LocalDownloadColor.current
+    val uploadColor = LocalUploadColor.current
+    val test = state.speedTest
+    val running = test is SpeedTestState.Running
+
+    ExpressiveCard {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.speed_test_title),
+                        style = MaterialTheme.typography.bodyLargeEmphasized,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = stringResource(R.string.speed_test_subtitle),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Button(
+                    onClick = { if (running) onStop() else onStart() },
+                    shape = AppButtonShape,
+                ) {
+                    if (running) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary,
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Rounded.PlayArrow,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+            }
+
+            if (test is SpeedTestState.Done) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Rounded.ArrowDownward,
+                                contentDescription = null,
+                                tint = downloadColor,
+                                modifier = Modifier.size(12.dp),
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = stringResource(R.string.label_download),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Text(
+                            text = Format.bits(test.downloadBitsPerSecond),
+                            style = MaterialTheme.typography.bodyMediumEmphasized,
+                            color = downloadColor,
+                        )
+                    }
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Rounded.ArrowUpward,
+                                contentDescription = null,
+                                tint = uploadColor,
+                                modifier = Modifier.size(12.dp),
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = stringResource(R.string.label_upload),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Text(
+                            text = Format.bits(test.uploadBitsPerSecond),
+                            style = MaterialTheme.typography.bodyMediumEmphasized,
+                            color = uploadColor,
+                        )
+                    }
+                }
+            }
+
+            if (test is SpeedTestState.Failed) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = stringResource(R.string.speed_test_failed),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
                 )
             }
         }
