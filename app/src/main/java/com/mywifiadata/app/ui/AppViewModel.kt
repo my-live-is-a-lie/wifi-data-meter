@@ -16,6 +16,7 @@ import com.mywifiadata.app.data.model.AppUsage
 import com.mywifiadata.app.data.model.AppsFilter
 import com.mywifiadata.app.data.model.DayUsage
 import com.mywifiadata.app.data.model.SpeedSample
+import com.mywifiadata.app.data.model.SpeedTestRecord
 import com.mywifiadata.app.data.model.ThemeMode
 import com.mywifiadata.app.data.model.TrafficTotals
 import com.mywifiadata.app.data.model.UsageSlice
@@ -32,23 +33,34 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 /**
- * حالة اختبار السرعة في بطاقة الرئيسية.
+ * حالة اختبار السرعة في بطاقة اليوم.
  */
 sealed interface SpeedTestState {
-    /** لم يبدأ الاختبار (أو أُلغي). */
+    /** لا نتيجة محفوظة بعد (لم يُجرَ أي اختبار). */
     data object Idle : SpeedTestState
 
-    /** الاختبار قيد التشغيل. */
-    data object Running : SpeedTestState
+    /** الاختبار قيد التشغيل مع مرحلته الحالية وسرعته اللحظية. */
+    data class Running(
+        val phase: SpeedTestEngine.Phase = SpeedTestEngine.Phase.PREPARING,
+        val bitsPerSecond: Double = 0.0,
+        val elapsedMillis: Long = 0L,
+    ) : SpeedTestState
 
-    /** اكتمل: القيم بالبت/ثانية. */
+    /** نتيجة جاهزة (محفوظة محليًا وتظهر حتى بعد إعادة التشغيل). */
     data class Done(
         val downloadBitsPerSecond: Double,
         val uploadBitsPerSecond: Double,
+        val timestampMillis: Long = System.currentTimeMillis(),
+        val usedFastCom: Boolean = true,
+        /** false إن تعذّر قياس الرفع (تُعرض شرطة بدل صفر). */
+        val uploadMeasured: Boolean = true,
     ) : SpeedTestState
 
-    /** تعذّر إجراء الاختبار. */
-    data object Failed : SpeedTestState
+    /** فشل الاختبار مع سببه وتفاصيل المصادر التي جُرّبت. */
+    data class Failed(
+        val failure: SpeedTestEngine.Failure = SpeedTestEngine.Failure.ERROR,
+        val detail: String? = null,
+    ) : SpeedTestState
 }
 
 /**
@@ -67,6 +79,11 @@ data class UiState(
     val samples: List<SpeedSample> = emptyList(),
     val speedTest: SpeedTestState = SpeedTestState.Idle,
     val daily: List<DayUsage> = emptyList(),
+    /**
+     * أعلى يوم استهلاكًا خلال آخر 30 يومًا — مرجع ثابت للمقارنة مهما كانت
+     * الفترة المختارة في شاشة السجل (تُحمَّل بياناته مستقلة عن [daily]).
+     */
+    val monthPeak: DayUsage? = null,
     val apps: List<AppUsage> = emptyList(),
     // تطبيقات الفترة كاملة (لا تتأثر باختيار شريحة) لبطاقة «الفترة».
     val periodApps: List<AppUsage> = emptyList(),
@@ -152,7 +169,10 @@ data class AppDetailState(
  */
 class AppViewModel(private val repository: UsageRepository) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(UiState())
+    // تُستعاد آخر نتيجة اختبار سرعة محفوظة فور إنشاء الحالة (قبل أي تحديث).
+    private val _uiState = MutableStateFlow(
+        UiState(speedTest = repository.settingsStore.current.lastSpeedTest.toSpeedTestState()),
+    )
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
     private var lastTotals: TrafficTotals = TrafficTotals.Empty
@@ -160,6 +180,7 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
     private var appsLoadedAt: Long = 0L
     private var dailyLoadedAt: Long = 0L
     private var dailyLoadedDays: Int = 0
+    private var monthPeakLoadedAt: Long = 0L
 
     init {
         viewModelScope.launch {
@@ -221,10 +242,34 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
             dailyLoadedDays = historyDays
             _uiState.update { it.copy(daily = daily) }
         }
+        loadMonthPeak(hasAccess, force, now)
 
         if (hasAccess && (force || now - appsLoadedAt > APPS_TTL_MILLIS)) {
             loadApps()
             loadAppsSlices()
+        }
+    }
+
+    /**
+     * يحمّل آخر 30 يومًا ويستخرج أعلى يوم استهلاكًا لعرضه في بطاقة «سجل
+     * الاستهلاك» كمرجع للمقارنة، حتى لو كانت الفترة المعروضة يومًا واحدًا
+     * (فلا يعود «أعلى يوم» مساويًا لاستهلاك اليوم نفسه).
+     *
+     * إن كانت الفترة المختارة شهرًا بالفعل نُعيد استخدام بياناتها بلا استعلام جديد.
+     */
+    private suspend fun loadMonthPeak(hasAccess: Boolean, force: Boolean, now: Long) {
+        if (!hasAccess) return
+        if (!force && now - monthPeakLoadedAt <= MONTH_PEAK_TTL_MILLIS) return
+
+        val loadedDays = dailyLoadedDays
+        val monthDaily = if (loadedDays >= MONTH_DAYS) {
+            _uiState.value.daily
+        } else {
+            repository.dailyUsage(MONTH_DAYS)
+        }
+        monthPeakLoadedAt = now
+        _uiState.update { state ->
+            state.copy(monthPeak = monthDaily.maxByOrNull { it.totals.totalBytes })
         }
     }
 
@@ -474,34 +519,75 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
 
     private var speedTestJob: Job? = null
 
-    /** بدء اختبار السرعة (fast.com مع رجوع تلقائي إذا حُجب). */
+    /**
+     * بدء اختبار السرعة عبر fast.com (مع رجوع تلقائي إلى Cloudflare إذا حُجب).
+     *
+     * - قبل البدء: إن لم يكن هناك اتصال تظهر رسالة فورية بلا أي تحميل.
+     * - أثناء الاختبار: إن انقطع الاتصال أو مرّ وقت طويل دون نتيجة يوقف
+     *   المحرّك التحميل ويصل السبب إلى الواجهة لتظهر رسالته.
+     * - بعد النجاح: تُحفظ النتيجة محليًا فتبقى ظاهرة بعد إعادة التشغيل.
+     */
     fun startSpeedTest() {
         if (_uiState.value.speedTest is SpeedTestState.Running) return
+
+        if (!repository.wifiStatus().isOnline) {
+            _uiState.update {
+                it.copy(speedTest = SpeedTestState.Failed(SpeedTestEngine.Failure.NO_CONNECTION))
+            }
+            return
+        }
+
         speedTestJob = viewModelScope.launch {
-            _uiState.update { it.copy(speedTest = SpeedTestState.Running) }
+            _uiState.update { it.copy(speedTest = SpeedTestState.Running()) }
             try {
-                val result = SpeedTestEngine.run()
+                val result = SpeedTestEngine.run(
+                    isOnline = { repository.wifiStatus().isOnline },
+                    onProgress = { progress ->
+                        _uiState.update { state ->
+                            state.copy(
+                                speedTest = SpeedTestState.Running(
+                                    phase = progress.phase,
+                                    bitsPerSecond = progress.bitsPerSecond,
+                                    elapsedMillis = progress.elapsedMillis,
+                                ),
+                            )
+                        }
+                    },
+                )
+                val record = SpeedTestRecord(
+                    downloadBitsPerSecond = result.downloadBitsPerSecond,
+                    uploadBitsPerSecond = result.uploadBitsPerSecond,
+                    timestampMillis = System.currentTimeMillis(),
+                    usedFastCom = result.usedFastCom,
+                    uploadMeasured = result.uploadMeasured,
+                )
+                repository.settingsStore.saveSpeedTest(record)
+                _uiState.update { it.copy(speedTest = record.toSpeedTestState()) }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: SpeedTestEngine.SpeedTestException) {
+                _uiState.update {
+                    it.copy(speedTest = SpeedTestState.Failed(e.failure, e.detail))
+                }
+            } catch (e: Exception) {
                 _uiState.update {
                     it.copy(
-                        speedTest = SpeedTestState.Done(
-                            downloadBitsPerSecond = result.downloadBitsPerSecond,
-                            uploadBitsPerSecond = result.uploadBitsPerSecond,
+                        speedTest = SpeedTestState.Failed(
+                            failure = SpeedTestEngine.Failure.ERROR,
+                            detail = e.message,
                         ),
                     )
                 }
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                _uiState.update { it.copy(speedTest = SpeedTestState.Failed) }
             }
         }
     }
 
-    /** إيقاف الاختبار الجارٍ. */
+    /** إيقاف الاختبار الجاري وإغلاق التحميل، مع الرجوع إلى آخر نتيجة محفوظة. */
     fun stopSpeedTest() {
         speedTestJob?.cancel()
         speedTestJob = null
-        _uiState.update { it.copy(speedTest = SpeedTestState.Idle) }
+        val saved = repository.settingsStore.current.lastSpeedTest
+        _uiState.update { it.copy(speedTest = saved.toSpeedTestState()) }
     }
 
     /** نص سرعة جاهز للعرض في الشريط العلوي. */
@@ -513,10 +599,27 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         private const val REFRESH_INTERVAL_MILLIS = 1_000L
         private const val APPS_TTL_MILLIS = 30_000L
         private const val DAILY_TTL_MILLIS = 60_000L
+        private const val MONTH_PEAK_TTL_MILLIS = 120_000L
+        private const val MONTH_DAYS = 30
         private const val MAX_SAMPLES = 30
 
         fun factory(repository: UsageRepository): ViewModelProvider.Factory = viewModelFactory {
             initializer { AppViewModel(repository) }
         }
     }
+}
+
+/**
+ * تحويل نتيجة اختبار السرعة المحفوظة إلى حالة واجهة، أو [SpeedTestState.Idle]
+ * إن لم يُجرَ أي اختبار بعد.
+ */
+private fun SpeedTestRecord?.toSpeedTestState(): SpeedTestState {
+    val record = this ?: return SpeedTestState.Idle
+    return SpeedTestState.Done(
+        downloadBitsPerSecond = record.downloadBitsPerSecond,
+        uploadBitsPerSecond = record.uploadBitsPerSecond,
+        timestampMillis = record.timestampMillis,
+        usedFastCom = record.usedFastCom,
+        uploadMeasured = record.uploadMeasured,
+    )
 }

@@ -1,5 +1,11 @@
 package com.mywifiadata.app.ui.screens
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,8 +33,18 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -41,8 +57,12 @@ import com.mywifiadata.app.ui.UiState
 import com.mywifiadata.app.ui.components.AppUsageRow
 import com.mywifiadata.app.ui.components.BarEntry
 import com.mywifiadata.app.ui.components.DailyBarChart
+import com.mywifiadata.app.ui.components.DayScrubber
+import com.mywifiadata.app.ui.components.chartSpacing
 import com.mywifiadata.app.ui.components.EmptyState
 import com.mywifiadata.app.ui.components.ExpressiveCard
+import kotlin.math.abs
+import kotlinx.coroutines.launch
 import com.mywifiadata.app.ui.components.InfoRow
 import com.mywifiadata.app.ui.components.PermissionCard
 import com.mywifiadata.app.ui.components.SectionHeader
@@ -106,7 +126,7 @@ fun HistoryScreen(
             }
 
             if (daily.isNotEmpty()) {
-                item { HistorySummaryCard(daily = daily) }
+                item { HistorySummaryCard(daily = daily, monthPeak = state.monthPeak) }
             } else {
                 item {
                     ExpressiveCard {
@@ -158,15 +178,26 @@ fun HistoryScreen(
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun ChartCard(state: UiState, onSelectDay: (Int?) -> Unit) {
+    // فهرس اليوم الذي يشير إليه المؤشر: يوم السحب الحالي، وإلا اليوم المحدد،
+    // وإلا أحدث يوم في الفترة (نهاية القائمة في هذا الترتيب).
+    var scrubIndex by remember { mutableStateOf<Int?>(null) }
+    val lastIndex = state.daily.lastIndex
+    val selectedIndex = state.selectedDayIndex?.takeIf { it in state.daily.indices }
+    val thumbIndex = (scrubIndex ?: selectedIndex ?: lastIndex).coerceAtLeast(0)
+
     val entries = state.daily.mapIndexed { index, day ->
         BarEntry(
             label = Format.dayOfMonth(day.startMillis),
             value = day.totals.totalBytes,
-            highlight = index == state.daily.lastIndex,
+            // يوم المؤشر هو المميّز بلون مختلف، تمامًا كما يشير إليه الشريط تحته.
+            highlight = index == thumbIndex,
         )
     }
 
-    ExpressiveCard {
+    // حشوة سفلية أصغر لهذه البطاقة لأن شريط التمرير يجلس قريبًا من حاشيتها.
+    ExpressiveCard(
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 10.dp),
+    ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             SectionHeader(
                 title = if (state.historyDays <= 1) {
@@ -199,20 +230,45 @@ private fun ChartCard(state: UiState, onSelectDay: (Int?) -> Unit) {
             } else {
                 DailyBarChart(
                     entries = entries,
+                    activeIndex = scrubIndex,
                     onEntryClick = { index ->
                         onSelectDay(if (state.selectedDayIndex == index) null else index)
                     },
                 )
+                if (entries.size > 1) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    // شريط تمرير لاختيار اليوم: يتحرك بالنقطة، ويتّسع عمود اليوم
+                    // المشار إليه ويظهر رقمه في صندوق فوقه أثناء السحب.
+                    DayScrubber(
+                        count = entries.size,
+                        thumbIndex = thumbIndex.coerceIn(0, entries.lastIndex),
+                        active = scrubIndex != null,
+                        spacing = chartSpacing(entries.size),
+                        activeIndex = scrubIndex,
+                        onScrubStart = {},
+                        onScrub = { index -> scrubIndex = index },
+                        onScrubEnd = { index ->
+                            scrubIndex = null
+                            onSelectDay(index)
+                        },
+                        onJump = { index ->
+                            scrubIndex = null
+                            onSelectDay(index)
+                        },
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun HistorySummaryCard(daily: List<DayUsage>) {
+private fun HistorySummaryCard(daily: List<DayUsage>, monthPeak: DayUsage?) {
     val total = daily.sumOf { it.totals.totalBytes }
     val average = if (daily.isEmpty()) 0L else total / daily.size
-    val peak = daily.maxByOrNull { it.totals.totalBytes }
+    // «أعلى يوم» مرجع من آخر 30 يومًا لا من الفترة المعروضة، فيبقى مفيدًا
+    // للمقارنة حتى عندما تكون الفترة المختارة يومًا واحدًا.
+    val peak = monthPeak
 
     ExpressiveCard {
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -234,7 +290,7 @@ private fun HistorySummaryCard(daily: List<DayUsage>) {
             if (peak != null) {
                 InfoRow(
                     icon = Icons.Rounded.TrendingUp,
-                    label = stringResource(R.string.label_peak),
+                    label = stringResource(R.string.label_peak_month),
                     value = "${Format.bytes(peak.totals.totalBytes)} • ${Format.shortDate(peak.startMillis)}",
                 )
             }
@@ -244,7 +300,61 @@ private fun HistorySummaryCard(daily: List<DayUsage>) {
 
 @Composable
 private fun SelectedDayCard(day: DayUsage, onClose: () -> Unit) {
-    ExpressiveCard(containerColor = MaterialTheme.colorScheme.secondaryContainer) {
+    val density = LocalDensity.current
+    val scope = rememberCoroutineScope()
+    val offsetX = remember { Animatable(0f) }
+    var cardWidth by remember { mutableIntStateOf(0) }
+    val screenWidthPx = with(density) {
+        LocalConfiguration.current.screenWidthDp.dp.toPx()
+    }
+    // مسافة السحب التي يكفي تجاوزها لإغلاق البطاقة (أو الإفلات بسرعة عالية).
+    val dismissThreshold = with(density) { 96.dp.toPx() }
+    val travelDistance = (if (cardWidth > 0) cardWidth.toFloat() else screenWidthPx)
+
+    /**
+     * نهاية السحب: إن تجاوزت المسافة الحد أو كانت سرعة الإفلات عالية تُخرج
+     * البطاقة من الشاشة ثم تُغلق، وإلا ترتد إلى مكانها.
+     */
+    fun settleDrag(velocity: Float) {
+        val traveled = offsetX.value
+        val dismissed = abs(traveled) > dismissThreshold || abs(velocity) > FLING_VELOCITY
+        scope.launch {
+            if (dismissed) {
+                val direction = when {
+                    traveled > 0f -> 1f
+                    traveled < 0f -> -1f
+                    velocity >= 0f -> 1f
+                    else -> -1f
+                }
+                offsetX.animateTo(direction * travelDistance, tween(durationMillis = 200))
+                onClose()
+            } else {
+                offsetX.animateTo(0f, spring(dampingRatio = 0.75f, stiffness = 400f))
+            }
+        }
+    }
+
+    ExpressiveCard(
+        modifier = Modifier
+            .onSizeChanged { size -> cardWidth = size.width }
+            .graphicsLayer {
+                translationX = offsetX.value
+                // شفافية خفيفة أثناء السحب لإيضاح أن البطاقة قابلة للإغلاق.
+                alpha = 1f - 0.55f * (abs(offsetX.value) / travelDistance).coerceIn(0f, 1f)
+            }
+            .draggable(
+                orientation = Orientation.Horizontal,
+                state = rememberDraggableState { delta ->
+                    scope.launch {
+                        offsetX.snapTo(
+                            (offsetX.value + delta).coerceIn(-travelDistance, travelDistance),
+                        )
+                    }
+                },
+                onDragStopped = { velocity -> settleDrag(velocity) },
+            ),
+        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+    ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             SectionHeader(
                 // التاريخ في البداية (يمين) واليوم بجانبه من اليسار.
@@ -355,3 +465,6 @@ private fun SelectedDayCard(day: DayUsage, onClose: () -> Unit) {
         }
     }
 }
+
+/** سرعة الإفلات (بكسل/ثانية) التي تكفي وحدها لإغلاق بطاقة اليوم المحدد. */
+private const val FLING_VELOCITY = 900f

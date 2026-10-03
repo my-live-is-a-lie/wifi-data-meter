@@ -3,6 +3,7 @@ package com.mywifiadata.app.ui.components
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -81,6 +82,8 @@ fun ExpressiveCard(
     modifier: Modifier = Modifier,
     containerColor: Color = MaterialTheme.colorScheme.surfaceContainerLow,
     onClick: (() -> Unit)? = null,
+    /** حشوة المحتوى: تُخصَّص لتقليص فراغ البطاقة عند الحاجة (مثل بطاقة السجل). */
+    contentPadding: PaddingValues = PaddingValues(20.dp),
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val shape = MaterialTheme.shapes.largeIncreased
@@ -90,7 +93,7 @@ fun ExpressiveCard(
             shape = shape,
             colors = CardDefaults.cardColors(containerColor = containerColor),
         ) {
-            Column(modifier = Modifier.padding(20.dp), content = content)
+            Column(modifier = Modifier.padding(contentPadding), content = content)
         }
     } else {
         Card(
@@ -99,7 +102,7 @@ fun ExpressiveCard(
             shape = shape,
             colors = CardDefaults.cardColors(containerColor = containerColor),
         ) {
-            Column(modifier = Modifier.padding(20.dp), content = content)
+            Column(modifier = Modifier.padding(contentPadding), content = content)
         }
     }
 }
