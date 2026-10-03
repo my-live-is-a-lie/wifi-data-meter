@@ -468,7 +468,7 @@ private fun PeriodStat(
         Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = value,
-            style = MaterialTheme.typography.titleMediumEmphasized,
+            style = MaterialTheme.typography.bodyMediumEmphasized,
             color = color,
             textAlign = TextAlign.Center,
             maxLines = 2,
