@@ -192,11 +192,6 @@ fun AppUsageRow(
                             style = MaterialTheme.typography.bodyMediumEmphasized,
                             color = MaterialTheme.colorScheme.onSurface,
                         )
-                        Text(
-                            text = context.getString(R.string.percent_format, (share * 100).toInt()),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
                     }
                 }
             }
@@ -204,11 +199,20 @@ fun AppUsageRow(
 
         Spacer(modifier = Modifier.size(8.dp))
 
-        QuotaBar(
-            progress = share,
-            height = 6.dp,
-            startColor = downloadColor,
-            endColor = uploadColor,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            QuotaBar(
+                progress = share,
+                modifier = Modifier.weight(1f),
+                height = 6.dp,
+                startColor = downloadColor,
+                endColor = uploadColor,
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = context.getString(R.string.percent_format, (share * 100).toInt()),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }

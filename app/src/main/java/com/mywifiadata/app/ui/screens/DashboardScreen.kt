@@ -169,6 +169,7 @@ private fun HeroCard(state: UiState, onOpenQuotaSettings: () -> Unit) {
                 contentDescription = stringResource(R.string.quota_ring_title),
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Spacer(modifier = Modifier.height(24.dp))
                     Text(
                         text = if (hasQuota) {
                             stringResource(
@@ -182,6 +183,7 @@ private fun HeroCard(state: UiState, onOpenQuotaSettings: () -> Unit) {
                         color = MaterialTheme.colorScheme.onSurface,
                         textAlign = TextAlign.Center,
                     )
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = if (hasQuota) {
                             stringResource(R.string.label_used)
@@ -561,10 +563,9 @@ private fun TodayCard(state: UiState) {
                 )
                 StatTile(
                     label = stringResource(R.string.label_current_speed),
-                    value = Format.speed(state.currentSpeed?.totalBytesPerSecond ?: 0.0),
+                    value = Format.speed((state.currentSpeed?.totalBytesPerSecond ?: 0.0) / 2.0),
                     icon = Icons.Rounded.Speed,
                     modifier = Modifier.weight(1f),
-                    caption = stringResource(R.string.label_session) + ": " + Format.bytes(state.session.totalBytes),
                 )
             }
         }
@@ -596,7 +597,7 @@ private fun SessionCard(state: UiState, onResetSession: () -> Unit) {
             InfoRow(
                 icon = Icons.Rounded.Speed,
                 label = stringResource(R.string.label_current_speed),
-                value = Format.speed(state.currentSpeed?.totalBytesPerSecond ?: 0.0),
+                value = Format.speed((state.currentSpeed?.totalBytesPerSecond ?: 0.0) / 2.0),
             )
             InfoRow(
                 icon = Icons.Rounded.ShowChart,
