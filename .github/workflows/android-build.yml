@@ -3,6 +3,7 @@
 # - يعتمد على الـ Wrapper المضمَّن في المشروع (Gradle 9.5.0) فلا حاجة لتثبيت Gradle يدويًا.
 # - يبني APK **إصدار (Release) بمعمارية arm64-v8a** موقّعًا وجاهزًا للتثبيت + يشغّل اختبارات الوحدة.
 # - عند إنشاء وسم v* يُرفق الملف بـ GitHub Releases، ويمكن اختيار بناء debug يدويًا من Run workflow.
+# - عند كل دفع ناجح يُدفع ملف APK أيضًا إلى فرع «apk-builds» ليسهل تنزيله مباشرة عبر git.
 #
 # أهم ما يجعل البناء سريعًا:
 #  1) Enhanced Caching من setup-gradle: كاش مُجزّأ (fine-grained) + إزالة تكرار (Deduplication)
@@ -356,3 +357,47 @@ jobs:
           gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 \
             || gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes "بناء تلقائي من GitHub Actions"
           gh release upload "$GITHUB_REF_NAME" app/build/outputs/apk/release/*.apk --clobber
+
+  # ——————————————————— نشر ملف APK على فرع apk-builds ———————————————————
+  # بعض البيئات تحجب تنزيل أرشيفات Actions وملفات Releases (Azure Blob)،
+  # لذا يُدفع الـ APK إلى فرع مستقل في المستودع نفسه ليُجلب عبر git.
+  # الفرع يُستبدل بالكامل في كل بناء (force-push) فيبقى هو آخر نسخة مبنية.
+  publish:
+    name: Publish APK to apk-builds branch
+    needs: build
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write # لدفع ملف APK إلى فرع apk-builds
+
+    steps:
+      - name: Download APK artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: app-release-apk
+          path: apk
+
+      - name: Push APK to apk-builds branch
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # الـ artifact يحتفظ ببنية المجلدات (release/...)، فنبحث بـ find
+          APK="$(find apk -type f -name '*.apk' | head -1)"
+          if [ -z "$APK" ]; then
+            echo "::error title=APK::لم يُعثر على ملف APK داخل الأرشيف"
+            find apk -type f -print || true
+            exit 1
+          fi
+          echo "الملف: $APK ($(du -h "$APK" | cut -f1))"
+          STAGE="$(mktemp -d)"
+          cp "$APK" "$STAGE/app-release.apk"
+          cd "$STAGE"
+          git init -q -b main
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app-release.apk
+          git commit -qm "APK ${GITHUB_SHA} (${GITHUB_REF_NAME}) run=${GITHUB_RUN_ID}"
+          git push -f "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" main:refs/heads/apk-builds
+          echo "تم دفع app-release.apk إلى فرع apk-builds"

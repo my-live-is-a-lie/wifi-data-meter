@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
+import com.mywifiadata.app.ui.theme.AppButtonShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -23,10 +23,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
-/** عنوان قسم مع نص توضيحي اختياري وعناصر إضافية في النهاية. */
+/**
+ * عنوان قسم مع نص توضيحي اختياري وعناصر إضافية في النهاية.
+ *
+ * العنوان والنص التوضيحي في سطر واحد لتقليص ارتفاع البطاقات: العنوان في
+ * البداية والنص التوضيحي في النهاية (يسار في العربية) ليُملأ عرض البطاقة
+ * بالكامل بدل ترك النصف الأيسر فارغًا.
+ */
 @Composable
 fun SectionHeader(
     title: String,
@@ -40,19 +47,29 @@ fun SectionHeader(
             .padding(horizontal = 4.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(modifier = Modifier.weight(1f)) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMediumEmphasized,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (supportingText != null) {
             Text(
-                text = title,
-                style = MaterialTheme.typography.titleMediumEmphasized,
-                color = MaterialTheme.colorScheme.onSurface,
+                text = supportingText,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                // weight يضمن عدم تجاوز النص لحدود البطاقة، وEnd يضعه في
+                // الطرف المقابل للعنوان (يسار في RTL) لاستخدام المساحة الفارغة.
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 8.dp),
+                textAlign = TextAlign.End,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-            if (supportingText != null) {
-                Text(
-                    text = supportingText,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+        } else {
+            Spacer(modifier = Modifier.weight(1f))
         }
         trailing?.invoke()
     }
@@ -87,7 +104,10 @@ fun ExpressiveCard(
     }
 }
 
-/** مربّع إحصائي: أيقونة + رقم رئيسي + تسمية. */
+/**
+ * بلاطة إحصاء: القيمة بعرض كامل في السطر الأول (تلفّ النص بدل إخفائه
+ * بثلاث نقاط)، ثم التسمية بجانب الأيقونة في السطر الثاني، ثم التعليق.
+ */
 @Composable
 fun StatTile(
     label: String,
@@ -104,34 +124,34 @@ fun StatTile(
         colors = CardDefaults.cardColors(containerColor = containerColor, contentColor = contentColor),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = contentColor.copy(alpha = 0.85f),
-                modifier = Modifier.size(22.dp),
-            )
-            Spacer(modifier = Modifier.size(10.dp))
+            // القيمة أول أبناء العمود فتحصل على العرض الكامل دون أي قصّ.
             Text(
                 text = value,
                 style = MaterialTheme.typography.titleLargeEmphasized,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
             )
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                color = contentColor.copy(alpha = 0.8f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = contentColor.copy(alpha = 0.8f),
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = contentColor.copy(alpha = 0.85f),
+                    modifier = Modifier.size(20.dp),
+                )
+            }
             if (caption != null) {
                 Spacer(modifier = Modifier.size(4.dp))
                 Text(
                     text = caption,
                     style = MaterialTheme.typography.labelSmall,
                     color = contentColor.copy(alpha = 0.7f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
@@ -170,8 +190,6 @@ fun InfoRow(
             text = value,
             style = MaterialTheme.typography.bodyMediumEmphasized,
             color = valueColor,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -255,7 +273,7 @@ fun EmptyState(
         )
         if (actionLabel != null && onAction != null) {
             Spacer(modifier = Modifier.size(16.dp))
-            Button(onClick = onAction) { Text(text = actionLabel) }
+            Button(onClick = onAction, shape = AppButtonShape) { Text(text = actionLabel) }
         }
     }
 }
@@ -293,10 +311,10 @@ fun PermissionCard(
             Text(text = message, style = MaterialTheme.typography.bodyMedium)
             Spacer(modifier = Modifier.size(16.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Button(onClick = onGrant, shape = RoundedCornerShape(50)) {
+                Button(onClick = onGrant, shape = AppButtonShape) {
                     Text(text = grantLabel)
                 }
-                OutlinedButton(onClick = onOpenSettings, shape = RoundedCornerShape(50)) {
+                OutlinedButton(onClick = onOpenSettings, shape = AppButtonShape) {
                     Text(text = settingsLabel)
                 }
             }

@@ -1,5 +1,8 @@
 package com.mywifiadata.app.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -14,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.MonetizationOn
 import androidx.compose.material.icons.rounded.Notifications
@@ -25,6 +29,7 @@ import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
@@ -47,6 +52,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
@@ -55,11 +61,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mywifiadata.app.R
 import com.mywifiadata.app.core.Format
+import com.mywifiadata.app.data.model.ThemeMode
 import com.mywifiadata.app.ui.UiState
 import com.mywifiadata.app.ui.components.ExpressiveCard
 import com.mywifiadata.app.ui.components.InfoRow
 import com.mywifiadata.app.ui.components.SectionHeader
 import com.mywifiadata.app.ui.components.SettingSwitchRow
+import com.mywifiadata.app.ui.theme.AppButtonShape
 import kotlin.math.roundToInt
 
 /**
@@ -76,6 +84,7 @@ fun SettingsScreen(
     onIntervalChange: (Int) -> Unit,
     onDynamicColorChange: (Boolean) -> Unit,
     onTrackingChange: (Boolean) -> Unit,
+    onThemeModeChange: (ThemeMode) -> Unit,
     onOpenUsageAccess: () -> Unit,
     onOpenWifiSettings: () -> Unit,
     onClearData: () -> Unit,
@@ -84,6 +93,8 @@ fun SettingsScreen(
 ) {
     var showQuotaDialog by rememberSaveable { mutableStateOf(false) }
     var showClearDialog by rememberSaveable { mutableStateOf(false) }
+    // قسم «حول التطبيق» مطوي افتراضيًا لتوفير مساحة أقل تمريرًا.
+    var aboutExpanded by rememberSaveable { mutableStateOf(false) }
     val settings = state.settings
 
     LazyColumn(
@@ -127,6 +138,7 @@ fun SettingsScreen(
                     FilledTonalButton(
                         onClick = { showQuotaDialog = true },
                         modifier = Modifier.fillMaxWidth(),
+                        shape = AppButtonShape,
                     ) {
                         Text(text = stringResource(R.string.quota_set_action))
                     }
@@ -180,6 +192,18 @@ fun SettingsScreen(
                         checked = settings.trackingEnabled,
                         onCheckedChange = onTrackingChange,
                     )
+                }
+            }
+        }
+
+        item {
+            ExpressiveCard {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    SectionHeader(title = stringResource(R.string.settings_section_appearance))
+                    ThemeModeSelector(
+                        themeMode = settings.themeMode,
+                        onThemeModeChange = onThemeModeChange,
+                    )
                     SettingSwitchRow(
                         icon = Icons.Rounded.Palette,
                         title = stringResource(R.string.settings_dynamic_color),
@@ -231,37 +255,7 @@ fun SettingsScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        TextButton(onClick = onOpenUsageAccess) {
-                            Text(text = stringResource(R.string.action_open_usage_access))
-                        }
-                    }
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Wifi,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(22.dp),
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = stringResource(R.string.wifi_card_title),
-                                style = MaterialTheme.typography.bodyLargeEmphasized,
-                            )
-                            Text(
-                                text = state.wifi.ssid
-                                    ?: stringResource(R.string.wifi_not_connected_title),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        TextButton(onClick = onOpenWifiSettings) {
+                        TextButton(onClick = onOpenUsageAccess, shape = AppButtonShape) {
                             Text(text = stringResource(R.string.action_open_usage_access))
                         }
                     }
@@ -270,6 +264,7 @@ fun SettingsScreen(
                     TextButton(
                         onClick = { showClearDialog = true },
                         modifier = Modifier.fillMaxWidth(),
+                        shape = AppButtonShape,
                     ) {
                         Text(
                             text = stringResource(R.string.settings_clear_data),
@@ -294,18 +289,42 @@ fun SettingsScreen(
                         .versionName
                 }.getOrNull().orEmpty()
             }
+            val chevronRotation by animateFloatAsState(
+                targetValue = if (aboutExpanded) 180f else 0f,
+                label = "aboutChevron",
+            )
             ExpressiveCard {
                 Column(modifier = Modifier.fillMaxWidth()) {
+                    // رأس القسم نفسه هو زر التوسيع/الطيّ.
                     SectionHeader(
                         title = stringResource(R.string.settings_section_about),
                         supportingText = stringResource(R.string.settings_version, versionName),
+                        modifier = Modifier.clickable { aboutExpanded = !aboutExpanded },
+                        trailing = {
+                            Icon(
+                                imageVector = Icons.Rounded.ExpandMore,
+                                contentDescription = stringResource(
+                                    if (aboutExpanded) {
+                                        R.string.settings_about_collapse
+                                    } else {
+                                        R.string.settings_about_expand
+                                    },
+                                ),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.rotate(chevronRotation),
+                            )
+                        },
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = stringResource(R.string.settings_about_body),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    AnimatedVisibility(visible = aboutExpanded) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = stringResource(R.string.settings_about_body),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -336,12 +355,17 @@ fun SettingsScreen(
                         showClearDialog = false
                         onClearData()
                     },
+                    shape = AppButtonShape,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError,
+                    ),
                 ) {
                     Text(text = stringResource(R.string.action_confirm))
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showClearDialog = false }) {
+                TextButton(onClick = { showClearDialog = false }, shape = AppButtonShape) {
                     Text(text = stringResource(R.string.action_cancel))
                 }
             },
@@ -392,6 +416,48 @@ private fun IntervalSelector(intervalSeconds: Int, onIntervalChange: (Int) -> Un
     }
 }
 
+/**
+ * منتقي سمة التطبيق: أربعة خيارات (النظام / فاتح / داكن / مظلم)
+ * بنفس نمط [IntervalSelector] مع قصّ النص عند الضيق.
+ */
+@Composable
+private fun ThemeModeSelector(
+    themeMode: ThemeMode,
+    onThemeModeChange: (ThemeMode) -> Unit,
+) {
+    val labels = listOf(
+        stringResource(R.string.theme_system),
+        stringResource(R.string.theme_light),
+        stringResource(R.string.theme_dark),
+        stringResource(R.string.theme_black),
+    )
+    val options = remember { ThemeMode.entries.toList() }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Spacer(modifier = Modifier.height(8.dp))
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            options.forEachIndexed { index, mode ->
+                SegmentedButton(
+                    selected = themeMode == mode,
+                    onClick = { onThemeModeChange(mode) },
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
+                    icon = {},
+                    label = {
+                        Text(
+                            text = labels[index],
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    },
+                )
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AlertThresholdSlider(value: Int, onValueChange: (Int) -> Unit) {
@@ -402,7 +468,11 @@ private fun AlertThresholdSlider(value: Int, onValueChange: (Int) -> Unit) {
     )
     Slider(
         state = sliderState,
-        onValueChange = { onValueChange(it.roundToInt()) },
+        onValueChange = {
+            // ملاحظة material3: السحب لا يحدّث state وحده — نحدّثه يدويًا لتحريك المؤشر.
+            sliderState.value = it
+            onValueChange(it.roundToInt())
+        },
     )
 }
 
@@ -483,12 +553,13 @@ private fun QuotaDialog(
             Button(
                 onClick = { onConfirm(parsed ?: 0.0, cycleDay) },
                 enabled = gigabytesText.isBlank() || (parsed != null && parsed >= 0.0),
+                shape = AppButtonShape,
             ) {
                 Text(text = stringResource(R.string.action_save))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(onClick = onDismiss, shape = AppButtonShape) {
                 Text(text = stringResource(R.string.action_cancel))
             }
         },

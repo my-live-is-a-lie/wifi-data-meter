@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -15,6 +16,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.mywifiadata.app.data.model.ThemeMode
 import com.mywifiadata.app.ui.AppViewModel
 import com.mywifiadata.app.ui.screens.MainScreen
 import com.mywifiadata.app.ui.theme.AppTheme
@@ -42,7 +44,19 @@ class MainActivity : ComponentActivity() {
                 else -> LayoutDirection.Rtl
             }
 
-            AppTheme(dynamicColor = settings.dynamicColorEnabled) {
+            // سمة التطبيق: النظام / فاتح / داكن / مظلم (أسود AMOLED).
+            val darkTheme = when (settings.themeMode) {
+                ThemeMode.SYSTEM -> isSystemInDarkTheme()
+                ThemeMode.LIGHT -> false
+                ThemeMode.DARK -> true
+                ThemeMode.BLACK -> true
+            }
+
+            AppTheme(
+                darkTheme = darkTheme,
+                dynamicColor = settings.dynamicColorEnabled,
+                amoled = settings.themeMode == ThemeMode.BLACK,
+            ) {
                 CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
                     Surface(
                         modifier = Modifier.fillMaxSize(),
