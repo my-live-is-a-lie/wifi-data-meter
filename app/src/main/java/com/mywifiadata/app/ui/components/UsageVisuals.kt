@@ -329,23 +329,38 @@ private fun DayLabelsRow(
             entries.forEachIndexed { index, entry ->
                 val isActive = index == activeIndex
                 if (showDayLabel(index, entries.size, stride, activeIndex)) {
-                    Text(
-                        text = entry.label,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (isActive) onPillColor else normalColor,
-                        maxLines = 1,
-                        softWrap = false,
-                        modifier = if (isActive) {
-                            // صندوق اليوم: عرض أدنى محسوس وحشوة أفقية واسعة.
-                            Modifier
+                    if (isActive) {
+                        // صندوق اليوم: Box بقياس محسوس ومحتوى مُوسَّط تمامًا، فيظهر
+                        // الرقم في منتصفه مهما كان عدد خاناته وفي كل الاتجاهات.
+                        Box(
+                            modifier = Modifier
                                 .defaultMinSize(minWidth = DAY_PILL_MIN_WIDTH)
-                                .clip(RoundedCornerShape(10.dp))
+                                .clip(RoundedCornerShape(9.dp))
                                 .background(pillColor)
-                                .padding(horizontal = DAY_PILL_HORIZONTAL_PADDING, vertical = 3.dp)
-                        } else {
-                            Modifier
-                        },
-                    )
+                                .padding(
+                                    horizontal = DAY_PILL_HORIZONTAL_PADDING,
+                                    vertical = DAY_PILL_VERTICAL_PADDING,
+                                ),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = entry.label,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = onPillColor,
+                                textAlign = TextAlign.Center,
+                                maxLines = 1,
+                                softWrap = false,
+                            )
+                        }
+                    } else {
+                        Text(
+                            text = entry.label,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = normalColor,
+                            maxLines = 1,
+                            softWrap = false,
+                        )
+                    }
                 } else {
                     Spacer(modifier = Modifier)
                 }
@@ -589,10 +604,13 @@ internal const val ACTIVE_BAR_WEIGHT = 2.6f
 internal const val MIN_OTHERS_WEIGHT = 0.25f
 
 /** عرض الصندوق الأزرق الذي يعرض رقم اليوم المشار إليه. */
-private val DAY_PILL_MIN_WIDTH = 46.dp
+private val DAY_PILL_MIN_WIDTH = 38.dp
 
 /** الحشوة الأفقية داخل صندوق اليوم: توسّعه من الجانبين حول الرقم. */
-private val DAY_PILL_HORIZONTAL_PADDING = 13.dp
+private val DAY_PILL_HORIZONTAL_PADDING = 9.dp
+
+/** الحشوة الرأسية داخل صندوق اليوم. */
+private val DAY_PILL_VERTICAL_PADDING = 2.dp
 
 /** نقطة ملوّنة صغيرة تُستخدم في وسائل الإيضاح. */
 @Composable
