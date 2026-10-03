@@ -76,6 +76,9 @@ class DayScrubberMathTest {
 
     @Test
     fun `spacing shrinks when many bars are shown`() {
-        assertEquals(false, chartSpacing(7) > chartSpacing(30))
+        // ٧ أيام: 6dp بين الأعمدة، ٣٠ يومًا: 3dp — أي أن التباعد يضيق مع الزحام.
+        assertEquals(true, chartSpacing(7) > chartSpacing(30))
+        assertEquals(6f, chartSpacing(7).value, 0f)
+        assertEquals(3f, chartSpacing(30).value, 0f)
     }
 }
