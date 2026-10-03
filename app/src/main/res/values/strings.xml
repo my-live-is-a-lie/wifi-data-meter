@@ -19,6 +19,7 @@
     <!-- بطاقة الشبكة -->
     <string name="wifi_card_title">تفاصيل الشبكة</string>
     <string name="wifi_details_expand">توسيع تفاصيل الشبكة</string>
+    <string name="wifi_permission_denied">تعذّر قراءة اسم شبكة الواي فاي: لم يُمنح إذن الأجهزة القريبة/الموقع.</string>
     <string name="wifi_details_collapse">طيّ تفاصيل الشبكة</string>
     <string name="label_ssid">اسم الشبكة</string>
     <string name="label_signal">قوة الإشارة</string>
@@ -54,12 +55,17 @@
     <string name="label_peak">أعلى يوم</string>
     <string name="label_days">عدد الأيام</string>
 
+    <!-- اختبار السرعة -->
+    <string name="speed_test_title">اختبار السرعة</string>
+    <string name="speed_test_subtitle">يستخدم موقع fast.com</string>
+    <string name="speed_test_failed">تعذّر إجراء الاختبار. تحقّق من الاتصال وحاول مجددًا.</string>
+
     <!-- البطاقة الرئيسية (الحلقة) -->
     <string name="quota_ring_title">استهلاك دورة الفاتورة</string>
     <string name="quota_not_set">لم تُحدَّد باقة شهرية بعد</string>
     <string name="quota_set_action">تحديد الباقة</string>
     <string name="quota_remaining_of">متبقٍ %1$s من %2$s</string>
-    <string name="quota_used_of">استُهلك %1$s من %2$s</string>
+    <string name="quota_used_of">استُهلك %1$s</string>
     <string name="quota_exceeded">تجاوزت الباقة بمقدار %1$s</string>
     <string name="percent_format">%1$d%%</string>
 
@@ -72,7 +78,6 @@
     <string name="action_reset_session">تصفير الجلسة</string>
     <string name="action_open_usage_access">فتح صلاحية الاستخدام</string>
     <string name="session_since">بدأت في %1$s</string>
-    <string name="live_chart_title">سرعة الشبكة اللحظية</string>
     <string name="live_chart_empty">لا توجد بيانات كافية بعد…</string>
 
     <!-- صلاحية الاستخدام -->
@@ -88,6 +93,13 @@
     <string name="apps_loading">جارٍ حساب استهلاك التطبيقات…</string>
     <string name="apps_no_permission">فعّل صلاحية الاستخدام لعرض التفاصيل حسب التطبيق.</string>
     <string name="system_apps_label">تطبيقات النظام</string>
+    <string name="apps_filter_label">نوع التطبيقات</string>
+    <string name="apps_filter_all">الكل</string>
+    <string name="apps_filter_installed">المثبتة</string>
+    <string name="apps_filter_system">النظام</string>
+    <string name="apps_slices_days">الأيام</string>
+    <string name="apps_slices_weeks">الأسابيع</string>
+    <string name="apps_slices_hours">الساعات</string>
     <string name="unknown_app_label">تطبيق غير معروف</string>
     <string name="apps_count">%1$d تطبيقًا</string>
     <string name="app_detail_title">استهلاك التطبيق</string>
@@ -124,15 +136,22 @@
     <string name="settings_interval_60">60 ث</string>
     <string name="settings_dynamic_color">ألوان النظام (Material You)</string>
     <string name="settings_dynamic_color_desc">استخدام ألوان خلفية الشاشة على أندرويد 12 وما بعده.</string>
-    <string name="settings_section_data">البيانات</string>
+    <string name="settings_section_data">الصلاحيات</string>
+    <string name="settings_section_appearance">المظهر</string>
+    <string name="theme_system">النظام</string>
+    <string name="theme_light">فاتح</string>
+    <string name="theme_dark">داكن</string>
+    <string name="theme_black">مظلم</string>
     <string name="settings_clear_data">مسح جميع البيانات</string>
-    <string name="settings_clear_data_desc">يحذف الإعدادات ومخزون القياسات المحلية.</string>
+    <string name="settings_clear_data_desc">يحذف الإعدادات ومخزون القياسات المحلية. لا يمكن التراجع عن هذا الإجراء.</string>
     <string name="settings_usage_access">صلاحية الوصول إلى الاستخدام</string>
     <string name="settings_usage_access_granted">ممنوحة</string>
     <string name="settings_usage_access_missing">غير ممنوحة — اضغط للمنح</string>
     <string name="settings_section_about">حول التطبيق</string>
     <string name="settings_version">الإصدار %1$s</string>
     <string name="settings_about_body">تطبيق مفتوح المصدر لقياس استهلاك الإنترنت على شبكة الواي فاي، مبني بـ Kotlin و Jetpack Compose و Material 3 Expressive. تُقرأ القياسات من NetworkStatsManager في نظام أندرويد ولا تُرسل أي بيانات إلى الإنترنت.</string>
+    <string name="settings_about_expand">عرض نص حول التطبيق</string>
+    <string name="settings_about_collapse">إخفاء نص حول التطبيق</string>
 
     <!-- الإشعارات -->
     <string name="channel_monitor_name">مراقبة الاستهلاك</string>
@@ -165,6 +184,7 @@
     <string name="action_cancel">إلغاء</string>
     <string name="action_close">إغلاق</string>
     <string name="action_confirm">تأكيد</string>
+    <string name="reset_session_confirm">سيتم تصفير جلسة الاستخدام الحالية وتبدأ من جديد. لا يمكن التراجع عن هذا الإجراء. هل تريد المتابعة؟</string>
     <string name="unit_gb">جيجابايت</string>
     <string name="unit_mbps">ميجابت/ث</string>
     <string name="unit_dbm">ديسيبل</string>

@@ -6,14 +6,19 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.mywifiadata.app.core.Format
+import com.mywifiadata.app.core.SpeedTestEngine
+import com.mywifiadata.app.core.TimeRange
 import com.mywifiadata.app.core.TimeRanges
 import com.mywifiadata.app.core.UsagePeriod
 import com.mywifiadata.app.data.UsageRepository
 import com.mywifiadata.app.data.model.AppSettings
 import com.mywifiadata.app.data.model.AppUsage
+import com.mywifiadata.app.data.model.AppsFilter
 import com.mywifiadata.app.data.model.DayUsage
 import com.mywifiadata.app.data.model.SpeedSample
+import com.mywifiadata.app.data.model.ThemeMode
 import com.mywifiadata.app.data.model.TrafficTotals
+import com.mywifiadata.app.data.model.UsageSlice
 import com.mywifiadata.app.data.model.WifiStatus
 import com.mywifiadata.app.monitor.MonitorService
 import kotlinx.coroutines.delay
@@ -23,7 +28,28 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+
+/**
+ * حالة اختبار السرعة في بطاقة الرئيسية.
+ */
+sealed interface SpeedTestState {
+    /** لم يبدأ الاختبار (أو أُلغي). */
+    data object Idle : SpeedTestState
+
+    /** الاختبار قيد التشغيل. */
+    data object Running : SpeedTestState
+
+    /** اكتمل: القيم بالبت/ثانية. */
+    data class Done(
+        val downloadBitsPerSecond: Double,
+        val uploadBitsPerSecond: Double,
+    ) : SpeedTestState
+
+    /** تعذّر إجراء الاختبار. */
+    data object Failed : SpeedTestState
+}
 
 /**
  * حالة الواجهة الكاملة.
@@ -39,14 +65,24 @@ data class UiState(
     val cycle: TrafficTotals = TrafficTotals.Empty,
     val session: TrafficTotals = TrafficTotals.Empty,
     val samples: List<SpeedSample> = emptyList(),
+    val speedTest: SpeedTestState = SpeedTestState.Idle,
     val daily: List<DayUsage> = emptyList(),
     val apps: List<AppUsage> = emptyList(),
+    // تطبيقات الفترة كاملة (لا تتأثر باختيار شريحة) لبطاقة «الفترة».
+    val periodApps: List<AppUsage> = emptyList(),
     val isAppsLoading: Boolean = false,
     val appsPeriod: UsagePeriod = UsagePeriod.MONTH,
     val historyPeriod: UsagePeriod = UsagePeriod.MONTH,
     val selectedDayIndex: Int? = null,
     val selectedDayApps: List<AppUsage> = emptyList(),
-    val showSystemApps: Boolean = false,
+    val appsFilter: AppsFilter = AppsFilter.ALL,
+    // تفصيل قسم التطبيقات: أسابيع/أيام/ساعات مع الشريحة المختارة حاليًا.
+    val appsWeeks: List<UsageSlice> = emptyList(),
+    val appsDays: List<UsageSlice> = emptyList(),
+    val appsWeekDays: List<UsageSlice> = emptyList(),
+    val appsHours: List<UsageSlice> = emptyList(),
+    val appsWeek: TimeRange? = null,
+    val appsSlice: TimeRange? = null,
     val appDetail: AppDetailState? = null,
 ) {
     val quotaBytes: Long get() = settings.quotaBytes
@@ -84,7 +120,18 @@ data class UiState(
     val sessionDurationMillis: Long get() = (now - settings.sessionStartMillis).coerceAtLeast(0L)
 
     val visibleApps: List<AppUsage>
-        get() = if (showSystemApps) apps else apps.filterNot { it.isSystem }
+        get() = when (appsFilter) {
+            AppsFilter.ALL -> apps
+            AppsFilter.INSTALLED -> apps.filterNot { it.isSystem }
+            AppsFilter.SYSTEM -> apps.filter { it.isSystem }
+        }
+
+    val visiblePeriodApps: List<AppUsage>
+        get() = when (appsFilter) {
+            AppsFilter.ALL -> periodApps
+            AppsFilter.INSTALLED -> periodApps.filterNot { it.isSystem }
+            AppsFilter.SYSTEM -> periodApps.filter { it.isSystem }
+        }
 
     val historyDays: Int get() = TimeRanges.daysOf(historyPeriod)
 }
@@ -175,9 +222,9 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
             _uiState.update { it.copy(daily = daily) }
         }
 
-        val appsPeriod = _uiState.value.appsPeriod
         if (hasAccess && (force || now - appsLoadedAt > APPS_TTL_MILLIS)) {
-            loadApps(appsPeriod)
+            loadApps()
+            loadAppsSlices()
         }
     }
 
@@ -194,21 +241,101 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         return SpeedSample(timestampMillis = now, rxBytesPerSecond = rx, txBytesPerSecond = tx)
     }
 
-    private suspend fun loadApps(period: UsagePeriod) {
+    /**
+     * تحميل التطبيقات للنطاق الحالي: الشريحة المختارة (ساعة/يوم) إن وُجدت،
+     * وإلا الفترة الكاملة المختارة.
+     */
+    private suspend fun loadApps() {
+        val period = _uiState.value.appsPeriod
+        val slice = _uiState.value.appsSlice
+        val periodRange = TimeRanges.forPeriod(period)
+        val range = slice ?: periodRange
         _uiState.update { it.copy(isAppsLoading = true) }
-        val range = TimeRanges.forPeriod(period)
-        val apps = repository.perAppUsage(range)
+        // تُحمَّل فترة كاملة دائمًا (لبطاقة «الفترة» الثابتة) + نطاق الشريحة إن وُجد.
+        val periodApps = repository.perAppUsage(periodRange)
+        val apps = if (range == periodRange) periodApps else repository.perAppUsage(range)
         appsLoadedAt = System.currentTimeMillis()
-        _uiState.update { it.copy(apps = apps, isAppsLoading = false) }
+        _uiState.update {
+            it.copy(apps = apps, periodApps = periodApps, isAppsLoading = false)
+        }
     }
+
+    /**
+     * تحميل شرائح التفصيل للفترة الحالية: ساعات اليوم (بما فيها الساعة الجارية
+     * بحدّها «الآن»)، أيام الأسبوع، أو آخر 4 أسابيع — مع حذف الشرائح التي لا
+     * يوجد بها استهلاك حتى لا تُعرض صفوف فارغة.
+     */
+    private suspend fun loadAppsSlices() {
+        // تُحمَّل شرائح اليوم/الأسبوع/الشهر دومًا ليظهر بطاقة أي فترة فورًا
+        // عند التبديل بينها (بلا فراغ أو وميض)، مع تجديد الفترة الحالية.
+        val hours = TimeRanges.hoursOfToday()
+            .map { range -> range.toSlice(repository.deviceTotals(range)) }
+            .filter { it.totals.totalBytes > 0L }
+        _uiState.update { it.copy(appsHours = hours) }
+
+        val days = TimeRanges.lastDays(7)
+            .map { range -> range.toSlice(repository.deviceTotals(range)) }
+            .filter { it.totals.totalBytes > 0L }
+        _uiState.update { it.copy(appsDays = days) }
+
+        val weeks = TimeRanges.lastWeeks()
+            .map { range -> range.toSlice(repository.deviceTotals(range)) }
+            .filter { it.totals.totalBytes > 0L }
+        _uiState.update { it.copy(appsWeeks = weeks) }
+
+        _uiState.value.appsWeek?.let { loadAppsWeekDays(it) }
+    }
+
+    /** أيام الأسبوع المحدد في عرض الشهر (الأحدث أولًا، بدون أيام فارغة). */
+    private suspend fun loadAppsWeekDays(week: TimeRange) {
+        val days = TimeRanges.daysInRange(week)
+            .map { range -> range.toSlice(repository.deviceTotals(range)) }
+            .filter { it.totals.totalBytes > 0L }
+        _uiState.update { it.copy(appsWeekDays = days) }
+    }
+
+    private fun TimeRange.toSlice(totals: TrafficTotals) =
+        UsageSlice(startMillis = startMillis, endMillis = endMillis, totals = totals)
 
     // ————————— إجراءات المستخدم —————————
 
     fun setAppsPeriod(period: UsagePeriod) {
         if (period == _uiState.value.appsPeriod) return
-        _uiState.update { it.copy(appsPeriod = period, apps = emptyList()) }
-        viewModelScope.launch { loadApps(period) }
+        // نُبقي القوائم والشرائح الحالية ظاهرة حتى تصل بيانات الفترة الجديدة
+        // (بلا مسح يسبّب دائرة التحميل والوميض)؛ يُصفَّر الاختيار فقط.
+        _uiState.update {
+            it.copy(
+                appsPeriod = period,
+                appsWeek = null,
+                appsSlice = null,
+            )
+        }
+        viewModelScope.launch {
+            loadApps()
+            loadAppsSlices()
+        }
     }
+
+    /** اختيار/إلغاء اختيار أسبوع في عرض الشهر، مع تحميل أيامه — بدون مسح
+     *  القوائم الحالية حتى لا تومض الشاشة أثناء التحميل. */
+    fun selectAppsWeek(week: TimeRange) {
+        val selected = if (_uiState.value.appsWeek == week) null else week
+        _uiState.update { it.copy(appsWeek = selected, appsSlice = null) }
+        viewModelScope.launch {
+            selected?.let { loadAppsWeekDays(it) }
+            loadApps()
+        }
+    }
+
+    /** اختيار/إلغاء اختيار شريحة (يوم أو ساعة) لعرض تطبيقاتها — بدون مسح
+     *  القائمة الحالية حتى لا تومض الشاشة أو تظهر دائرة تحميل عند كل ضغطة. */
+    fun selectAppsSlice(slice: TimeRange) {
+        val selected = if (_uiState.value.appsSlice == slice) null else slice
+        _uiState.update { it.copy(appsSlice = selected) }
+        viewModelScope.launch { loadApps() }
+    }
+
+    fun setAppsFilter(filter: AppsFilter) = _uiState.update { it.copy(appsFilter = filter) }
 
     fun setHistoryPeriod(period: UsagePeriod) {
         if (period == _uiState.value.historyPeriod) return
@@ -274,8 +401,6 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         }
     }
 
-    fun setShowSystemApps(show: Boolean) = _uiState.update { it.copy(showSystemApps = show) }
-
     fun refreshNow() {
         _uiState.update { it.copy(isRefreshing = true) }
         viewModelScope.launch {
@@ -330,6 +455,10 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         repository.settingsStore.update { it.copy(dynamicColorEnabled = enabled) }
     }
 
+    fun setThemeMode(mode: ThemeMode) {
+        repository.settingsStore.update { it.copy(themeMode = mode) }
+    }
+
     fun clearData() {
         stopTracking()
         repository.settingsStore.clearAll()
@@ -343,11 +472,45 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         refreshNow()
     }
 
+    private var speedTestJob: Job? = null
+
+    /** بدء اختبار السرعة (fast.com مع رجوع تلقائي إذا حُجب). */
+    fun startSpeedTest() {
+        if (_uiState.value.speedTest is SpeedTestState.Running) return
+        speedTestJob = viewModelScope.launch {
+            _uiState.update { it.copy(speedTest = SpeedTestState.Running) }
+            try {
+                val result = SpeedTestEngine.run()
+                _uiState.update {
+                    it.copy(
+                        speedTest = SpeedTestState.Done(
+                            downloadBitsPerSecond = result.downloadBitsPerSecond,
+                            uploadBitsPerSecond = result.uploadBitsPerSecond,
+                        ),
+                    )
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _uiState.update { it.copy(speedTest = SpeedTestState.Failed) }
+            }
+        }
+    }
+
+    /** إيقاف الاختبار الجارٍ. */
+    fun stopSpeedTest() {
+        speedTestJob?.cancel()
+        speedTestJob = null
+        _uiState.update { it.copy(speedTest = SpeedTestState.Idle) }
+    }
+
     /** نص سرعة جاهز للعرض في الشريط العلوي. */
     fun speedText(): String = Format.speed(_uiState.value.currentSpeed?.totalBytesPerSecond ?: 0.0)
 
     companion object {
-        private const val REFRESH_INTERVAL_MILLIS = 4_000L
+        // تحديث كل ثانية ليتحرك مقياس السرعة اللحظي باستمرار لا كل 4 ثوانٍ؛
+        // أعمال التحميل الثقيلة داخل refresh() محمية بمواعيد TTL منفصلة.
+        private const val REFRESH_INTERVAL_MILLIS = 1_000L
         private const val APPS_TTL_MILLIS = 30_000L
         private const val DAILY_TTL_MILLIS = 60_000L
         private const val MAX_SAMPLES = 30

@@ -49,6 +49,15 @@ object Format {
         else -> String.format(numbers, "%.0f B/ث", bytesPerSecond)
     }
 
+    /** مثال: "‎125 Mbit/s" أو "‎40 kbit/s" (لنتائج اختبار السرعة). */
+    fun bits(bitsPerSecond: Double): String = when {
+        bitsPerSecond.isNaN() || bitsPerSecond <= 0.0 -> String.format(numbers, "0 kbit/s")
+        bitsPerSecond >= 1_000_000_000.0 -> String.format(numbers, "%.2f Gbit/s", bitsPerSecond / 1_000_000_000.0)
+        bitsPerSecond >= 1_000_000.0 -> String.format(numbers, "%.1f Mbit/s", bitsPerSecond / 1_000_000.0)
+        bitsPerSecond >= 1_000.0 -> String.format(numbers, "%.0f kbit/s", bitsPerSecond / 1_000.0)
+        else -> String.format(numbers, "%.0f bit/s", bitsPerSecond)
+    }
+
     /** تحويل البايت/ثانية إلى ميجابت/ثانية (لتفاصيل الشبكة). */
     fun megabits(bytesPerSecond: Double): String =
         String.format(numbers, "%.1f", bytesPerSecond * 8.0 / 1_000_000.0)

@@ -115,6 +115,9 @@ private fun DashboardPreview() {
             onOpenQuotaSettings = {},
             onRefresh = {},
             onResetSession = {},
+            onToggleTracking = {},
+            onStartSpeedTest = {},
+            onStopSpeedTest = {},
         )
     }
 }
@@ -126,7 +129,9 @@ private fun AppsPreview() {
         AppsScreen(
             state = sampleState(),
             onPeriodChange = {},
-            onShowSystemAppsChange = {},
+            onAppsFilterChange = {},
+            onAppsWeekChange = {},
+            onAppsSliceChange = {},
             onOpenUsageAccess = {},
             onAppClick = {},
         )
@@ -178,6 +183,7 @@ private fun SettingsPreview() {
             onIntervalChange = {},
             onDynamicColorChange = {},
             onTrackingChange = {},
+            onThemeModeChange = {},
             onOpenUsageAccess = {},
             onOpenWifiSettings = {},
             onClearData = {},
@@ -199,6 +205,7 @@ private fun SettingsDarkPreview() {
                 onIntervalChange = {},
                 onDynamicColorChange = {},
                 onTrackingChange = {},
+                onThemeModeChange = {},
                 onOpenUsageAccess = {},
                 onOpenWifiSettings = {},
                 onClearData = {},

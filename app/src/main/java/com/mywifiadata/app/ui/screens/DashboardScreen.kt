@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -22,14 +23,19 @@ import androidx.compose.material.icons.rounded.DataUsage
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.MonetizationOn
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.ShowChart
 import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material.icons.rounded.Router
 import androidx.compose.material.icons.rounded.Speed
+import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material.icons.rounded.WifiOff
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -54,6 +60,7 @@ import com.mywifiadata.app.R
 import com.mywifiadata.app.core.Format
 import com.mywifiadata.app.data.model.WifiBand
 import com.mywifiadata.app.data.model.WifiStatus
+import com.mywifiadata.app.ui.SpeedTestState
 import com.mywifiadata.app.ui.UiState
 import com.mywifiadata.app.ui.components.Dot
 import com.mywifiadata.app.ui.components.EmptyState
@@ -65,6 +72,7 @@ import com.mywifiadata.app.ui.components.SectionHeader
 import com.mywifiadata.app.ui.components.SignalBarsIcon
 import com.mywifiadata.app.ui.components.StatTile
 import com.mywifiadata.app.ui.components.UsageRing
+import com.mywifiadata.app.ui.theme.AppButtonShape
 import com.mywifiadata.app.ui.theme.LocalDownloadColor
 import com.mywifiadata.app.ui.theme.LocalUploadColor
 import kotlin.math.roundToInt
@@ -80,6 +88,9 @@ fun DashboardScreen(
     onOpenQuotaSettings: () -> Unit,
     onRefresh: () -> Unit,
     onResetSession: () -> Unit,
+    onToggleTracking: () -> Unit,
+    onStartSpeedTest: () -> Unit,
+    onStopSpeedTest: () -> Unit,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(16.dp),
 ) {
@@ -109,6 +120,8 @@ fun DashboardScreen(
                 onRefresh = onRefresh,
                 onResetSession = onResetSession,
                 onOpenQuotaSettings = onOpenQuotaSettings,
+                trackingEnabled = state.settings.trackingEnabled,
+                onToggleTracking = onToggleTracking,
             )
         }
 
@@ -120,7 +133,13 @@ fun DashboardScreen(
             }
         }
 
-        item { TodayCard(state = state) }
+        item {
+            TodayCard(
+                state = state,
+                onStart = onStartSpeedTest,
+                onStop = onStopSpeedTest,
+            )
+        }
 
         item { SessionCard(state = state, onResetSession = onResetSession) }
     }
@@ -136,7 +155,6 @@ private fun HeroCard(state: UiState, onOpenQuotaSettings: () -> Unit) {
     }
     val downloadColor = LocalDownloadColor.current
     val uploadColor = LocalUploadColor.current
-    val speed = state.currentSpeed?.totalBytesPerSecond ?: 0.0
 
     ExpressiveCard(
         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -162,6 +180,7 @@ private fun HeroCard(state: UiState, onOpenQuotaSettings: () -> Unit) {
                 contentDescription = stringResource(R.string.quota_ring_title),
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Spacer(modifier = Modifier.height(24.dp))
                     Text(
                         text = if (hasQuota) {
                             stringResource(
@@ -175,6 +194,7 @@ private fun HeroCard(state: UiState, onOpenQuotaSettings: () -> Unit) {
                         color = MaterialTheme.colorScheme.onSurface,
                         textAlign = TextAlign.Center,
                     )
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = if (hasQuota) {
                             stringResource(R.string.label_used)
@@ -186,7 +206,7 @@ private fun HeroCard(state: UiState, onOpenQuotaSettings: () -> Unit) {
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = Format.speed(speed),
+                        text = Format.bytes(state.cycle.totalBytes),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
                     )
@@ -204,17 +224,6 @@ private fun HeroCard(state: UiState, onOpenQuotaSettings: () -> Unit) {
                     ),
                     style = MaterialTheme.typography.bodyLargeEmphasized,
                     color = MaterialTheme.colorScheme.onSurface,
-                    textAlign = TextAlign.Center,
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = stringResource(
-                        R.string.quota_used_of,
-                        Format.bytes(state.cycle.totalBytes),
-                        Format.bytes(state.quotaBytes),
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                 )
                 if (state.quotaExceeded) {
@@ -251,7 +260,7 @@ private fun HeroCard(state: UiState, onOpenQuotaSettings: () -> Unit) {
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                TextButton(onClick = onOpenQuotaSettings) {
+                TextButton(onClick = onOpenQuotaSettings, shape = AppButtonShape) {
                     Text(text = stringResource(R.string.quota_set_action))
                 }
             }
@@ -282,18 +291,17 @@ private fun LegendItem(color: Color, label: String, value: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Dot(color = color, size = 10.dp)
         Spacer(modifier = Modifier.width(8.dp))
-        Column {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = value,
-                style = MaterialTheme.typography.bodyMediumEmphasized,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMediumEmphasized,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 
@@ -302,28 +310,34 @@ private fun QuickActions(
     onRefresh: () -> Unit,
     onResetSession: () -> Unit,
     onOpenQuotaSettings: () -> Unit,
+    trackingEnabled: Boolean,
+    onToggleTracking: () -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        // ارتفاع أدنى موحّد حتى يتساوى زر المراقبة (سطر واحد) مع بقية الأزرار.
+        QuickActionButton(
+            label = stringResource(
+                if (trackingEnabled) R.string.action_stop_tracking else R.string.action_start_tracking,
+            ),
+            icon = if (trackingEnabled) Icons.Rounded.Stop else Icons.Rounded.PlayArrow,
+            onClick = onToggleTracking,
+            active = trackingEnabled,
+            modifier = Modifier.weight(1f).heightIn(min = 84.dp),
+        )
         QuickActionButton(
             label = stringResource(R.string.action_refresh),
             icon = Icons.Rounded.Refresh,
             onClick = onRefresh,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).heightIn(min = 84.dp),
         )
         QuickActionButton(
             label = stringResource(R.string.action_reset_session),
             icon = Icons.Rounded.RestartAlt,
             onClick = onResetSession,
-            modifier = Modifier.weight(1f),
-        )
-        QuickActionButton(
-            label = stringResource(R.string.label_quota),
-            icon = Icons.Rounded.MonetizationOn,
-            onClick = onOpenQuotaSettings,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).heightIn(min = 84.dp),
         )
     }
 }
@@ -331,6 +345,7 @@ private fun QuickActions(
 /**
  * زر إجراء سريع: الأيقونة فوق النص، مع قصّ النص بثلاث نقاط بدل تجاوزه حدود الزر
  * (ButtonGroup كان يقصّ التسميات الطويلة فتظهر الأيقونة فوق النص).
+ * [active] تلوّن الزر باللون الأساسي (يُستخدم لحالة المراقبة الجارية).
  */
 @Composable
 private fun QuickActionButton(
@@ -338,10 +353,20 @@ private fun QuickActionButton(
     icon: ImageVector,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    active: Boolean = false,
 ) {
     FilledTonalButton(
         onClick = onClick,
         modifier = modifier,
+        shape = AppButtonShape,
+        colors = if (active) {
+            ButtonDefaults.filledTonalButtonColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+        } else {
+            ButtonDefaults.filledTonalButtonColors()
+        },
         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
     ) {
         Column(
@@ -503,7 +528,11 @@ private fun NotConnectedCard(isOnline: Boolean) {
 }
 
 @Composable
-private fun TodayCard(state: UiState) {
+private fun TodayCard(
+    state: UiState,
+    onStart: () -> Unit,
+    onStop: () -> Unit,
+) {
     val downloadColor = LocalDownloadColor.current
     val uploadColor = LocalUploadColor.current
 
@@ -549,11 +578,118 @@ private fun TodayCard(state: UiState) {
                 )
                 StatTile(
                     label = stringResource(R.string.label_current_speed),
-                    value = Format.speed(state.currentSpeed?.totalBytesPerSecond ?: 0.0),
+                    value = Format.speed((state.currentSpeed?.totalBytesPerSecond ?: 0.0) / 2.0),
                     icon = Icons.Rounded.Speed,
                     modifier = Modifier.weight(1f),
-                    caption = stringResource(R.string.label_session) + ": " + Format.bytes(state.session.totalBytes),
                 )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+            SpeedTestRow(state = state, onStart = onStart, onStop = onStop)
+        }
+    }
+}
+
+/**
+ * صف اختبار السرعة داخل بطاقة اليوم: الزر أولًا (يمين RTL) ثم العنوان
+ * ثم نتائج التنزيل/الرفع يسارًا — كما في التصميم المرجعي.
+ */
+@Composable
+private fun SpeedTestRow(state: UiState, onStart: () -> Unit, onStop: () -> Unit) {
+    val downloadColor = LocalDownloadColor.current
+    val uploadColor = LocalUploadColor.current
+    val test = state.speedTest
+    val running = test is SpeedTestState.Running
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Button(
+            onClick = { if (running) onStop() else onStart() },
+            shape = AppButtonShape,
+        ) {
+            if (running) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Rounded.PlayArrow,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = stringResource(R.string.speed_test_title),
+                style = MaterialTheme.typography.bodyLargeEmphasized,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = stringResource(R.string.speed_test_subtitle),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (test is SpeedTestState.Failed) {
+                Text(
+                    text = stringResource(R.string.speed_test_failed),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
+
+        if (test is SpeedTestState.Done) {
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = Format.bits(test.downloadBitsPerSecond),
+                        style = MaterialTheme.typography.bodyMediumEmphasized,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Rounded.ArrowDownward,
+                            contentDescription = null,
+                            tint = downloadColor,
+                            modifier = Modifier.size(12.dp),
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = stringResource(R.string.label_download),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = Format.bits(test.uploadBitsPerSecond),
+                        style = MaterialTheme.typography.bodyMediumEmphasized,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Rounded.ArrowUpward,
+                            contentDescription = null,
+                            tint = uploadColor,
+                            modifier = Modifier.size(12.dp),
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = stringResource(R.string.label_upload),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
             }
         }
     }
@@ -570,7 +706,7 @@ private fun SessionCard(state: UiState, onResetSession: () -> Unit) {
                     Format.clock(state.settings.sessionStartMillis),
                 ),
                 trailing = {
-                    TextButton(onClick = onResetSession) {
+                    TextButton(onClick = onResetSession, shape = AppButtonShape) {
                         Text(text = stringResource(R.string.action_reset_session))
                     }
                 },
@@ -584,7 +720,7 @@ private fun SessionCard(state: UiState, onResetSession: () -> Unit) {
             InfoRow(
                 icon = Icons.Rounded.Speed,
                 label = stringResource(R.string.label_current_speed),
-                value = Format.speed(state.currentSpeed?.totalBytesPerSecond ?: 0.0),
+                value = Format.speed((state.currentSpeed?.totalBytesPerSecond ?: 0.0) / 2.0),
             )
             InfoRow(
                 icon = Icons.Rounded.ShowChart,

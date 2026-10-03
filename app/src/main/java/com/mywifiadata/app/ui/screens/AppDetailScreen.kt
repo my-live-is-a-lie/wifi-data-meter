@@ -40,7 +40,6 @@ import com.mywifiadata.app.ui.AppDetailState
 import com.mywifiadata.app.ui.components.AppIcon
 import com.mywifiadata.app.ui.components.ExpressiveCard
 import com.mywifiadata.app.ui.components.InfoRow
-import com.mywifiadata.app.ui.components.SectionHeader
 import com.mywifiadata.app.ui.theme.LocalDownloadColor
 import com.mywifiadata.app.ui.theme.LocalUploadColor
 
@@ -158,20 +157,29 @@ private fun PeriodUsageCard(
     containerColor: Color = MaterialTheme.colorScheme.surfaceContainerLow,
 ) {
     ExpressiveCard(containerColor = containerColor) {
-        SectionHeader(title = title)
-        Spacer(modifier = Modifier.height(4.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        // سطر واحد: الإجمالي في البداية واسم الفترة مع أيقونته في النهاية
+        // (يسار في العربية) لتوفير سطر كامل وملء عرض البطاقة.
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = Format.bytes(totals.totalBytes),
+                style = MaterialTheme.typography.headlineSmallEmphasized,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Spacer(modifier = Modifier.weight(1f))
             Icon(
                 imageVector = icon,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(22.dp),
             )
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = Format.bytes(totals.totalBytes),
-                style = MaterialTheme.typography.headlineSmallEmphasized,
-                color = MaterialTheme.colorScheme.onSurface,
+                text = title,
+                style = MaterialTheme.typography.titleMediumEmphasized,
+                color = MaterialTheme.colorScheme.primary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )

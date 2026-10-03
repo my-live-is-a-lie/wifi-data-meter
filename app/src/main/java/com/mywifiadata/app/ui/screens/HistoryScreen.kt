@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -14,10 +15,13 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.ShowChart
 import androidx.compose.material.icons.rounded.TrendingUp
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -25,6 +29,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.mywifiadata.app.R
@@ -41,6 +46,7 @@ import com.mywifiadata.app.ui.components.ExpressiveCard
 import com.mywifiadata.app.ui.components.InfoRow
 import com.mywifiadata.app.ui.components.PermissionCard
 import com.mywifiadata.app.ui.components.SectionHeader
+import com.mywifiadata.app.ui.theme.AppButtonShape
 import com.mywifiadata.app.ui.theme.LocalDownloadColor
 import com.mywifiadata.app.ui.theme.LocalUploadColor
 
@@ -89,6 +95,16 @@ fun HistoryScreen(
         } else {
             item { ChartCard(state = state, onSelectDay = onSelectDay) }
 
+            // بطاقة اليوم المحدد تظهر فورًا فوق سجل الاستهلاك.
+            if (selectedDay != null) {
+                item {
+                    SelectedDayCard(
+                        day = selectedDay,
+                        onClose = { onSelectDay(null) },
+                    )
+                }
+            }
+
             if (daily.isNotEmpty()) {
                 item { HistorySummaryCard(daily = daily) }
             } else {
@@ -104,12 +120,6 @@ fun HistoryScreen(
             }
 
             if (selectedDay != null) {
-                item {
-                    SelectedDayCard(
-                        day = selectedDay,
-                        onClose = { onSelectDay(null) },
-                    )
-                }
 
                 item {
                     SectionHeader(
@@ -164,7 +174,6 @@ private fun ChartCard(state: UiState, onSelectDay: (Int?) -> Unit) {
                 } else {
                     stringResource(R.string.history_days_shown, state.historyDays)
                 },
-                supportingText = stringResource(R.string.live_chart_title),
             )
             Spacer(modifier = Modifier.height(16.dp))
             if (entries.isEmpty()) {
@@ -238,32 +247,111 @@ private fun SelectedDayCard(day: DayUsage, onClose: () -> Unit) {
     ExpressiveCard(containerColor = MaterialTheme.colorScheme.secondaryContainer) {
         Column(modifier = Modifier.fillMaxWidth()) {
             SectionHeader(
+                // التاريخ في البداية (يمين) واليوم بجانبه من اليسار.
                 title = Format.fullDate(day.startMillis),
                 supportingText = Format.weekday(day.startMillis),
                 trailing = {
-                    TextButton(onClick = onClose) {
-                        Text(text = stringResource(R.string.action_close))
+                    // offset هنا واعٍ لاتجاه الواجهة: في RTL يعكس الموجب/السالب
+                    // (rtlAware)، فالقيمة +16dp تعني 16dp نحو اليسار هنا،
+                    // لمحاذاة الأيقونة مع حاشية المحتوى (20dp) بعد خصم نصف
+                    // صندوق اللمس 48dp وحشوة صف العنوان 4dp.
+                    IconButton(
+                        onClick = onClose,
+                        modifier = Modifier.offset(x = 16.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Close,
+                            contentDescription = stringResource(R.string.action_close),
+                        )
                     }
                 },
             )
             Spacer(modifier = Modifier.height(4.dp))
-            InfoRow(
-                icon = Icons.Rounded.ArrowDownward,
-                label = stringResource(R.string.label_download),
-                value = Format.bytes(day.totals.rxBytes),
-                valueColor = LocalDownloadColor.current,
-            )
-            InfoRow(
-                icon = Icons.Rounded.ArrowUpward,
-                label = stringResource(R.string.label_upload),
-                value = Format.bytes(day.totals.txBytes),
-                valueColor = LocalUploadColor.current,
-            )
-            InfoRow(
-                icon = Icons.Rounded.ShowChart,
-                label = stringResource(R.string.label_total),
-                value = Format.bytes(day.totals.totalBytes),
-            )
+            // التنزيل والرفع والإجمالي: الأسماء في سطر واحد وتحت كل اسم رقمه
+            // لتقصير ارتفاع البطاقة بدل الصفوف العمودية الثلاثة.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.ArrowDownward,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Text(
+                            text = stringResource(R.string.label_download),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Text(
+                        text = Format.bytes(day.totals.rxBytes),
+                        style = MaterialTheme.typography.bodyMediumEmphasized,
+                        color = LocalDownloadColor.current,
+                    )
+                }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.ArrowUpward,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Text(
+                            text = stringResource(R.string.label_upload),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Text(
+                        text = Format.bytes(day.totals.txBytes),
+                        style = MaterialTheme.typography.bodyMediumEmphasized,
+                        color = LocalUploadColor.current,
+                    )
+                }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.ShowChart,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Text(
+                            text = stringResource(R.string.label_total),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Text(
+                        text = Format.bytes(day.totals.totalBytes),
+                        style = MaterialTheme.typography.bodyMediumEmphasized,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+            }
         }
     }
 }

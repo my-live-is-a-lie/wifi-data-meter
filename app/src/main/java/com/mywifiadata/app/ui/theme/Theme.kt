@@ -28,23 +28,42 @@ val LocalUploadColor = staticCompositionLocalOf { Color(0xFF9C27B0) }
  *
  * - يختار مخطط الألوان الديناميكي من خلفية الشاشة عند توفره (أندرويد 12+) إن كان مُفعّلًا.
  * - يستخدم [expressiveLightColorScheme] في الوضع الفاتح و [darkColorScheme] في الوضع الداكن.
+ * - عند تفعيل [amoled] في الوضع الداكن تصبح الخلفيات سوداء بالكامل (وضع «مظلم»).
  * - يمرّر [MotionScheme.expressive] لحركات أكثر حيوية.
  */
 @Composable
 fun AppTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = true,
+    amoled: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
 
-    val colorScheme: ColorScheme = when {
+    val baseScheme: ColorScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
 
         darkTheme -> darkColorScheme()
         else -> expressiveLightColorScheme()
+    }
+
+    // وضع «مظلم» (AMOLED): أسود بالكامل للخلفيات مع تدرّجات شبه سوداء للتباين.
+    val colorScheme: ColorScheme = if (amoled && darkTheme) {
+        baseScheme.copy(
+            background = Color.Black,
+            surface = Color.Black,
+            surfaceDim = Color.Black,
+            surfaceVariant = Color(0xFF121212),
+            surfaceContainerLowest = Color.Black,
+            surfaceContainerLow = Color(0xFF050505),
+            surfaceContainer = Color(0xFF0A0A0A),
+            surfaceContainerHigh = Color(0xFF101010),
+            surfaceContainerHighest = Color(0xFF161616),
+        )
+    } else {
+        baseScheme
     }
 
     val downloadColor = if (darkTheme) Color(0xFFB7C4FF) else Color(0xFF2A3EB1)
