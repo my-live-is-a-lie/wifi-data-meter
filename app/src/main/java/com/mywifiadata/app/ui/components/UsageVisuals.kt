@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -230,7 +231,11 @@ fun DailyBarChart(
             )
             // عرض العمود يتبع المؤشر: المشار إليه يتّسع والمحيط به ينكمش وينزاح.
             val weight by animateFloatAsState(
-                targetValue = barWeight(index = index, activeIndex = activeIndex),
+                targetValue = barWeight(
+                    index = index,
+                    activeIndex = activeIndex,
+                    count = entries.size,
+                ),
                 animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
                 label = "bar-weight-$index",
             )
@@ -301,11 +306,14 @@ fun DailyBarChart(
                     Box(
                         modifier = if (isActive) {
                             Modifier
-                                // عرض أدنى + حشوة أوسع: صندوق اليوم أوضح أفقيًا.
-                                .defaultMinSize(minWidth = 34.dp)
-                                .clip(RoundedCornerShape(9.dp))
+                                // wrapContentWidth(unbounded) يجعل الصندوق يُقاس بعرضه
+                                // الكامل ولا يتقيّد بخانة العمود الضيقة (خانة اليوم الواحد
+                                // من 30 يومًا نحو 11dp) — وهذا سبب اقتطاع الرقم سابقًا.
+                                .wrapContentWidth(unbounded = true)
+                                .defaultMinSize(minWidth = DAY_PILL_MIN_WIDTH)
+                                .clip(RoundedCornerShape(10.dp))
                                 .background(MaterialTheme.colorScheme.primaryContainer)
-                                .padding(horizontal = 11.dp, vertical = 2.dp)
+                                .padding(horizontal = 12.dp, vertical = 2.dp)
                         } else {
                             Modifier
                         },
@@ -416,7 +424,11 @@ fun DayScrubber(
         ) {
             repeat(count) { index ->
                 val weight by animateFloatAsState(
-                    targetValue = barWeight(index = index, activeIndex = activeIndex),
+                    targetValue = barWeight(
+                        index = index,
+                        activeIndex = activeIndex,
+                        count = count,
+                    ),
                     animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
                     label = "slider-weight-$index",
                 )
@@ -467,17 +479,18 @@ private fun Thumb(active: Boolean, color: Color) {
 }
 
 /**
- * وزن عمود واحد في المخطط وشريط التمرير:
- * 1 للعادي، وأكبر للعمود المشار إليه (يتّسع أفقيًا)، بينما تنكمش الأعمدة
- * المجاورة **بشكل متدرّج** (أقرب عمود أكثر انكماشًا) فتنزاح عدة أعمدة من
- * الجانبين بدل عمود واحد فقط.
+ * وزن عمود واحد في المخطط وشريط التمرير.
+ *
+ * عندما يقف المؤشر على يوم، يتّسع عموده إلى [ACTIVE_BAR_WEIGHT] ضعفًا، بينما
+ * تتقاسم **بقية الأعمدة كلها** العرض المتبقّي بالتساوي (فتنزاح جميعها ولا
+ * يبقى الانزياح محصورًا في العمود الملاصق). مجموع الأوزان يبقى مساويًا لعدد
+ * الأعمدة، فلا يتغيّر عرض المخطط ولا يقفز.
  */
-internal fun barWeight(index: Int, activeIndex: Int?): Float {
-    if (activeIndex == null) return 1f
-    if (index == activeIndex) return 1f + BAR_EXPANSION
-    val distance = abs(index - activeIndex)
-    if (distance > BAR_SHRINK_BY_DISTANCE.size) return 1f
-    return 1f - BAR_SHRINK_BY_DISTANCE[distance - 1]
+internal fun barWeight(index: Int, activeIndex: Int?, count: Int): Float {
+    if (activeIndex == null || count < 2) return 1f
+    if (index == activeIndex) return ACTIVE_BAR_WEIGHT
+    val othersWeight = (count - ACTIVE_BAR_WEIGHT) / (count - 1)
+    return othersWeight.coerceAtLeast(MIN_OTHERS_WEIGHT)
 }
 
 /**
@@ -521,25 +534,11 @@ private const val THUMB_ACTIVE_SCALE = 1.3f
 /** أقصى عرض لعمود اليوم المشار إليه عند اتساعه. */
 private val ACTIVE_BAR_MAX_WIDTH = 84.dp
 
-/** زيادة وزن العمود المشار إليه (اتساع أفقي). */
-internal const val BAR_EXPANSION = 0.9f
+/** عرض العمود المشار إليه كنسبة من عمود عادي (يتّسع أفقيًا). */
+internal const val ACTIVE_BAR_WEIGHT = 2.6f
 
-/**
- * مقدار انكماش الأعمدة المجاورة حسب بُعدها عن العمود المشار إليه:
- * العمود الملاصق أكثر انكماشًا، ثم يقل الانكماش تدريجيًا حتى ثلاث خطوات.
- */
-private val BAR_SHRINK_BY_DISTANCE = floatArrayOf(0.42f, 0.24f, 0.10f)
+/** حدّ أدنى لوزن العمود العادي حتى لا يختفي عند قلة الأعمدة. */
+internal const val MIN_OTHERS_WEIGHT = 0.25f
 
-/** مقدار انكماش العمود الملاصق (للاختبارات والتوثيق). */
-internal const val BAR_NEIGHBOR_SHRINK = 0.42f
-
-/** نقطة ملوّنة صغيرة تُستخدم في وسائل الإيضاح. */
-@Composable
-fun Dot(color: Color, modifier: Modifier = Modifier, size: Dp = 10.dp) {
-    Box(
-        modifier = modifier
-            .size(size)
-            .clip(RoundedCornerShape(50))
-            .background(color),
-    )
-}
+/** عرض الصندوق الأزرق الذي يعرض رقم اليوم المشار إليه. */
+private val DAY_PILL_MIN_WIDTH = 46.dp
