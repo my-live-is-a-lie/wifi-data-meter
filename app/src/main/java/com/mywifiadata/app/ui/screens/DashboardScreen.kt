@@ -600,11 +600,6 @@ private fun SessionCard(state: UiState, onResetSession: () -> Unit) {
                 value = Format.bytes(state.session.totalBytes),
             )
             InfoRow(
-                icon = Icons.Rounded.Speed,
-                label = stringResource(R.string.label_current_speed),
-                value = Format.speed((state.currentSpeed?.totalBytesPerSecond ?: 0.0) / 2.0),
-            )
-            InfoRow(
                 icon = Icons.Rounded.ShowChart,
                 label = stringResource(R.string.label_average),
                 value = Format.bytes(state.averagePerDay),

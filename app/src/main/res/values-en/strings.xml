@@ -65,6 +65,7 @@
     <string name="label_period">Period</string>
     <string name="label_average">Daily average</string>
     <string name="label_peak">Busiest day</string>
+    <string name="label_peak_month">Busiest day this month</string>
     <string name="label_days">Days</string>
 
     <string name="quota_ring_title">Billing cycle usage</string>

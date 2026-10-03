@@ -95,6 +95,7 @@ private fun sampleState(): UiState {
             usedFastCom = true,
         ),
         daily = daily,
+        monthPeak = daily.maxByOrNull { day -> day.totals.totalBytes },
         apps = apps,
         appsPeriod = UsagePeriod.MONTH,
         historyPeriod = UsagePeriod.WEEK,

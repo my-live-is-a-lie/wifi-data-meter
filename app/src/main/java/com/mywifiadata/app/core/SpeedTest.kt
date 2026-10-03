@@ -16,6 +16,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
 import kotlin.coroutines.coroutineContext
 
@@ -29,8 +30,8 @@ import kotlin.coroutines.coroutineContext
  * - **رسالة عند انقطاع الاتصال**: مرصد يفحص الشبكة كل نصف ثانية، وعند فقدانها
  *   يتوقف كل شيء فورًا ويُفصل كل اتصال.
  * - **رسالة عند مرور وقت طويل دون نتيجة**: إن توقف وصول البيانات خلال القياس
- *   [Config.stallTimeoutMillis]، أو تجاوز الاختبار [Config.overallTimeoutMillis]
- *   يُغلق التحميل ويُعاد سبب الفشل للواجهة.
+ *   [Config.stallTimeoutMillis] (7 ثوانٍ بلا أي بايت)، أو تجاوز الاختبار
+ *   [Config.overallTimeoutMillis] (45 ثانية)، يُغلق التحميل ويُعاد السبب للواجهة.
  * - **إغلاق التحميل دائمًا**: كل اتصال يُفصل في `finally`، وإلغاء الـCoroutine
  *   (زر الإيقاف) يوقف القراءة/الكتابة فورًا.
  * - **تفاصيل الفشل**: تُسجَّل نتيجة كل مصدر لتُعرض في الواجهة عند تعذّر الاختبار.
@@ -74,7 +75,13 @@ object SpeedTestEngine {
     /** إعدادات الاختبار والمراصد الزمنية. */
     data class Config(
         val overallTimeoutMillis: Long = SpeedTestWatchdog.DEFAULT_OVERALL_TIMEOUT_MILLIS,
-        val stallTimeoutMillis: Long = SpeedTestWatchdog.DEFAULT_STALL_TIMEOUT_MILLIS,
+        /**
+         * نافذة «توقّف البيانات» أثناء القياس الفعلي: أقصر من نافذة المرصد
+         * الافتراضية حتى تكون قابلة للوصول داخل مدة القياس.
+         */
+        val stallTimeoutMillis: Long = MEASURE_STALL_TIMEOUT_MILLIS,
+        /** سقف زمني لفكّ روابط المصادر (fast.com يجلب رمزًا من الواجهة). */
+        val resolutionTimeoutMillis: Long = 12_000L,
         /** مدة معايرة المصادر المتوازية. */
         val probeMillis: Long = 4_500L,
         /** عدد البايتات الذي يعتبر المصدر ناجحًا عند بلوغه أثناء المعايرة. */
@@ -82,7 +89,7 @@ object SpeedTestEngine {
         /** مهلة إضافية نمنحها لمصدر fast.com قبل اختيار مصدر آخر. */
         val preferredGraceMillis: Long = 1_500L,
         /** نافذة القياس الفعلية. */
-        val measureMillis: Long = 8_000L,
+        val measureMillis: Long = 10_000L,
         val uploadMillis: Long = 6_000L,
         val probeConnections: Int = 1,
         val streams: Int = 5,
@@ -260,18 +267,25 @@ object SpeedTestEngine {
     ): DownloadOutcome {
         tracker.startPhase(Phase.PREPARING)
 
-        // 1) فكّ الروابط (fast.com يحتاج جلب رمز من الواجهة).
+        // 1) فكّ الروابط بالتوازي (fast.com يحتاج جلب رمز من الواجهة)، مع سقف
+        //    زمني حتى لا يؤخّر مصدر محجوب بقية المصادر.
         val resolved = ConcurrentHashMap<String, List<String>>()
-        coroutineScope {
-            DOWNLOAD_SOURCES.forEach { source ->
-                launch(Dispatchers.IO) {
-                    try {
-                        val urls = source.urls(config)
-                        if (urls.isEmpty()) log.record(source.id, REASON_NO_URLS) else resolved[source.id] = urls
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Throwable) {
-                        log.record(source.id, reasonOf(e))
+        withTimeoutOrNull(config.resolutionTimeoutMillis) {
+            coroutineScope {
+                DOWNLOAD_SOURCES.forEach { source ->
+                    launch(Dispatchers.IO) {
+                        try {
+                            val urls = source.urls(config)
+                            if (urls.isEmpty()) {
+                                log.record(source.id, REASON_NO_URLS)
+                            } else {
+                                resolved[source.id] = urls
+                            }
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Throwable) {
+                            log.record(source.id, reasonOf(e))
+                        }
                     }
                 }
             }
@@ -694,6 +708,9 @@ object SpeedTestEngine {
     }
 
     private const val PROBE_POLL_MILLIS = 120L
+
+    /** نافذة توقّف البيانات أثناء القياس: 7 ثوانٍ بلا بايت واحد = رابط ميت. */
+    private const val MEASURE_STALL_TIMEOUT_MILLIS = 7_000L
     private const val REASON_NO_URLS = "بلا روابط"
     private const val REASON_NO_BYTES = "بلا بيانات"
     private const val REASON_TIMEOUT = "مهلة"

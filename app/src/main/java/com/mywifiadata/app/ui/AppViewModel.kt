@@ -79,6 +79,11 @@ data class UiState(
     val samples: List<SpeedSample> = emptyList(),
     val speedTest: SpeedTestState = SpeedTestState.Idle,
     val daily: List<DayUsage> = emptyList(),
+    /**
+     * أعلى يوم استهلاكًا خلال آخر 30 يومًا — مرجع ثابت للمقارنة مهما كانت
+     * الفترة المختارة في شاشة السجل (تُحمَّل بياناته مستقلة عن [daily]).
+     */
+    val monthPeak: DayUsage? = null,
     val apps: List<AppUsage> = emptyList(),
     // تطبيقات الفترة كاملة (لا تتأثر باختيار شريحة) لبطاقة «الفترة».
     val periodApps: List<AppUsage> = emptyList(),
@@ -175,6 +180,7 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
     private var appsLoadedAt: Long = 0L
     private var dailyLoadedAt: Long = 0L
     private var dailyLoadedDays: Int = 0
+    private var monthPeakLoadedAt: Long = 0L
 
     init {
         viewModelScope.launch {
@@ -236,10 +242,34 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
             dailyLoadedDays = historyDays
             _uiState.update { it.copy(daily = daily) }
         }
+        loadMonthPeak(hasAccess, force, now)
 
         if (hasAccess && (force || now - appsLoadedAt > APPS_TTL_MILLIS)) {
             loadApps()
             loadAppsSlices()
+        }
+    }
+
+    /**
+     * يحمّل آخر 30 يومًا ويستخرج أعلى يوم استهلاكًا لعرضه في بطاقة «سجل
+     * الاستهلاك» كمرجع للمقارنة، حتى لو كانت الفترة المعروضة يومًا واحدًا
+     * (فلا يعود «أعلى يوم» مساويًا لاستهلاك اليوم نفسه).
+     *
+     * إن كانت الفترة المختارة شهرًا بالفعل نُعيد استخدام بياناتها بلا استعلام جديد.
+     */
+    private suspend fun loadMonthPeak(hasAccess: Boolean, force: Boolean, now: Long) {
+        if (!hasAccess) return
+        if (!force && now - monthPeakLoadedAt <= MONTH_PEAK_TTL_MILLIS) return
+
+        val loadedDays = dailyLoadedDays
+        val monthDaily = if (loadedDays >= MONTH_DAYS) {
+            _uiState.value.daily
+        } else {
+            repository.dailyUsage(MONTH_DAYS)
+        }
+        monthPeakLoadedAt = now
+        _uiState.update { state ->
+            state.copy(monthPeak = monthDaily.maxByOrNull { it.totals.totalBytes })
         }
     }
 
@@ -569,6 +599,8 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         private const val REFRESH_INTERVAL_MILLIS = 1_000L
         private const val APPS_TTL_MILLIS = 30_000L
         private const val DAILY_TTL_MILLIS = 60_000L
+        private const val MONTH_PEAK_TTL_MILLIS = 120_000L
+        private const val MONTH_DAYS = 30
         private const val MAX_SAMPLES = 30
 
         fun factory(repository: UsageRepository): ViewModelProvider.Factory = viewModelFactory {
