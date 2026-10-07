@@ -69,6 +69,14 @@
     <string name="label_days">Days</string>
 
     <string name="quota_ring_title">Billing cycle usage</string>
+    <string name="widget_title">Data usage</string>
+    <string name="widget_description">A card showing Wi-Fi data usage</string>
+    <string name="widget_traffic_line">%1$s: %2$s</string>
+    <string name="action_add_widget">Add to home screen</string>
+    <string name="cd_previous_usage_card">Previous card style</string>
+    <string name="cd_next_usage_card">Next card style</string>
+    <string name="widget_pin_requested">Confirm adding the widget in your home screen launcher.</string>
+    <string name="widget_pin_unsupported">Your home screen launcher does not support direct pinning. Add the widget from its widget picker.</string>
     <string name="quota_not_set">No monthly plan set yet</string>
     <string name="quota_set_action">Set plan</string>
     <string name="quota_remaining_of">%1$s left of %2$s</string>

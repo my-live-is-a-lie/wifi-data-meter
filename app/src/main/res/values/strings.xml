@@ -77,6 +77,14 @@
 
     <!-- البطاقة الرئيسية (الحلقة) -->
     <string name="quota_ring_title">استهلاك دورة الفاتورة</string>
+    <string name="widget_title">استهلاك البيانات</string>
+    <string name="widget_description">بطاقة تعرض استهلاك بيانات الواي فاي</string>
+    <string name="widget_traffic_line">%1$s: %2$s</string>
+    <string name="action_add_widget">إضافة للشاشة الرئيسية</string>
+    <string name="cd_previous_usage_card">شكل البطاقة السابق</string>
+    <string name="cd_next_usage_card">شكل البطاقة التالي</string>
+    <string name="widget_pin_requested">أكّد إضافة الأداة في نافذة مشغّل الشاشة الرئيسية.</string>
+    <string name="widget_pin_unsupported">مشغّل الشاشة الرئيسية لا يدعم الإضافة المباشرة. أضف الأداة من قائمة الأدوات.</string>
     <string name="quota_not_set">لم تُحدَّد باقة شهرية بعد</string>
     <string name="quota_set_action">تحديد الباقة</string>
     <string name="quota_remaining_of">متبقٍ %1$s من %2$s</string>
