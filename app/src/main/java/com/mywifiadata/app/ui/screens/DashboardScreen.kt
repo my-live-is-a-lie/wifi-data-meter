@@ -86,6 +86,7 @@ import com.mywifiadata.app.data.model.WifiBand
 import com.mywifiadata.app.data.model.WifiStatus
 import com.mywifiadata.app.ui.UiState
 import com.mywifiadata.app.ui.components.Dot
+import com.mywifiadata.app.ui.components.DottedUsageGauge
 import com.mywifiadata.app.ui.components.EmptyState
 import com.mywifiadata.app.ui.components.ExpressiveCard
 import com.mywifiadata.app.ui.components.InfoRow
@@ -232,7 +233,7 @@ fun DashboardScreen(
 
 private enum class UsageCardStyle {
     RING,
-    PROGRESS,
+    DOTTED_RING,
     SPLIT,
 }
 
@@ -610,102 +611,18 @@ private fun CompactUsageCardContent(state: UiState, style: UsageCardStyle) {
     }
 
     when (style) {
-        UsageCardStyle.RING -> {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                UsageRing(
-                    progress = progress,
-                    modifier = Modifier.size(148.dp),
-                    strokeWidth = 14.dp,
-                    startColor = if (state.quotaExceeded) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.primary
-                    },
-                    endColor = if (state.quotaExceeded) {
-                        MaterialTheme.colorScheme.errorContainer
-                    } else {
-                        MaterialTheme.colorScheme.tertiary
-                    },
-                    contentDescription = stringResource(R.string.quota_ring_title),
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = usageValue,
-                            style = MaterialTheme.typography.titleLargeEmphasized,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            textAlign = TextAlign.Center,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            text = usedLabel,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Text(
-                            text = Format.bytesShort(usedBytes),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(7.dp))
-                Text(
-                    text = remainingText,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(modifier = Modifier.height(7.dp))
-                CompactTrafficSummary(state, downloadColor, uploadColor)
-            }
-        }
-
-        UsageCardStyle.PROGRESS -> {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = stringResource(R.string.quota_ring_title),
-                        style = MaterialTheme.typography.titleSmallEmphasized,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Text(
-                        text = usageValue,
-                        style = MaterialTheme.typography.titleMediumEmphasized,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                }
-                Spacer(modifier = Modifier.height(14.dp))
-                QuotaBar(
-                    progress = progress,
-                    height = 14.dp,
-                    startColor = if (state.quotaExceeded) MaterialTheme.colorScheme.error else downloadColor,
-                    endColor = if (state.quotaExceeded) MaterialTheme.colorScheme.errorContainer else uploadColor,
-                )
-                Spacer(modifier = Modifier.height(10.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    CompactMetric(
-                        label = usedLabel,
-                        value = Format.bytesShort(usedBytes),
-                        modifier = Modifier.weight(1f),
-                    )
-                    CompactMetric(
-                        label = stringResource(R.string.label_remaining),
-                        value = if (state.hasQuota) Format.bytesShort(state.remainingBytes) else "—",
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                Spacer(modifier = Modifier.weight(1f))
-                CompactTrafficSummary(state, downloadColor, uploadColor)
-            }
+        UsageCardStyle.RING, UsageCardStyle.DOTTED_RING -> {
+            CompactCircularUsageCardContent(
+                state = state,
+                progress = progress,
+                usageValue = usageValue,
+                usedBytes = usedBytes,
+                usedLabel = usedLabel,
+                remainingText = remainingText,
+                downloadColor = downloadColor,
+                uploadColor = uploadColor,
+                dotted = style == UsageCardStyle.DOTTED_RING,
+            )
         }
 
         UsageCardStyle.SPLIT -> {
@@ -768,21 +685,93 @@ private fun CompactUsageCardContent(state: UiState, style: UsageCardStyle) {
 }
 
 @Composable
-private fun CompactMetric(label: String, value: String, modifier: Modifier = Modifier) {
-    Column(modifier = modifier) {
+private fun CompactCircularUsageCardContent(
+    state: UiState,
+    progress: Float,
+    usageValue: String,
+    usedBytes: Long,
+    usedLabel: String,
+    remainingText: String,
+    downloadColor: Color,
+    uploadColor: Color,
+    dotted: Boolean,
+) {
+    val startColor = if (state.quotaExceeded) {
+        MaterialTheme.colorScheme.error
+    } else {
+        MaterialTheme.colorScheme.primary
+    }
+    val endColor = if (state.quotaExceeded) {
+        MaterialTheme.colorScheme.errorContainer
+    } else {
+        MaterialTheme.colorScheme.tertiary
+    }
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        if (dotted) {
+            DottedUsageGauge(
+                progress = progress,
+                modifier = Modifier.size(148.dp),
+                strokeWidth = 9.dp,
+                dotRadius = 2.dp,
+                dotCount = 31,
+                dotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.72f),
+                startColor = startColor,
+                endColor = endColor,
+                contentDescription = stringResource(R.string.quota_ring_title),
+            ) {
+                CompactGaugeCenter(usageValue, usedLabel, usedBytes)
+            }
+        } else {
+            UsageRing(
+                progress = progress,
+                modifier = Modifier.size(148.dp),
+                strokeWidth = 14.dp,
+                startColor = startColor,
+                endColor = endColor,
+                contentDescription = stringResource(R.string.quota_ring_title),
+            ) {
+                CompactGaugeCenter(usageValue, usedLabel, usedBytes)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(7.dp))
         Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            text = remainingText,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(modifier = Modifier.height(7.dp))
+        CompactTrafficSummary(state, downloadColor, uploadColor)
+    }
+}
+
+@Composable
+private fun CompactGaugeCenter(usageValue: String, usedLabel: String, usedBytes: Long) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = usageValue,
+            style = MaterialTheme.typography.titleLargeEmphasized,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
         Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMediumEmphasized,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+            text = usedLabel,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = Format.bytesShort(usedBytes),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
         )
     }
 }
