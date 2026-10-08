@@ -29,7 +29,6 @@ import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -461,7 +460,6 @@ private fun FullGaugeCenter(
     usedValue: String,
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Spacer(modifier = Modifier.height(24.dp))
         Text(
             text = usageValue,
             style = MaterialTheme.typography.displaySmallEmphasized,
@@ -740,8 +738,7 @@ private fun CompactCircularUsageCardContent(
     ) {
         if (dotted) {
             BoxWithConstraints(contentAlignment = Alignment.Center) {
-                val gaugeSize = minOf(maxWidth * 0.80f, 176.dp)
-                val centerOffsetY = gaugeSize * (-38f / 176f)
+                val gaugeSize = minOf(maxWidth * 0.82f, 176.dp)
                 DottedUsageGauge(
                     progress = progress,
                     modifier = Modifier.size(gaugeSize),
@@ -752,9 +749,7 @@ private fun CompactCircularUsageCardContent(
                     progressColor = startColor,
                     contentDescription = stringResource(R.string.quota_ring_title),
                 ) {
-                    Box(modifier = Modifier.offset(y = centerOffsetY)) {
-                        CompactGaugeCenter(usageValue, usedLabel, usedBytes)
-                    }
+                    CompactGaugeCenter(usageValue, usedLabel, usedBytes)
                 }
             }
         } else {
@@ -799,11 +794,13 @@ private fun CompactGaugeCenter(usageValue: String, usedLabel: String, usedBytes:
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+        Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = usedLabel,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = Format.bytes(usedBytes),
             style = MaterialTheme.typography.labelMedium,

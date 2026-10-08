@@ -159,8 +159,9 @@ fun DottedUsageGauge(
             val radius = (size.minDimension - stroke) / 2f
             val arcSize = Size(radius * 2f, radius * 2f)
             val topLeft = Offset(center.x - radius, center.y - radius)
-            val startAngle = 135f
-            val sweepAngle = 270f
+            // أطراف القوس مرفوعة قليلًا عن الوضع الافتراضي، فتكون الفتحة السفلية أوسع وأقصر.
+            val startAngle = 145f
+            val sweepAngle = 250f
             val steps = dotCount.coerceAtLeast(2)
 
             drawArc(
@@ -189,20 +190,25 @@ fun DottedUsageGauge(
 
             if (animatedProgress > 0.001f) {
                 val progressSweep = sweepAngle * animatedProgress
-                drawArc(
-                    color = progressColor,
-                    startAngle = startAngle,
-                    sweepAngle = progressSweep,
-                    useCenter = false,
-                    topLeft = topLeft,
-                    size = arcSize,
-                    style = Stroke(width = stroke, cap = StrokeCap.Round),
-                )
+                // نترك فسحة قصيرة بعد نهاية القوس حتى لا يندمج المؤشر مع الشريط
+                // ولا يظهر كعلامة زائد؛ مقدارها ثابت نسبيًا إلى المسافة بين النقاط.
+                val indicatorGap = sweepAngle / (steps - 1) * 0.8f
+                val arcSweep = (progressSweep - indicatorGap).coerceAtLeast(0f)
+                if (arcSweep > 0.001f) {
+                    drawArc(
+                        color = progressColor,
+                        startAngle = startAngle,
+                        sweepAngle = arcSweep,
+                        useCenter = false,
+                        topLeft = topLeft,
+                        size = arcSize,
+                        style = Stroke(width = stroke, cap = StrokeCap.Round),
+                    )
+                }
 
-                // علامة قصيرة شعاعية على طرف التقدّم، مثل المؤشر في التصميم المرجعي.
-                // يزداد طولها وسماكتها نسبيًا مع حجم الحلقة حتى تبقى متناسقة في البطاقات.
+                // مؤشر شعاعي صغير ومستقل عند قيمة التقدّم، بحجم يتناسب مع الحلقة.
                 val pointerAngle = Math.toRadians((startAngle + progressSweep).toDouble())
-                val pointerLength = radius * 0.20f
+                val pointerLength = radius * 0.18f
                 val pointerRadiusStart = radius - pointerLength / 2f
                 val pointerRadiusEnd = radius + pointerLength / 2f
                 val pointerX = cos(pointerAngle).toFloat()
@@ -217,7 +223,7 @@ fun DottedUsageGauge(
                         x = center.x + pointerX * pointerRadiusEnd,
                         y = center.y + pointerY * pointerRadiusEnd,
                     ),
-                    strokeWidth = stroke * 0.45f,
+                    strokeWidth = stroke * 0.40f,
                     cap = StrokeCap.Round,
                 )
             }
