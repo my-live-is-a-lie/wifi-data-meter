@@ -134,6 +134,7 @@ fun DottedUsageGauge(
     dotRadius: Dp = 2.dp,
     dotCount: Int = 31,
     dotColor: Color = MaterialTheme.colorScheme.primary.copy(alpha = 0.72f),
+    trackColor: Color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.55f),
     progressColor: Color = MaterialTheme.colorScheme.primary,
     contentDescription: String? = null,
     content: @Composable BoxScope.() -> Unit,
@@ -161,6 +162,16 @@ fun DottedUsageGauge(
             val startAngle = 135f
             val sweepAngle = 270f
             val steps = dotCount.coerceAtLeast(2)
+
+            drawArc(
+                color = trackColor,
+                startAngle = startAngle,
+                sweepAngle = sweepAngle,
+                useCenter = false,
+                topLeft = topLeft,
+                size = arcSize,
+                style = Stroke(width = stroke, cap = StrokeCap.Round),
+            )
 
             for (index in 0 until steps) {
                 val angle = Math.toRadians(

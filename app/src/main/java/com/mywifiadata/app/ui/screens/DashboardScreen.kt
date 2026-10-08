@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -354,7 +355,7 @@ private fun FullUsageCard(
             if (selectedStyleIndex == UsageCardStyle.DOTTED_RING.ordinal) {
                 DottedUsageGauge(
                     progress = progress,
-                    modifier = Modifier.size(width = 280.dp, height = 196.dp),
+                    modifier = Modifier.size(width = 280.dp, height = 234.dp),
                     strokeWidth = 14.dp,
                     dotRadius = 3.dp,
                     dotCount = 46,
@@ -457,7 +458,10 @@ private fun FullGaugeCenter(
     usedValue: String,
     dotted: Boolean = false,
 ) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(
+        modifier = if (dotted) Modifier.offset(y = (-44).dp) else Modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
         if (!dotted) Spacer(modifier = Modifier.height(24.dp))
         Text(
             text = usageValue,
@@ -738,7 +742,7 @@ private fun CompactCircularUsageCardContent(
         if (dotted) {
             BoxWithConstraints(contentAlignment = Alignment.Center) {
                 val gaugeWidth = minOf(maxWidth, 188.dp)
-                val gaugeHeight = gaugeWidth * (132f / 188f)
+                val gaugeHeight = gaugeWidth * (158f / 188f)
                 DottedUsageGauge(
                     progress = progress,
                     modifier = Modifier.size(width = gaugeWidth, height = gaugeHeight),
@@ -749,7 +753,9 @@ private fun CompactCircularUsageCardContent(
                     progressColor = startColor,
                     contentDescription = stringResource(R.string.quota_ring_title),
                 ) {
-                    CompactGaugeCenter(usageValue, usedLabel, usedBytes)
+                    Box(modifier = Modifier.offset(y = (-30).dp)) {
+                        CompactGaugeCenter(usageValue, usedLabel, usedBytes)
+                    }
                 }
             }
         } else {
