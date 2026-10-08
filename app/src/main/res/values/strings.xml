@@ -79,7 +79,7 @@
     <string name="quota_ring_title">استهلاك دورة الفاتورة</string>
     <string name="widget_title">استهلاك البيانات</string>
     <string name="widget_description">بطاقة تعرض استهلاك بيانات الواي فاي</string>
-    <string name="widget_traffic_line">%1$s: %2$s</string>
+    <string name="widget_traffic_line">%1$s %2$s</string>
     <string name="action_add_widget">إضافة للشاشة الرئيسية</string>
     <string name="cd_previous_usage_card">شكل البطاقة السابق</string>
     <string name="cd_next_usage_card">شكل البطاقة التالي</string>

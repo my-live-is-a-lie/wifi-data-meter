@@ -6,12 +6,18 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.view.View
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.RectF
+import android.os.Bundle
 import android.widget.RemoteViews
 import com.mywifiadata.app.MainActivity
 import com.mywifiadata.app.R
 import com.mywifiadata.app.core.Format
+import kotlin.math.cos
 import kotlin.math.roundToInt
+import kotlin.math.sin
 
 /**
  * أداة الشاشة الرئيسية لعرض استهلاك الواي فاي. تُحفظ آخر قراءة من التطبيق
@@ -25,6 +31,16 @@ class UsageWidgetProvider : AppWidgetProvider() {
         appWidgetIds: IntArray,
     ) {
         UsageWidgetProvider.updateWidgets(context, appWidgetManager, appWidgetIds)
+    }
+
+    @Suppress("UNUSED_PARAMETER")
+    override fun onAppWidgetOptionsChanged(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetId: Int,
+        newOptions: Bundle,
+    ) {
+        UsageWidgetProvider.updateWidgets(context, appWidgetManager, intArrayOf(appWidgetId))
     }
 
     companion object {
@@ -49,24 +65,31 @@ class UsageWidgetProvider : AppWidgetProvider() {
             val quota = preferences.getLong(UsageWidgetUpdater.KEY_QUOTA, 0L)
             val hasQuota = quota > 0L
             val used = if (hasQuota) cycleUsage else todayDownload + todayUpload
-            val progress = if (hasQuota) {
-                (cycleUsage.toDouble() / quota.toDouble() * 100.0)
-                    .roundToInt()
-                    .coerceIn(0, 100)
-            } else {
-                0
-            }
+            val gaugeProgress = when {
+                hasQuota -> cycleUsage.toDouble() / quota.toDouble()
+                cycleUsage > 0L -> used.toDouble() / cycleUsage.toDouble()
+                else -> 0.0
+            }.coerceIn(0.0, 1.0).toFloat()
+            val progressPercent = (gaugeProgress * 100f).roundToInt()
 
             appWidgetIds.forEach { widgetId ->
                 val views = RemoteViews(context.packageName, R.layout.widget_usage)
-                views.setTextViewText(
-                    R.id.widget_title,
-                    context.getString(R.string.widget_title),
+                val options = appWidgetManager.getAppWidgetOptions(widgetId)
+                val widgetWidthDp = options
+                    .getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 220)
+                    .takeIf { it > 0 } ?: 220
+                val gaugeFrameWidthDp = (widgetWidthDp - 24).coerceAtLeast(140)
+                val gaugeWidthDp = (gaugeFrameWidthDp * 0.82f)
+                    .roundToInt()
+                    .coerceIn(140, 176)
+                views.setImageViewBitmap(
+                    R.id.widget_gauge,
+                    createGaugeBitmap(context, gaugeFrameWidthDp, gaugeWidthDp, gaugeProgress),
                 )
                 views.setTextViewText(
                     R.id.widget_usage_value,
                     if (hasQuota) {
-                        context.getString(R.string.percent_format, progress)
+                        context.getString(R.string.percent_format, progressPercent)
                     } else {
                         Format.bytes(used)
                     },
@@ -75,12 +98,8 @@ class UsageWidgetProvider : AppWidgetProvider() {
                     R.id.widget_usage_label,
                     context.getString(if (hasQuota) R.string.label_used else R.string.label_today),
                 )
-                views.setViewVisibility(
-                    R.id.widget_progress,
-                    if (hasQuota) View.VISIBLE else View.GONE,
-                )
+                views.setTextViewText(R.id.widget_used_value, Format.bytes(used))
                 if (hasQuota) {
-                    views.setProgressBar(R.id.widget_progress, 100, progress, false)
                     views.setTextViewText(
                         R.id.widget_remaining,
                         context.getString(
@@ -100,7 +119,7 @@ class UsageWidgetProvider : AppWidgetProvider() {
                     context.getString(
                         R.string.widget_traffic_line,
                         context.getString(R.string.label_download),
-                        Format.bytesShort(todayDownload),
+                        Format.bytes(todayDownload),
                     ),
                 )
                 views.setTextViewText(
@@ -108,7 +127,7 @@ class UsageWidgetProvider : AppWidgetProvider() {
                     context.getString(
                         R.string.widget_traffic_line,
                         context.getString(R.string.label_upload),
-                        Format.bytesShort(todayUpload),
+                        Format.bytes(todayUpload),
                     ),
                 )
 
@@ -124,6 +143,80 @@ class UsageWidgetProvider : AppWidgetProvider() {
             }
         }
     }
+}
+
+private fun createGaugeBitmap(
+    context: Context,
+    frameWidthDp: Int,
+    gaugeWidthDp: Int,
+    progress: Float,
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val frameHeightDp = 158f
+    val gaugeHeightDp = gaugeWidthDp * (158f / 188f)
+    val bitmapWidth = (frameWidthDp * density).roundToInt().coerceAtLeast(1)
+    val bitmapHeight = (frameHeightDp * density).roundToInt().coerceAtLeast(1)
+    val gaugeWidth = gaugeWidthDp * density
+    val gaugeHeight = gaugeHeightDp * density
+    val bitmap = Bitmap.createBitmap(bitmapWidth, bitmapHeight, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val stroke = 9f * density
+    val centerX = bitmapWidth / 2f
+    // يرسم القوس في أعلى مساحة المؤشر، ويترك الحيّز السفلي للنص ثم لسطر المتبقي.
+    val centerY = gaugeHeight / 2f
+    val radiusX = (gaugeWidth - stroke) / 2f
+    val radiusY = (gaugeHeight - stroke) / 2f
+    val arcBounds = RectF(
+        centerX - radiusX,
+        centerY - radiusY,
+        centerX + radiusX,
+        centerY + radiusY,
+    )
+    val startAngle = 135f
+    val sweepAngle = 270f
+    val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = context.getColor(R.color.widget_progress_track)
+        alpha = 140
+        style = Paint.Style.STROKE
+        strokeWidth = stroke
+        strokeCap = Paint.Cap.ROUND
+    }
+    val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = context.getColor(R.color.widget_progress)
+        alpha = 184
+        style = Paint.Style.FILL
+    }
+    val progressPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = context.getColor(R.color.widget_progress)
+        style = Paint.Style.STROKE
+        strokeWidth = stroke
+        strokeCap = Paint.Cap.ROUND
+    }
+
+    canvas.drawArc(arcBounds, startAngle, sweepAngle, false, trackPaint)
+    val dotRadius = 2f * density
+    val dotCount = 31
+    for (index in 0 until dotCount) {
+        val angle = Math.toRadians(
+            (startAngle + sweepAngle * index.toFloat() / (dotCount - 1)).toDouble(),
+        )
+        canvas.drawCircle(
+            centerX + cos(angle).toFloat() * radiusX,
+            centerY + sin(angle).toFloat() * radiusY,
+            dotRadius,
+            dotPaint,
+        )
+    }
+    if (progress > 0.001f) {
+        canvas.drawArc(
+            arcBounds,
+            startAngle,
+            sweepAngle * progress.coerceIn(0f, 1f),
+            false,
+            progressPaint,
+        )
+    }
+    return bitmap
 }
 
 /** يخزن آخر قراءة ويحدّث واجهة الأداة على فترات معقولة بدل تحديثها كل ثانية. */

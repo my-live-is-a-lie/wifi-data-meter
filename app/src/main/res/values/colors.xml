@@ -7,4 +7,6 @@
     <color name="widget_on_surface_variant">#C9C5D0</color>
     <color name="widget_progress">#B7C4FF</color>
     <color name="widget_progress_track">#49464F</color>
+    <color name="widget_download">#B7C4FF</color>
+    <color name="widget_upload">#E3C4F5</color>
 </resources>

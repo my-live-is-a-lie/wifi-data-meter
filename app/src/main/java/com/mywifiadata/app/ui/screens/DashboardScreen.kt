@@ -741,8 +741,9 @@ private fun CompactCircularUsageCardContent(
     ) {
         if (dotted) {
             BoxWithConstraints(contentAlignment = Alignment.Center) {
-                val gaugeWidth = minOf(maxWidth, 188.dp)
+                val gaugeWidth = minOf(maxWidth * 0.82f, 176.dp)
                 val gaugeHeight = gaugeWidth * (158f / 188f)
+                val centerOffsetY = gaugeWidth * (-30f / 188f)
                 DottedUsageGauge(
                     progress = progress,
                     modifier = Modifier.size(width = gaugeWidth, height = gaugeHeight),
@@ -753,7 +754,7 @@ private fun CompactCircularUsageCardContent(
                     progressColor = startColor,
                     contentDescription = stringResource(R.string.quota_ring_title),
                 ) {
-                    Box(modifier = Modifier.offset(y = (-30).dp)) {
+                    Box(modifier = Modifier.offset(y = centerOffsetY)) {
                         CompactGaugeCenter(usageValue, usedLabel, usedBytes)
                     }
                 }
