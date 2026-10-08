@@ -123,8 +123,9 @@ fun UsageRing(
 }
 
 /**
- * مؤشر استهلاك بقوس مفتوح ذي مسار منقّط، مع قوس تقدّم سميك في بدايته.
- * يبدأ المسار من أسفل اليسار ويمر أعلى البطاقة حتى أسفل اليمين مثل التصميم المرجعي.
+ * مؤشر استهلاك بقوس مفتوح ذي مسار منقّط، وقوس تقدّم سميك مع علامة شعاعية
+ * قصيرة عند نهايته. يبدأ المسار من أسفل اليسار ويمر أعلى البطاقة حتى أسفل اليمين
+ * مثل التصميم المرجعي.
  */
 @Composable
 fun DottedUsageGauge(
@@ -187,14 +188,37 @@ fun DottedUsageGauge(
             }
 
             if (animatedProgress > 0.001f) {
+                val progressSweep = sweepAngle * animatedProgress
                 drawArc(
                     color = progressColor,
                     startAngle = startAngle,
-                    sweepAngle = sweepAngle * animatedProgress,
+                    sweepAngle = progressSweep,
                     useCenter = false,
                     topLeft = topLeft,
                     size = arcSize,
                     style = Stroke(width = stroke, cap = StrokeCap.Round),
+                )
+
+                // علامة قصيرة شعاعية على طرف التقدّم، مثل المؤشر في التصميم المرجعي.
+                // يزداد طولها وسماكتها نسبيًا مع حجم الحلقة حتى تبقى متناسقة في البطاقات.
+                val pointerAngle = Math.toRadians((startAngle + progressSweep).toDouble())
+                val pointerLength = radius * 0.20f
+                val pointerRadiusStart = radius - pointerLength / 2f
+                val pointerRadiusEnd = radius + pointerLength / 2f
+                val pointerX = cos(pointerAngle).toFloat()
+                val pointerY = sin(pointerAngle).toFloat()
+                drawLine(
+                    color = progressColor,
+                    start = Offset(
+                        x = center.x + pointerX * pointerRadiusStart,
+                        y = center.y + pointerY * pointerRadiusStart,
+                    ),
+                    end = Offset(
+                        x = center.x + pointerX * pointerRadiusEnd,
+                        y = center.y + pointerY * pointerRadiusEnd,
+                    ),
+                    strokeWidth = stroke * 0.45f,
+                    cap = StrokeCap.Round,
                 )
             }
         }
