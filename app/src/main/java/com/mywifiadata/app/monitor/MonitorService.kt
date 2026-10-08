@@ -15,6 +15,7 @@ import com.mywifiadata.app.core.TimeRange
 import com.mywifiadata.app.core.TimeRanges
 import com.mywifiadata.app.data.UsageRepository
 import com.mywifiadata.app.data.model.AppSettings
+import com.mywifiadata.app.widget.UsageWidgetUpdater
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -132,6 +133,13 @@ class MonitorService : Service() {
         val today = repository.todayTotals(now)
         val cycle = repository.cycleTotals(settings.cycleStartDay, now)
         val session = repository.deviceTotals(TimeRange(settings.sessionStartMillis, now))
+        UsageWidgetUpdater.publish(
+            context = this,
+            todayDownload = today.rxBytes,
+            todayUpload = today.txBytes,
+            cycleUsage = cycle.totalBytes,
+            quota = settings.quotaBytes,
+        )
 
         val speed = estimateSpeed(cycle.totalBytes, now)
 

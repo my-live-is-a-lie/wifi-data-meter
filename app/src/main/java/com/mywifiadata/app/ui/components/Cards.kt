@@ -1,5 +1,7 @@
 package com.mywifiadata.app.ui.components
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -78,31 +80,52 @@ fun SectionHeader(
 
 /** بطاقة بأشكال Material 3 Expressive. */
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 fun ExpressiveCard(
     modifier: Modifier = Modifier,
     containerColor: Color = MaterialTheme.colorScheme.surfaceContainerLow,
     onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
     /** حشوة المحتوى: تُخصَّص لتقليص فراغ البطاقة عند الحاجة (مثل بطاقة السجل). */
     contentPadding: PaddingValues = PaddingValues(20.dp),
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val shape = MaterialTheme.shapes.largeIncreased
-    if (onClick == null) {
-        Card(
-            modifier = modifier.fillMaxWidth(),
-            shape = shape,
-            colors = CardDefaults.cardColors(containerColor = containerColor),
-        ) {
-            Column(modifier = Modifier.padding(contentPadding), content = content)
+    when {
+        onLongClick != null -> {
+            Card(
+                modifier = modifier
+                    .fillMaxWidth()
+                    .combinedClickable(
+                        onClick = onClick ?: {},
+                        onLongClick = onLongClick,
+                    ),
+                shape = shape,
+                colors = CardDefaults.cardColors(containerColor = containerColor),
+            ) {
+                Column(modifier = Modifier.padding(contentPadding), content = content)
+            }
         }
-    } else {
-        Card(
-            onClick = onClick,
-            modifier = modifier.fillMaxWidth(),
-            shape = shape,
-            colors = CardDefaults.cardColors(containerColor = containerColor),
-        ) {
-            Column(modifier = Modifier.padding(contentPadding), content = content)
+
+        onClick == null -> {
+            Card(
+                modifier = modifier.fillMaxWidth(),
+                shape = shape,
+                colors = CardDefaults.cardColors(containerColor = containerColor),
+            ) {
+                Column(modifier = Modifier.padding(contentPadding), content = content)
+            }
+        }
+
+        else -> {
+            Card(
+                onClick = onClick,
+                modifier = modifier.fillMaxWidth(),
+                shape = shape,
+                colors = CardDefaults.cardColors(containerColor = containerColor),
+            ) {
+                Column(modifier = Modifier.padding(contentPadding), content = content)
+            }
         }
     }
 }
