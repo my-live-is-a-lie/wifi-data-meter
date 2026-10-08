@@ -134,8 +134,7 @@ fun DottedUsageGauge(
     dotRadius: Dp = 2.dp,
     dotCount: Int = 31,
     dotColor: Color = MaterialTheme.colorScheme.primary.copy(alpha = 0.72f),
-    startColor: Color = MaterialTheme.colorScheme.primary,
-    endColor: Color = MaterialTheme.colorScheme.tertiary,
+    progressColor: Color = MaterialTheme.colorScheme.primary,
     contentDescription: String? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
@@ -155,9 +154,10 @@ fun DottedUsageGauge(
             val stroke = strokeWidth.toPx()
             val dot = dotRadius.toPx()
             val center = Offset(size.width / 2f, size.height / 2f)
-            val radius = (size.minDimension - stroke) / 2f
-            val arcSize = Size(radius * 2f, radius * 2f)
-            val topLeft = Offset(center.x - radius, center.y - radius)
+            val radiusX = (size.width - stroke) / 2f
+            val radiusY = (size.height - stroke) / 2f
+            val arcSize = Size(radiusX * 2f, radiusY * 2f)
+            val topLeft = Offset(center.x - radiusX, center.y - radiusY)
             val startAngle = 135f
             val sweepAngle = 270f
             val steps = dotCount.coerceAtLeast(2)
@@ -170,21 +170,15 @@ fun DottedUsageGauge(
                     color = dotColor,
                     radius = dot,
                     center = Offset(
-                        x = center.x + cos(angle).toFloat() * radius,
-                        y = center.y + sin(angle).toFloat() * radius,
+                        x = center.x + cos(angle).toFloat() * radiusX,
+                        y = center.y + sin(angle).toFloat() * radiusY,
                     ),
                 )
             }
 
             if (animatedProgress > 0.001f) {
-                val brush = Brush.sweepGradient(
-                    0f to startColor,
-                    0.45f to endColor,
-                    1f to startColor,
-                    center = center,
-                )
                 drawArc(
-                    brush = brush,
+                    color = progressColor,
                     startAngle = startAngle,
                     sweepAngle = sweepAngle * animatedProgress,
                     useCenter = false,
