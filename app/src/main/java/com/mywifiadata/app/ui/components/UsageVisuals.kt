@@ -155,10 +155,9 @@ fun DottedUsageGauge(
             val stroke = strokeWidth.toPx()
             val dot = dotRadius.toPx()
             val center = Offset(size.width / 2f, size.height / 2f)
-            val radiusX = (size.width - stroke) / 2f
-            val radiusY = (size.height - stroke) / 2f
-            val arcSize = Size(radiusX * 2f, radiusY * 2f)
-            val topLeft = Offset(center.x - radiusX, center.y - radiusY)
+            val radius = (size.minDimension - stroke) / 2f
+            val arcSize = Size(radius * 2f, radius * 2f)
+            val topLeft = Offset(center.x - radius, center.y - radius)
             val startAngle = 135f
             val sweepAngle = 270f
             val steps = dotCount.coerceAtLeast(2)
@@ -181,8 +180,8 @@ fun DottedUsageGauge(
                     color = dotColor,
                     radius = dot,
                     center = Offset(
-                        x = center.x + cos(angle).toFloat() * radiusX,
-                        y = center.y + sin(angle).toFloat() * radiusY,
+                        x = center.x + cos(angle).toFloat() * radius,
+                        y = center.y + sin(angle).toFloat() * radius,
                     ),
                 )
             }

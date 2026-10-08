@@ -79,7 +79,7 @@ class UsageWidgetProvider : AppWidgetProvider() {
                     .getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 220)
                     .takeIf { it > 0 } ?: 220
                 val gaugeFrameWidthDp = (widgetWidthDp - 24).coerceAtLeast(140)
-                val gaugeWidthDp = (gaugeFrameWidthDp * 0.82f)
+                val gaugeWidthDp = (gaugeFrameWidthDp * 0.80f)
                     .roundToInt()
                     .coerceIn(140, 176)
                 views.setImageViewBitmap(
@@ -152,25 +152,21 @@ private fun createGaugeBitmap(
     progress: Float,
 ): Bitmap {
     val density = context.resources.displayMetrics.density
-    val frameHeightDp = 158f
-    val gaugeHeightDp = gaugeWidthDp * (158f / 188f)
+    val frameHeightDp = 176f
     val bitmapWidth = (frameWidthDp * density).roundToInt().coerceAtLeast(1)
     val bitmapHeight = (frameHeightDp * density).roundToInt().coerceAtLeast(1)
-    val gaugeWidth = gaugeWidthDp * density
-    val gaugeHeight = gaugeHeightDp * density
+    val gaugeDiameter = gaugeWidthDp * density
     val bitmap = Bitmap.createBitmap(bitmapWidth, bitmapHeight, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
     val stroke = 9f * density
     val centerX = bitmapWidth / 2f
-    // يرسم القوس في أعلى مساحة المؤشر، ويترك الحيّز السفلي للنص ثم لسطر المتبقي.
-    val centerY = gaugeHeight / 2f
-    val radiusX = (gaugeWidth - stroke) / 2f
-    val radiusY = (gaugeHeight - stroke) / 2f
+    val centerY = bitmapHeight / 2f
+    val radius = (gaugeDiameter - stroke) / 2f
     val arcBounds = RectF(
-        centerX - radiusX,
-        centerY - radiusY,
-        centerX + radiusX,
-        centerY + radiusY,
+        centerX - radius,
+        centerY - radius,
+        centerX + radius,
+        centerY + radius,
     )
     val startAngle = 135f
     val sweepAngle = 270f
@@ -201,8 +197,8 @@ private fun createGaugeBitmap(
             (startAngle + sweepAngle * index.toFloat() / (dotCount - 1)).toDouble(),
         )
         canvas.drawCircle(
-            centerX + cos(angle).toFloat() * radiusX,
-            centerY + sin(angle).toFloat() * radiusY,
+            centerX + cos(angle).toFloat() * radius,
+            centerY + sin(angle).toFloat() * radius,
             dotRadius,
             dotPaint,
         )

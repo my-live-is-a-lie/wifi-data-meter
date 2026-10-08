@@ -6,14 +6,14 @@
     android:background="@drawable/widget_usage_background"
     android:gravity="center_horizontal"
     android:layoutDirection="locale"
-    android:minHeight="236dp"
+    android:minHeight="244dp"
     android:orientation="vertical"
     android:padding="12dp">
 
     <FrameLayout
         android:id="@+id/widget_gauge_area"
         android:layout_width="match_parent"
-        android:layout_height="158dp">
+        android:layout_height="176dp">
 
         <ImageView
             android:id="@+id/widget_gauge"
@@ -27,7 +27,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="top|center_horizontal"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="16dp"
             android:gravity="center_horizontal"
             android:orientation="vertical">
 
@@ -67,10 +67,11 @@
         </LinearLayout>
     </FrameLayout>
 
-    <Space
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1" />
+        android:layout_weight="1"
+        android:orientation="vertical" />
 
     <TextView
         android:id="@+id/widget_remaining"
@@ -99,10 +100,11 @@
             android:gravity="center"
             android:orientation="horizontal">
 
-            <View
+            <ImageView
                 android:layout_width="6dp"
                 android:layout_height="6dp"
-                android:background="@drawable/widget_download_dot" />
+                android:background="@drawable/widget_download_dot"
+                android:contentDescription="@null" />
 
             <TextView
                 android:id="@+id/widget_download"
@@ -127,10 +129,11 @@
             android:gravity="center"
             android:orientation="horizontal">
 
-            <View
+            <ImageView
                 android:layout_width="6dp"
                 android:layout_height="6dp"
-                android:background="@drawable/widget_upload_dot" />
+                android:background="@drawable/widget_upload_dot"
+                android:contentDescription="@null" />
 
             <TextView
                 android:id="@+id/widget_upload"

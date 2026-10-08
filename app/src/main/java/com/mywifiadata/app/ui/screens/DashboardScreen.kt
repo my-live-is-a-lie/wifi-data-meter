@@ -355,7 +355,7 @@ private fun FullUsageCard(
             if (selectedStyleIndex == UsageCardStyle.DOTTED_RING.ordinal) {
                 DottedUsageGauge(
                     progress = progress,
-                    modifier = Modifier.size(width = 280.dp, height = 234.dp),
+                    modifier = Modifier.size(280.dp),
                     strokeWidth = 14.dp,
                     dotRadius = 3.dp,
                     dotCount = 46,
@@ -459,7 +459,7 @@ private fun FullGaugeCenter(
     dotted: Boolean = false,
 ) {
     Column(
-        modifier = if (dotted) Modifier.offset(y = (-44).dp) else Modifier,
+        modifier = if (dotted) Modifier.offset(y = (-60).dp) else Modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         if (!dotted) Spacer(modifier = Modifier.height(24.dp))
@@ -741,12 +741,11 @@ private fun CompactCircularUsageCardContent(
     ) {
         if (dotted) {
             BoxWithConstraints(contentAlignment = Alignment.Center) {
-                val gaugeWidth = minOf(maxWidth * 0.82f, 176.dp)
-                val gaugeHeight = gaugeWidth * (158f / 188f)
-                val centerOffsetY = gaugeWidth * (-30f / 188f)
+                val gaugeSize = minOf(maxWidth * 0.80f, 176.dp)
+                val centerOffsetY = gaugeSize * (-38f / 176f)
                 DottedUsageGauge(
                     progress = progress,
-                    modifier = Modifier.size(width = gaugeWidth, height = gaugeHeight),
+                    modifier = Modifier.size(gaugeSize),
                     strokeWidth = 9.dp,
                     dotRadius = 2.dp,
                     dotCount = 31,
