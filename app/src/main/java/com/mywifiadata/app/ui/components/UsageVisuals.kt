@@ -49,7 +49,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import kotlin.math.abs
+import kotlin.math.cos
 import kotlin.math.roundToInt
+import kotlin.math.sin
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.input.pointer.pointerInput
 
@@ -109,6 +111,86 @@ fun UsageRing(
                     brush = brush,
                     startAngle = -90f,
                     sweepAngle = 360f * animatedProgress,
+                    useCenter = false,
+                    topLeft = topLeft,
+                    size = arcSize,
+                    style = Stroke(width = stroke, cap = StrokeCap.Round),
+                )
+            }
+        }
+        content()
+    }
+}
+
+/**
+ * مؤشر استهلاك بقوس مفتوح ذي مسار منقّط، مع قوس تقدّم سميك في بدايته.
+ * يبدأ المسار من أسفل اليسار ويمر أعلى البطاقة حتى أسفل اليمين مثل التصميم المرجعي.
+ */
+@Composable
+fun DottedUsageGauge(
+    progress: Float,
+    modifier: Modifier = Modifier,
+    strokeWidth: Dp = 9.dp,
+    dotRadius: Dp = 2.dp,
+    dotCount: Int = 31,
+    dotColor: Color = MaterialTheme.colorScheme.primary.copy(alpha = 0.72f),
+    trackColor: Color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.55f),
+    progressColor: Color = MaterialTheme.colorScheme.primary,
+    contentDescription: String? = null,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    val animatedProgress by animateFloatAsState(
+        targetValue = progress.coerceIn(0f, 1f),
+        animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+        label = "dotted-usage-gauge-progress",
+    )
+
+    Box(
+        modifier = modifier.semantics {
+            if (contentDescription != null) this.contentDescription = contentDescription
+        },
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(modifier = Modifier.matchParentSize()) {
+            val stroke = strokeWidth.toPx()
+            val dot = dotRadius.toPx()
+            val center = Offset(size.width / 2f, size.height / 2f)
+            val radius = (size.minDimension - stroke) / 2f
+            val arcSize = Size(radius * 2f, radius * 2f)
+            val topLeft = Offset(center.x - radius, center.y - radius)
+            val startAngle = 135f
+            val sweepAngle = 270f
+            val steps = dotCount.coerceAtLeast(2)
+
+            drawArc(
+                color = trackColor,
+                startAngle = startAngle,
+                sweepAngle = sweepAngle,
+                useCenter = false,
+                topLeft = topLeft,
+                size = arcSize,
+                style = Stroke(width = stroke, cap = StrokeCap.Round),
+            )
+
+            for (index in 0 until steps) {
+                val angle = Math.toRadians(
+                    (startAngle + sweepAngle * index.toFloat() / (steps - 1)).toDouble(),
+                )
+                drawCircle(
+                    color = dotColor,
+                    radius = dot,
+                    center = Offset(
+                        x = center.x + cos(angle).toFloat() * radius,
+                        y = center.y + sin(angle).toFloat() * radius,
+                    ),
+                )
+            }
+
+            if (animatedProgress > 0.001f) {
+                drawArc(
+                    color = progressColor,
+                    startAngle = startAngle,
+                    sweepAngle = sweepAngle * animatedProgress,
                     useCenter = false,
                     topLeft = topLeft,
                     size = arcSize,

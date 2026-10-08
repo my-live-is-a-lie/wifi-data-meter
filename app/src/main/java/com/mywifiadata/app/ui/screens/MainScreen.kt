@@ -1,8 +1,13 @@
 package com.mywifiadata.app.ui.screens
 
 import android.Manifest
+import android.app.PendingIntent
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Bundle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -56,6 +61,7 @@ import com.mywifiadata.app.R
 import com.mywifiadata.app.core.SystemActions
 import com.mywifiadata.app.ui.AppViewModel
 import com.mywifiadata.app.ui.theme.AppButtonShape
+import com.mywifiadata.app.widget.UsageWidgetProvider
 import kotlinx.coroutines.launch
 
 private enum class AppTab(val labelRes: Int, val icon: ImageVector) {
@@ -70,7 +76,10 @@ private enum class AppTab(val labelRes: Int, val icon: ImageVector) {
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun MainScreen(viewModel: AppViewModel) {
+fun MainScreen(
+    viewModel: AppViewModel,
+    initialUsageCardStyle: Int = UsageWidgetProvider.DEFAULT_USAGE_CARD_STYLE,
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -82,6 +91,8 @@ fun MainScreen(viewModel: AppViewModel) {
     val openSettingsLabel = stringResource(R.string.action_open_usage_access)
     val notificationDeniedMessage = stringResource(R.string.notification_permission_denied)
     val wifiDeniedMessage = stringResource(R.string.wifi_permission_denied)
+    val widgetPinRequestedMessage = stringResource(R.string.widget_pin_requested)
+    val widgetPinUnsupportedMessage = stringResource(R.string.widget_pin_unsupported)
 
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
@@ -152,6 +163,41 @@ fun MainScreen(viewModel: AppViewModel) {
             viewModel.startTracking()
         } else {
             viewModel.stopTracking()
+        }
+    }
+
+    fun requestUsageWidgetPin(selectedStyleIndex: Int) {
+        val widgetManager = AppWidgetManager.getInstance(context)
+        val provider = ComponentName(context, UsageWidgetProvider::class.java)
+        val safeStyleIndex = selectedStyleIndex.coerceIn(
+            UsageWidgetProvider.DEFAULT_USAGE_CARD_STYLE,
+            UsageWidgetProvider.MAX_USAGE_CARD_STYLE_INDEX,
+        )
+        val pinResultIntent = Intent(context, UsageWidgetProvider::class.java).apply {
+            action = UsageWidgetProvider.ACTION_WIDGET_PINNED
+            putExtra(UsageWidgetProvider.EXTRA_USAGE_CARD_STYLE, safeStyleIndex)
+        }
+        val mutableFlag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            PendingIntent.FLAG_MUTABLE
+        } else {
+            0
+        }
+        val pinResult = PendingIntent.getBroadcast(
+            context,
+            safeStyleIndex,
+            pinResultIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or mutableFlag,
+        )
+        val initialOptions = Bundle().apply {
+            putInt(UsageWidgetProvider.EXTRA_USAGE_CARD_STYLE, safeStyleIndex)
+        }
+        val requested = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+            widgetManager.isRequestPinAppWidgetSupported &&
+            widgetManager.requestPinAppWidget(provider, initialOptions, pinResult)
+        scope.launch {
+            snackbarHostState.showSnackbar(
+                if (requested) widgetPinRequestedMessage else widgetPinUnsupportedMessage,
+            )
         }
     }
 
@@ -239,6 +285,11 @@ fun MainScreen(viewModel: AppViewModel) {
                     onToggleTracking = { toggleTracking(!state.settings.trackingEnabled) },
                     onStartSpeedTest = { viewModel.startSpeedTest() },
                     onStopSpeedTest = { viewModel.stopSpeedTest() },
+                    onAddUsageWidget = { styleIndex -> requestUsageWidgetPin(styleIndex) },
+                    initialSelectedCardStyle = initialUsageCardStyle.coerceIn(
+                        UsageWidgetProvider.DEFAULT_USAGE_CARD_STYLE,
+                        UsageWidgetProvider.MAX_USAGE_CARD_STYLE_INDEX,
+                    ),
                 )
 
                 AppTab.APPS -> {

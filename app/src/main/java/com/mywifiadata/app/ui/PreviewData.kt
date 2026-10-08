@@ -125,6 +125,7 @@ private fun DashboardPreview() {
             onToggleTracking = {},
             onStartSpeedTest = {},
             onStopSpeedTest = {},
+            onAddUsageWidget = {},
         )
     }
 }

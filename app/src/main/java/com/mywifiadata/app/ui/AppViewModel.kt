@@ -22,6 +22,7 @@ import com.mywifiadata.app.data.model.TrafficTotals
 import com.mywifiadata.app.data.model.UsageSlice
 import com.mywifiadata.app.data.model.WifiStatus
 import com.mywifiadata.app.monitor.MonitorService
+import com.mywifiadata.app.widget.UsageWidgetUpdater
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collect
@@ -234,6 +235,13 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
                 samples = if (sample == null) state.samples else (state.samples + sample).takeLast(MAX_SAMPLES),
             )
         }
+        UsageWidgetUpdater.publish(
+            context = repository.context,
+            todayDownload = today.rxBytes,
+            todayUpload = today.txBytes,
+            cycleUsage = cycle.totalBytes,
+            quota = settings.quotaBytes,
+        )
 
         val historyDays = TimeRanges.daysOf(_uiState.value.historyPeriod)
         if (hasAccess && (force || now - dailyLoadedAt > DAILY_TTL_MILLIS || dailyLoadedDays != historyDays)) {

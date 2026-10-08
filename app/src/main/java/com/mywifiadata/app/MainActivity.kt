@@ -20,6 +20,7 @@ import com.mywifiadata.app.data.model.ThemeMode
 import com.mywifiadata.app.ui.AppViewModel
 import com.mywifiadata.app.ui.screens.MainScreen
 import com.mywifiadata.app.ui.theme.AppTheme
+import com.mywifiadata.app.widget.UsageWidgetProvider
 
 /**
  * الشاشة الوحيدة في التطبيق: تستضيف واجهة Compose بكاملها.
@@ -31,6 +32,13 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         val repository = (application as MyWifiApplication).repository
+        val initialUsageCardStyle = intent.getIntExtra(
+            UsageWidgetProvider.EXTRA_OPEN_USAGE_CARD_STYLE,
+            UsageWidgetProvider.DEFAULT_USAGE_CARD_STYLE,
+        ).coerceIn(
+            UsageWidgetProvider.DEFAULT_USAGE_CARD_STYLE,
+            UsageWidgetProvider.MAX_USAGE_CARD_STYLE_INDEX,
+        )
 
         setContent {
             val settings by repository.settingsStore.settings.collectAsStateWithLifecycle()
@@ -65,7 +73,10 @@ class MainActivity : ComponentActivity() {
                         val viewModel: AppViewModel = viewModel(
                             factory = AppViewModel.factory(repository),
                         )
-                        MainScreen(viewModel = viewModel)
+                        MainScreen(
+                            viewModel = viewModel,
+                            initialUsageCardStyle = initialUsageCardStyle,
+                        )
                     }
                 }
             }
