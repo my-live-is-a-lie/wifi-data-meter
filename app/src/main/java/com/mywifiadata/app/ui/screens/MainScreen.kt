@@ -1,10 +1,13 @@
 package com.mywifiadata.app.ui.screens
 
 import android.Manifest
+import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Bundle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -73,7 +76,10 @@ private enum class AppTab(val labelRes: Int, val icon: ImageVector) {
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun MainScreen(viewModel: AppViewModel) {
+fun MainScreen(
+    viewModel: AppViewModel,
+    initialUsageCardStyle: Int = UsageWidgetProvider.DEFAULT_USAGE_CARD_STYLE,
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -160,12 +166,34 @@ fun MainScreen(viewModel: AppViewModel) {
         }
     }
 
-    fun requestUsageWidgetPin() {
+    fun requestUsageWidgetPin(selectedStyleIndex: Int) {
         val widgetManager = AppWidgetManager.getInstance(context)
         val provider = ComponentName(context, UsageWidgetProvider::class.java)
+        val safeStyleIndex = selectedStyleIndex.coerceIn(
+            UsageWidgetProvider.DEFAULT_USAGE_CARD_STYLE,
+            UsageWidgetProvider.MAX_USAGE_CARD_STYLE_INDEX,
+        )
+        val pinResultIntent = Intent(context, UsageWidgetProvider::class.java).apply {
+            action = UsageWidgetProvider.ACTION_WIDGET_PINNED
+            putExtra(UsageWidgetProvider.EXTRA_USAGE_CARD_STYLE, safeStyleIndex)
+        }
+        val mutableFlag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            PendingIntent.FLAG_MUTABLE
+        } else {
+            0
+        }
+        val pinResult = PendingIntent.getBroadcast(
+            context,
+            safeStyleIndex,
+            pinResultIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or mutableFlag,
+        )
+        val initialOptions = Bundle().apply {
+            putInt(UsageWidgetProvider.EXTRA_USAGE_CARD_STYLE, safeStyleIndex)
+        }
         val requested = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
             widgetManager.isRequestPinAppWidgetSupported &&
-            widgetManager.requestPinAppWidget(provider, null, null)
+            widgetManager.requestPinAppWidget(provider, initialOptions, pinResult)
         scope.launch {
             snackbarHostState.showSnackbar(
                 if (requested) widgetPinRequestedMessage else widgetPinUnsupportedMessage,
@@ -257,7 +285,11 @@ fun MainScreen(viewModel: AppViewModel) {
                     onToggleTracking = { toggleTracking(!state.settings.trackingEnabled) },
                     onStartSpeedTest = { viewModel.startSpeedTest() },
                     onStopSpeedTest = { viewModel.stopSpeedTest() },
-                    onAddUsageWidget = { requestUsageWidgetPin() },
+                    onAddUsageWidget = { styleIndex -> requestUsageWidgetPin(styleIndex) },
+                    initialSelectedCardStyle = initialUsageCardStyle.coerceIn(
+                        UsageWidgetProvider.DEFAULT_USAGE_CARD_STYLE,
+                        UsageWidgetProvider.MAX_USAGE_CARD_STYLE_INDEX,
+                    ),
                 )
 
                 AppTab.APPS -> {

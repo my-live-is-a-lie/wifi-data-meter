@@ -25,6 +25,31 @@ import kotlin.math.sin
  */
 class UsageWidgetProvider : AppWidgetProvider() {
 
+    override fun onReceive(context: Context, intent: Intent) {
+        super.onReceive(context, intent)
+        if (intent.action != ACTION_WIDGET_PINNED) return
+
+        val widgetId = intent.getIntExtra(
+            AppWidgetManager.EXTRA_APPWIDGET_ID,
+            AppWidgetManager.INVALID_APPWIDGET_ID,
+        )
+        if (widgetId == AppWidgetManager.INVALID_APPWIDGET_ID) return
+
+        val styleIndex = intent.getIntExtra(
+            EXTRA_USAGE_CARD_STYLE,
+            DEFAULT_USAGE_CARD_STYLE,
+        ).coerceIn(0, MAX_USAGE_CARD_STYLE_INDEX)
+        context.getSharedPreferences(UsageWidgetUpdater.PREFERENCES_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putInt(widgetStylePreferenceKey(widgetId), styleIndex)
+            .apply()
+        updateWidgets(
+            context,
+            AppWidgetManager.getInstance(context),
+            intArrayOf(widgetId),
+        )
+    }
+
     override fun onUpdate(
         context: Context,
         appWidgetManager: AppWidgetManager,
@@ -44,6 +69,16 @@ class UsageWidgetProvider : AppWidgetProvider() {
     }
 
     companion object {
+        const val ACTION_WIDGET_PINNED = "com.mywifiadata.app.widget.ACTION_WIDGET_PINNED"
+        const val EXTRA_USAGE_CARD_STYLE = "com.mywifiadata.app.widget.EXTRA_USAGE_CARD_STYLE"
+        const val EXTRA_OPEN_USAGE_CARD_STYLE = "com.mywifiadata.app.widget.EXTRA_OPEN_USAGE_CARD_STYLE"
+        const val DEFAULT_USAGE_CARD_STYLE = 0
+        const val MAX_USAGE_CARD_STYLE_INDEX = 2
+        private const val KEY_WIDGET_STYLE_PREFIX = "widget_style_"
+
+        private fun widgetStylePreferenceKey(widgetId: Int): String =
+            "$KEY_WIDGET_STYLE_PREFIX$widgetId"
+
         fun updateAll(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
             val component = ComponentName(context, UsageWidgetProvider::class.java)
@@ -75,6 +110,21 @@ class UsageWidgetProvider : AppWidgetProvider() {
             appWidgetIds.forEach { widgetId ->
                 val views = RemoteViews(context.packageName, R.layout.widget_usage)
                 val options = appWidgetManager.getAppWidgetOptions(widgetId)
+                val styleFromOptions = if (options.containsKey(EXTRA_USAGE_CARD_STYLE)) {
+                    options.getInt(EXTRA_USAGE_CARD_STYLE)
+                        .takeIf { it in 0..MAX_USAGE_CARD_STYLE_INDEX }
+                } else {
+                    null
+                }
+                val styleIndex = styleFromOptions ?: preferences.getInt(
+                    widgetStylePreferenceKey(widgetId),
+                    DEFAULT_USAGE_CARD_STYLE,
+                ).coerceIn(0, MAX_USAGE_CARD_STYLE_INDEX)
+                if (styleFromOptions != null) {
+                    preferences.edit()
+                        .putInt(widgetStylePreferenceKey(widgetId), styleFromOptions)
+                        .apply()
+                }
                 val widgetWidthDp = options
                     .getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 220)
                     .takeIf { it > 0 } ?: 220
@@ -131,7 +181,9 @@ class UsageWidgetProvider : AppWidgetProvider() {
                     ),
                 )
 
-                val openApp = Intent(context, MainActivity::class.java)
+                val openApp = Intent(context, MainActivity::class.java).apply {
+                    putExtra(EXTRA_OPEN_USAGE_CARD_STYLE, styleIndex)
+                }
                 val pendingIntent = PendingIntent.getActivity(
                     context,
                     widgetId,

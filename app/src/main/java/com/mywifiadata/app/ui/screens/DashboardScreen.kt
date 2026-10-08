@@ -118,12 +118,15 @@ fun DashboardScreen(
     onToggleTracking: () -> Unit,
     onStartSpeedTest: () -> Unit,
     onStopSpeedTest: () -> Unit,
-    onAddUsageWidget: () -> Unit,
+    onAddUsageWidget: (Int) -> Unit,
+    initialSelectedCardStyle: Int = 0,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(16.dp),
 ) {
     var isHeroCompact by rememberSaveable { mutableStateOf(false) }
-    var selectedCardStyle by rememberSaveable { mutableIntStateOf(0) }
+    var selectedCardStyle by rememberSaveable {
+        mutableIntStateOf(initialSelectedCardStyle.coerceIn(0, UsageCardStyle.entries.lastIndex))
+    }
     val layoutDirection = LocalLayoutDirection.current
     val horizontalStartPadding = contentPadding.calculateStartPadding(layoutDirection)
     val horizontalEndPadding = contentPadding.calculateEndPadding(layoutDirection)
@@ -248,7 +251,7 @@ private fun HeroCard(
     onLongPress: () -> Unit,
     onRestore: () -> Unit,
     onChangeStyle: (Int) -> Unit,
-    onAddWidget: () -> Unit,
+    onAddWidget: (Int) -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         AnimatedContent(
@@ -298,7 +301,7 @@ private fun HeroCard(
                 contentAlignment = Alignment.Center,
             ) {
                 FilledTonalButton(
-                    onClick = onAddWidget,
+                    onClick = { onAddWidget(selectedStyleIndex) },
                     shape = AppButtonShape,
                     contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp),
                 ) {

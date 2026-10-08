@@ -109,7 +109,7 @@ fun UsageRing(
                 )
                 drawArc(
                     brush = brush,
-                    startAngle = -90f,
+                    startAngle = 135f,
                     sweepAngle = 360f * animatedProgress,
                     useCenter = false,
                     topLeft = topLeft,
