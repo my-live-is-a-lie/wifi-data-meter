@@ -355,15 +355,15 @@ private fun FullUsageCard(
             if (selectedStyleIndex == UsageCardStyle.DOTTED_RING.ordinal) {
                 DottedUsageGauge(
                     progress = progress,
-                    modifier = Modifier.size(280.dp),
-                    strokeWidth = 14.dp,
-                    dotRadius = 3.dp,
-                    dotCount = 46,
+                    modifier = Modifier.size(220.dp),
+                    strokeWidth = 11.dp,
+                    dotRadius = 2.5f.dp,
+                    dotCount = 39,
                     dotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.72f),
                     progressColor = gaugeStartColor,
                     contentDescription = stringResource(R.string.quota_ring_title),
                 ) {
-                    FullGaugeCenter(usageValue, usageLabel, usedValue, dotted = true)
+                    FullGaugeCenter(usageValue, usageLabel, usedValue)
                 }
             } else {
                 UsageRing(
@@ -456,13 +456,9 @@ private fun FullGaugeCenter(
     usageValue: String,
     usageLabel: String,
     usedValue: String,
-    dotted: Boolean = false,
 ) {
-    Column(
-        modifier = if (dotted) Modifier.offset(y = (-60).dp) else Modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        if (!dotted) Spacer(modifier = Modifier.height(24.dp))
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Spacer(modifier = Modifier.height(24.dp))
         Text(
             text = usageValue,
             style = MaterialTheme.typography.displaySmallEmphasized,
