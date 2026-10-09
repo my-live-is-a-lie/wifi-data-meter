@@ -328,6 +328,7 @@ private fun FullUsageCard(
 ) {
     val hasQuota = state.hasQuota
     val progress = usageCardProgress(state)
+    val traffic = if (hasQuota) state.cycle else state.today
     val downloadColor = LocalDownloadColor.current
     val uploadColor = LocalUploadColor.current
     val usageValue = if (hasQuota) {
@@ -444,12 +445,12 @@ private fun FullUsageCard(
                 LegendItem(
                     color = downloadColor,
                     label = stringResource(R.string.label_download),
-                    value = Format.bytes(state.today.rxBytes),
+                    value = Format.bytes(traffic.rxBytes),
                 )
                 LegendItem(
                     color = uploadColor,
                     label = stringResource(R.string.label_upload),
-                    value = Format.bytes(state.today.txBytes),
+                    value = Format.bytes(traffic.txBytes),
                 )
             }
         }
@@ -818,6 +819,7 @@ private fun CompactTrafficSummary(
     downloadColor: Color,
     uploadColor: Color,
 ) {
+    val traffic = if (state.hasQuota) state.cycle else state.today
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -825,12 +827,12 @@ private fun CompactTrafficSummary(
     ) {
         CompactTrafficItem(
             label = stringResource(R.string.label_download),
-            value = Format.bytes(state.today.rxBytes),
+            value = Format.bytes(traffic.rxBytes),
             color = downloadColor,
         )
         CompactTrafficItem(
             label = stringResource(R.string.label_upload),
-            value = Format.bytes(state.today.txBytes),
+            value = Format.bytes(traffic.txBytes),
             color = uploadColor,
         )
     }
