@@ -390,10 +390,12 @@ fun SettingsScreen(
 private fun IntervalSelector(intervalIndex: Int, onIntervalChange: (Int) -> Unit) {
     val options = SamplingIntervals.options
     val safeIntervalIndex = SamplingIntervals.coerceIndex(intervalIndex)
-    val initialListIndex = remember(options.size, safeIntervalIndex) {
+    val initialCenterVirtualIndex = remember(options.size, safeIntervalIndex) {
         val virtualCycleStart = (Int.MAX_VALUE / 2 / options.size) * options.size
         virtualCycleStart + safeIntervalIndex
     }
+    // بلا حشوة: العنصر الأول قبل المختار مباشرة، فيقع المختار دائمًا في الصف الأوسط.
+    val initialListIndex = initialCenterVirtualIndex - 1
     val listState = rememberLazyListState(
         initialFirstVisibleItemIndex = initialListIndex,
     )
@@ -405,7 +407,7 @@ private fun IntervalSelector(intervalIndex: Int, onIntervalChange: (Int) -> Unit
                 .minByOrNull { item ->
                     abs(item.offset + item.size / 2 - viewportCenter)
                 }
-                ?.index ?: listState.firstVisibleItemIndex
+                ?.index ?: (listState.firstVisibleItemIndex + 1)
         }
     }
     val currentIntervalIndex by rememberUpdatedState(safeIntervalIndex)
@@ -434,7 +436,8 @@ private fun IntervalSelector(intervalIndex: Int, onIntervalChange: (Int) -> Unit
             } else {
                 forwardDistance - options.size
             }
-            listState.animateScrollToItem(currentVirtualIndex + shortestDistance)
+            // animateScrollToItem يضع الفهرس عند أعلى القائمة؛ نمرر الفهرس السابق كي يتوسط الهدف.
+            listState.animateScrollToItem(currentVirtualIndex + shortestDistance - 1)
         }
     }
 
@@ -461,7 +464,7 @@ private fun IntervalSelector(intervalIndex: Int, onIntervalChange: (Int) -> Unit
                 .width(INTERVAL_WHEEL_WIDTH)
                 .height(INTERVAL_WHEEL_HEIGHT),
         ) {
-            val selectionShape = RoundedCornerShape(12.dp)
+            val selectionShape = RoundedCornerShape(8.dp)
             Box(
                 modifier = Modifier
                     .align(Alignment.Center)
@@ -479,7 +482,6 @@ private fun IntervalSelector(intervalIndex: Int, onIntervalChange: (Int) -> Unit
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(vertical = INTERVAL_WHEEL_ITEM_HEIGHT),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 flingBehavior = rememberSnapFlingBehavior(lazyListState = listState),
             ) {
@@ -494,8 +496,8 @@ private fun IntervalSelector(intervalIndex: Int, onIntervalChange: (Int) -> Unit
                         (abs(itemCenter - viewportCenter).toFloat() / item.size.coerceAtLeast(1).toFloat())
                             .coerceIn(0f, 1f)
                     } ?: 1f
-                    val itemAlpha = 1f - 0.84f * distanceFraction
-                    val itemScale = 1f - 0.18f * distanceFraction
+                    val itemAlpha = 1f - 0.20f * distanceFraction
+                    val itemScale = 1f - 0.08f * distanceFraction
                     val unitLabel = stringResource(
                         when (option.unit) {
                             SamplingIntervalUnit.SECOND -> R.string.settings_interval_unit_seconds
@@ -517,7 +519,7 @@ private fun IntervalSelector(intervalIndex: Int, onIntervalChange: (Int) -> Unit
                     ) {
                         Text(
                             text = "${option.amountLabel} $unitLabel",
-                            style = MaterialTheme.typography.titleLarge,
+                            style = MaterialTheme.typography.titleMedium,
                             color = if (distanceFromCenter == 0) {
                                 MaterialTheme.colorScheme.onSurface
                             } else {
@@ -534,9 +536,9 @@ private fun IntervalSelector(intervalIndex: Int, onIntervalChange: (Int) -> Unit
     }
 }
 
-private val INTERVAL_WHEEL_ITEM_HEIGHT = 48.dp
+private val INTERVAL_WHEEL_ITEM_HEIGHT = 24.dp
 private val INTERVAL_WHEEL_HEIGHT = INTERVAL_WHEEL_ITEM_HEIGHT * 3
-private val INTERVAL_WHEEL_WIDTH = 124.dp
+private val INTERVAL_WHEEL_WIDTH = 96.dp
 
 /**
  * منتقي سمة التطبيق: أربعة خيارات (النظام / فاتح / داكن / مظلم)
