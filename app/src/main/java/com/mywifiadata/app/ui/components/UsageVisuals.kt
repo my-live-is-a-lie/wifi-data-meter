@@ -123,9 +123,9 @@ fun UsageRing(
 }
 
 /**
- * مؤشر استهلاك بقوس مفتوح ذي مسار منقّط، وقوس تقدّم سميك مع علامة شعاعية
- * قصيرة عند نهايته. يبدأ المسار من أسفل اليسار ويمر أعلى البطاقة حتى أسفل اليمين
- * مثل التصميم المرجعي.
+ * مؤشر استهلاك بقوس مفتوح ذي مسار منقّط. تظهر نقاط داكنة داخل قوس التقدّم الأزرق،
+ * مع طرف مستوٍ للقوس ورأس دائري للمؤشر الشعاعي. يبدأ المسار من أسفل اليسار ويمر
+ * أعلى البطاقة حتى أسفل اليمين مثل التصميم المرجعي.
  */
 @Composable
 fun DottedUsageGauge(
@@ -135,6 +135,8 @@ fun DottedUsageGauge(
     dotRadius: Dp = 2.dp,
     dotCount: Int = 31,
     dotColor: Color = MaterialTheme.colorScheme.primary.copy(alpha = 0.72f),
+    /** لون الثقوب الداكنة فوق جزء التقدّم المكتمل. */
+    activeDotColor: Color = MaterialTheme.colorScheme.surfaceContainerHigh,
     trackColor: Color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.55f),
     progressColor: Color = MaterialTheme.colorScheme.primary,
     contentDescription: String? = null,
@@ -164,6 +166,11 @@ fun DottedUsageGauge(
             val sweepAngle = 250f
             val steps = dotCount.coerceAtLeast(2)
 
+            val progressSweep = sweepAngle * animatedProgress
+            // نترك فسحة قصيرة بعد نهاية القوس حتى لا يندمج المؤشر مع الشريط.
+            val indicatorGap = sweepAngle / (steps - 1) * 0.8f
+            val arcSweep = (progressSweep - indicatorGap).coerceAtLeast(0f)
+
             drawArc(
                 color = trackColor,
                 startAngle = startAngle,
@@ -174,13 +181,37 @@ fun DottedUsageGauge(
                 style = Stroke(width = stroke, cap = StrokeCap.Round),
             )
 
-            for (index in 0 until steps) {
-                val angle = Math.toRadians(
-                    (startAngle + sweepAngle * index.toFloat() / (steps - 1)).toDouble(),
+            if (arcSweep > 0.001f) {
+                // نهاية التقدّم مسطّحة كما في المرجع، مع تدوير بداية الشريط فقط.
+                drawArc(
+                    color = progressColor,
+                    startAngle = startAngle,
+                    sweepAngle = arcSweep,
+                    useCenter = false,
+                    topLeft = topLeft,
+                    size = arcSize,
+                    style = Stroke(width = stroke, cap = StrokeCap.Butt),
                 )
+                val startRadians = Math.toRadians(startAngle.toDouble())
                 drawCircle(
-                    color = dotColor,
-                    radius = dot,
+                    color = progressColor,
+                    radius = stroke / 2f,
+                    center = Offset(
+                        x = center.x + cos(startRadians).toFloat() * radius,
+                        y = center.y + sin(startRadians).toFloat() * radius,
+                    ),
+                )
+            }
+
+            // النقاط غير المكتملة تبقى زرقاء، بينما تظهر نقاط داكنة داخل الشريط الأزرق.
+            for (index in 0 until steps) {
+                val dotSweep = sweepAngle * index.toFloat() / (steps - 1)
+                val angle = Math.toRadians((startAngle + dotSweep).toDouble())
+                val isActiveDot = index > 0 && dotSweep < arcSweep
+                if (index == 0 && arcSweep > 0.001f) continue
+                drawCircle(
+                    color = if (isActiveDot) activeDotColor else dotColor,
+                    radius = if (isActiveDot) dot * 0.72f else dot,
                     center = Offset(
                         x = center.x + cos(angle).toFloat() * radius,
                         y = center.y + sin(angle).toFloat() * radius,
@@ -189,42 +220,32 @@ fun DottedUsageGauge(
             }
 
             if (animatedProgress > 0.001f) {
-                val progressSweep = sweepAngle * animatedProgress
-                // نترك فسحة قصيرة بعد نهاية القوس حتى لا يندمج المؤشر مع الشريط
-                // ولا يظهر كعلامة زائد؛ مقدارها ثابت نسبيًا إلى المسافة بين النقاط.
-                val indicatorGap = sweepAngle / (steps - 1) * 0.8f
-                val arcSweep = (progressSweep - indicatorGap).coerceAtLeast(0f)
-                if (arcSweep > 0.001f) {
-                    drawArc(
-                        color = progressColor,
-                        startAngle = startAngle,
-                        sweepAngle = arcSweep,
-                        useCenter = false,
-                        topLeft = topLeft,
-                        size = arcSize,
-                        style = Stroke(width = stroke, cap = StrokeCap.Round),
-                    )
-                }
-
-                // مؤشر شعاعي صغير ومستقل عند قيمة التقدّم، بحجم يتناسب مع الحلقة.
+                // المؤشر الشعاعي له قاعدة مستوية ورأس خارجي دائري، بدل الكبسولة الدائرية من الطرفين.
                 val pointerAngle = Math.toRadians((startAngle + progressSweep).toDouble())
                 val pointerLength = radius * 0.18f
                 val pointerRadiusStart = radius - pointerLength / 2f
                 val pointerRadiusEnd = radius + pointerLength / 2f
                 val pointerX = cos(pointerAngle).toFloat()
                 val pointerY = sin(pointerAngle).toFloat()
+                val pointerStroke = stroke * 0.40f
+                val pointerEnd = Offset(
+                    x = center.x + pointerX * pointerRadiusEnd,
+                    y = center.y + pointerY * pointerRadiusEnd,
+                )
                 drawLine(
                     color = progressColor,
                     start = Offset(
                         x = center.x + pointerX * pointerRadiusStart,
                         y = center.y + pointerY * pointerRadiusStart,
                     ),
-                    end = Offset(
-                        x = center.x + pointerX * pointerRadiusEnd,
-                        y = center.y + pointerY * pointerRadiusEnd,
-                    ),
-                    strokeWidth = stroke * 0.40f,
-                    cap = StrokeCap.Round,
+                    end = pointerEnd,
+                    strokeWidth = pointerStroke,
+                    cap = StrokeCap.Butt,
+                )
+                drawCircle(
+                    color = progressColor,
+                    radius = pointerStroke / 2f,
+                    center = pointerEnd,
                 )
             }
         }
