@@ -74,6 +74,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.mywifiadata.app.R
 import com.mywifiadata.app.core.Format
 import com.mywifiadata.app.core.SamplingIntervalUnit
@@ -520,7 +521,7 @@ private fun IntervalSelector(intervalIndex: Int, onIntervalChange: (Int) -> Unit
                         Text(
                             text = "${option.amountLabel} $unitLabel",
                             style = if (distanceFromCenter == 0) {
-                                MaterialTheme.typography.titleMedium
+                                MaterialTheme.typography.titleMedium.copy(fontSize = 15.sp)
                             } else {
                                 MaterialTheme.typography.titleSmall
                             },
@@ -542,7 +543,7 @@ private fun IntervalSelector(intervalIndex: Int, onIntervalChange: (Int) -> Unit
 
 private val INTERVAL_WHEEL_ITEM_HEIGHT = 24.dp
 private val INTERVAL_WHEEL_HEIGHT = INTERVAL_WHEEL_ITEM_HEIGHT * 3
-private val INTERVAL_WHEEL_WIDTH = 84.dp
+private val INTERVAL_WHEEL_WIDTH = 68.dp
 
 /**
  * منتقي سمة التطبيق: أربعة خيارات (النظام / فاتح / داكن / مظلم)
