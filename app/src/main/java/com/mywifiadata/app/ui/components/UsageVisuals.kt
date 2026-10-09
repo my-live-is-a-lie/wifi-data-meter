@@ -167,8 +167,8 @@ fun DottedUsageGauge(
             val steps = dotCount.coerceAtLeast(2)
 
             val progressSweep = sweepAngle * animatedProgress
-            // نترك فسحة قصيرة بعد نهاية القوس حتى لا يندمج المؤشر مع الشريط.
-            val indicatorGap = sweepAngle / (steps - 1) * 0.8f
+            // فجوة صغيرة تعادل نصف سماكة الشريط، كي يقترب المؤشر من القوس دون أن يلتصق به.
+            val indicatorGap = Math.toDegrees((stroke * 0.5f / radius).toDouble()).toFloat()
             val arcSweep = (progressSweep - indicatorGap).coerceAtLeast(0f)
 
             drawArc(
@@ -204,11 +204,16 @@ fun DottedUsageGauge(
             }
 
             // النقاط غير المكتملة تبقى زرقاء، بينما تظهر نقاط داكنة داخل الشريط الأزرق.
+            // نخفي أقرب نقطة زرقاء للمؤشر حتى لا تظهر تحته أو خلف الشرطة.
+            val dotStep = sweepAngle / (steps - 1)
             for (index in 0 until steps) {
-                val dotSweep = sweepAngle * index.toFloat() / (steps - 1)
+                val dotSweep = dotStep * index
                 val angle = Math.toRadians((startAngle + dotSweep).toDouble())
                 val isActiveDot = index > 0 && dotSweep < arcSweep
+                val isPointerNeighbor = animatedProgress > 0.001f &&
+                    abs(dotSweep - progressSweep) <= dotStep * 0.55f
                 if (index == 0 && arcSweep > 0.001f) continue
+                if (isPointerNeighbor && !isActiveDot) continue
                 drawCircle(
                     color = if (isActiveDot) activeDotColor else dotColor,
                     radius = if (isActiveDot) dot * 0.72f else dot,
