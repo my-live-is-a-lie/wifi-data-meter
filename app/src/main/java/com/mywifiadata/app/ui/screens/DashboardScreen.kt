@@ -118,13 +118,15 @@ fun DashboardScreen(
     onStartSpeedTest: () -> Unit,
     onStopSpeedTest: () -> Unit,
     onAddUsageWidget: (Int) -> Unit,
-    initialSelectedCardStyle: Int = 0,
+    onUsageCardStyleChange: (Int) -> Unit,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(16.dp),
 ) {
     var isHeroCompact by rememberSaveable { mutableStateOf(false) }
     var selectedCardStyle by rememberSaveable {
-        mutableIntStateOf(initialSelectedCardStyle.coerceIn(0, UsageCardStyle.entries.lastIndex))
+        mutableIntStateOf(
+            state.settings.usageCardStyleIndex.coerceIn(0, UsageCardStyle.entries.lastIndex),
+        )
     }
     val layoutDirection = LocalLayoutDirection.current
     val horizontalStartPadding = contentPadding.calculateStartPadding(layoutDirection)
@@ -152,6 +154,7 @@ fun DashboardScreen(
                 onChangeStyle = { direction ->
                     val styleCount = UsageCardStyle.entries.size
                     selectedCardStyle = (selectedCardStyle + direction + styleCount) % styleCount
+                    onUsageCardStyleChange(selectedCardStyle)
                 },
                 onAddWidget = onAddUsageWidget,
             )

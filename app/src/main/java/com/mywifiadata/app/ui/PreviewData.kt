@@ -126,6 +126,7 @@ private fun DashboardPreview() {
             onStartSpeedTest = {},
             onStopSpeedTest = {},
             onAddUsageWidget = {},
+            onUsageCardStyleChange = {},
         )
     }
 }

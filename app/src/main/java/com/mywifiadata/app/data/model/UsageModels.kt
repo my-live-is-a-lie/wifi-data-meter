@@ -123,6 +123,8 @@ data class AppSettings(
     val sampleIntervalSeconds: Int = 15,
     val dynamicColorEnabled: Boolean = true,
     val trackingEnabled: Boolean = false,
+    /** فهرس تصميم بطاقة استهلاك الباقة المختار على لوحة المعلومات. */
+    val usageCardStyleIndex: Int = 0,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val sessionStartMillis: Long = System.currentTimeMillis(),
     val sessionBaseline: TrafficTotals = TrafficTotals.Empty,

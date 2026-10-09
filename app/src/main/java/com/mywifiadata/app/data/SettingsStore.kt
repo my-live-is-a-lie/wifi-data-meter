@@ -52,6 +52,7 @@ class SettingsStore(context: Context) {
         sampleIntervalSeconds = prefs.getInt(KEY_INTERVAL, 15),
         dynamicColorEnabled = prefs.getBoolean(KEY_DYNAMIC_COLOR, true),
         trackingEnabled = prefs.getBoolean(KEY_TRACKING, false),
+        usageCardStyleIndex = prefs.getInt(KEY_USAGE_CARD_STYLE, 0).coerceAtLeast(0),
         themeMode = prefs.getString(KEY_THEME_MODE, null)
             ?.let { stored -> ThemeMode.entries.firstOrNull { it.name == stored } }
             ?: ThemeMode.SYSTEM,
@@ -87,6 +88,7 @@ class SettingsStore(context: Context) {
             .putInt(KEY_INTERVAL, settings.sampleIntervalSeconds)
             .putBoolean(KEY_DYNAMIC_COLOR, settings.dynamicColorEnabled)
             .putBoolean(KEY_TRACKING, settings.trackingEnabled)
+            .putInt(KEY_USAGE_CARD_STYLE, settings.usageCardStyleIndex)
             .putString(KEY_THEME_MODE, settings.themeMode.name)
             .putLong(KEY_SESSION_START, settings.sessionStartMillis)
             .putLong(KEY_SESSION_RX, settings.sessionBaseline.rxBytes)
@@ -111,6 +113,7 @@ class SettingsStore(context: Context) {
         private const val KEY_INTERVAL = "sample_interval"
         private const val KEY_DYNAMIC_COLOR = "dynamic_color"
         private const val KEY_TRACKING = "tracking_enabled"
+        private const val KEY_USAGE_CARD_STYLE = "usage_card_style"
         private const val KEY_SESSION_START = "session_start"
         private const val KEY_SESSION_RX = "session_baseline_rx"
         private const val KEY_SESSION_TX = "session_baseline_tx"
