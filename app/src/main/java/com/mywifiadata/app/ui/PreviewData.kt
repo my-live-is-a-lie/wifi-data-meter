@@ -126,6 +126,7 @@ private fun DashboardPreview() {
             onStartSpeedTest = {},
             onStopSpeedTest = {},
             onAddUsageWidget = {},
+            onUsageCardStyleChange = {},
         )
     }
 }
@@ -140,6 +141,7 @@ private fun AppsPreview() {
             onAppsFilterChange = {},
             onAppsWeekChange = {},
             onAppsSliceChange = {},
+            onChartTypeChange = {},
             onOpenUsageAccess = {},
             onAppClick = {},
         )
@@ -154,6 +156,7 @@ private fun HistoryPreview() {
             state = sampleState(),
             onPeriodChange = {},
             onSelectDay = {},
+            onChartTypeChange = {},
             onOpenUsageAccess = {},
             onAppClick = {},
         )

@@ -32,13 +32,18 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         val repository = (application as MyWifiApplication).repository
-        val initialUsageCardStyle = intent.getIntExtra(
-            UsageWidgetProvider.EXTRA_OPEN_USAGE_CARD_STYLE,
-            UsageWidgetProvider.DEFAULT_USAGE_CARD_STYLE,
-        ).coerceIn(
-            UsageWidgetProvider.DEFAULT_USAGE_CARD_STYLE,
-            UsageWidgetProvider.MAX_USAGE_CARD_STYLE_INDEX,
-        )
+        // فتح الأداة اختيار صريح لشكلها؛ أما التشغيل العادي فيستعيد القيمة دون الكتابة فوقها.
+        val hasWidgetStyle = intent.hasExtra(UsageWidgetProvider.EXTRA_OPEN_USAGE_CARD_STYLE)
+        if (savedInstanceState == null && hasWidgetStyle) {
+            val openedStyle = intent.getIntExtra(
+                UsageWidgetProvider.EXTRA_OPEN_USAGE_CARD_STYLE,
+                UsageWidgetProvider.DEFAULT_USAGE_CARD_STYLE,
+            ).coerceIn(
+                UsageWidgetProvider.DEFAULT_USAGE_CARD_STYLE,
+                UsageWidgetProvider.MAX_USAGE_CARD_STYLE_INDEX,
+            )
+            repository.settingsStore.update { it.copy(usageCardStyleIndex = openedStyle) }
+        }
 
         setContent {
             val settings by repository.settingsStore.settings.collectAsStateWithLifecycle()
@@ -73,10 +78,7 @@ class MainActivity : ComponentActivity() {
                         val viewModel: AppViewModel = viewModel(
                             factory = AppViewModel.factory(repository),
                         )
-                        MainScreen(
-                            viewModel = viewModel,
-                            initialUsageCardStyle = initialUsageCardStyle,
-                        )
+                        MainScreen(viewModel = viewModel)
                     }
                 }
             }

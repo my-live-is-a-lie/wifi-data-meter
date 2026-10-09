@@ -11,6 +11,7 @@ import androidx.core.content.ContextCompat
 import com.mywifiadata.app.MyWifiApplication
 import com.mywifiadata.app.R
 import com.mywifiadata.app.core.Format
+import com.mywifiadata.app.core.SamplingIntervals
 import com.mywifiadata.app.core.TimeRange
 import com.mywifiadata.app.core.TimeRanges
 import com.mywifiadata.app.data.UsageRepository
@@ -22,9 +23,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * خدمة أمامية تراقب استهلاك الواي فاي وتُحدّث الإشعار الدائم،
@@ -113,8 +115,14 @@ class MonitorService : Service() {
 
             runCatching { sample(settings) }
 
-            val intervalSeconds = settings.sampleIntervalSeconds.coerceIn(5, 300)
-            delay(intervalSeconds * 1_000L)
+            val intervalIndex = SamplingIntervals.coerceIndex(settings.sampleIntervalIndex)
+            val intervalMillis = SamplingIntervals.options[intervalIndex].durationMillis
+            // تغيّر الإعداد أو إيقاف المراقبة يوقظ الحلقة فورًا بدل انتظار مدة القياس القديمة.
+            withTimeoutOrNull(intervalMillis) {
+                repository.settingsStore.settings.first {
+                    !it.trackingEnabled || it.sampleIntervalIndex != intervalIndex
+                }
+            }
         }
     }
 

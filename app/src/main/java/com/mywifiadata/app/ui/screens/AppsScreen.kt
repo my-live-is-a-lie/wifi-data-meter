@@ -79,6 +79,7 @@ fun AppsScreen(
     onAppsSliceChange: (TimeRange) -> Unit,
     onOpenUsageAccess: () -> Unit,
     onAppClick: (AppUsage) -> Unit,
+    onChartTypeChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(16.dp),
 ) {
@@ -134,6 +135,8 @@ fun AppsScreen(
                         slices = state.appsHours,
                         label = hourLabel,
                         selected = state.appsSlice,
+                        lineChartEnabled = state.settings.appsLineChartEnabled,
+                        onChartTypeChange = onChartTypeChange,
                         onSelect = onAppsSliceChange,
                     )
                 }
@@ -145,6 +148,8 @@ fun AppsScreen(
                         slices = state.appsDays,
                         label = dayLabel,
                         selected = state.appsSlice,
+                        lineChartEnabled = state.settings.appsLineChartEnabled,
+                        onChartTypeChange = onChartTypeChange,
                         onSelect = onAppsSliceChange,
                     )
                 }
@@ -157,6 +162,8 @@ fun AppsScreen(
                             slices = state.appsWeeks,
                             label = weekLabel,
                             selected = state.appsWeek,
+                            lineChartEnabled = state.settings.appsLineChartEnabled,
+                            onChartTypeChange = onChartTypeChange,
                             onSelect = onAppsWeekChange,
                         )
                     }
@@ -168,6 +175,8 @@ fun AppsScreen(
                                 slices = state.appsWeekDays,
                                 label = dayLabel,
                                 selected = state.appsSlice,
+                                lineChartEnabled = state.settings.appsLineChartEnabled,
+                                onChartTypeChange = onChartTypeChange,
                                 onSelect = onAppsSliceChange,
                             )
                         }
@@ -294,6 +303,8 @@ private fun SliceCard(
     slices: List<UsageSlice>,
     label: (UsageSlice) -> String,
     selected: TimeRange?,
+    lineChartEnabled: Boolean,
+    onChartTypeChange: (Boolean) -> Unit,
     onSelect: (TimeRange) -> Unit,
 ) {
     if (slices.isEmpty()) return
@@ -321,6 +332,8 @@ private fun SliceCard(
             )
             Spacer(modifier = Modifier.height(8.dp))
             DailyBarChart(
+                lineChartEnabled = lineChartEnabled,
+                onChartTypeChange = onChartTypeChange,
                 entries = slices.map { slice ->
                     BarEntry(
                         label = shortLabel(slice),

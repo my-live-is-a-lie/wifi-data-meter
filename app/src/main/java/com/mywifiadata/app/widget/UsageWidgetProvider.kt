@@ -15,6 +15,7 @@ import android.widget.RemoteViews
 import com.mywifiadata.app.MainActivity
 import com.mywifiadata.app.R
 import com.mywifiadata.app.core.Format
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -128,8 +129,8 @@ class UsageWidgetProvider : AppWidgetProvider() {
                 val widgetWidthDp = options
                     .getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 220)
                     .takeIf { it > 0 } ?: 220
-                val gaugeFrameWidthDp = (widgetWidthDp - 24).coerceAtLeast(140)
-                val gaugeWidthDp = (gaugeFrameWidthDp * 0.80f)
+                val gaugeFrameWidthDp = (widgetWidthDp - 28).coerceAtLeast(140)
+                val gaugeWidthDp = (gaugeFrameWidthDp * 0.82f)
                     .roundToInt()
                     .coerceIn(140, 176)
                 views.setImageViewBitmap(
@@ -220,8 +221,16 @@ private fun createGaugeBitmap(
         centerX + radius,
         centerY + radius,
     )
-    val startAngle = 135f
-    val sweepAngle = 270f
+    // اجعل هندسة الأداة مطابقة لقوس DottedUsageGauge داخل التطبيق.
+    val startAngle = 145f
+    val sweepAngle = 250f
+    val dotCount = 31
+    val steps = dotCount.coerceAtLeast(2)
+    val safeProgress = progress.coerceIn(0f, 1f)
+    val progressSweep = sweepAngle * safeProgress
+    val indicatorGap = Math.toDegrees((stroke * 0.5f / radius).toDouble()).toFloat()
+    val arcSweep = (progressSweep - indicatorGap).coerceAtLeast(0f)
+
     val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = context.getColor(R.color.widget_progress_track)
         alpha = 140
@@ -234,34 +243,83 @@ private fun createGaugeBitmap(
         alpha = 184
         style = Paint.Style.FILL
     }
+    val activeDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = context.getColor(R.color.widget_surface)
+        style = Paint.Style.FILL
+    }
     val progressPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = context.getColor(R.color.widget_progress)
         style = Paint.Style.STROKE
         strokeWidth = stroke
-        strokeCap = Paint.Cap.ROUND
+        strokeCap = Paint.Cap.BUTT
+    }
+    val progressCapPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = context.getColor(R.color.widget_progress)
+        style = Paint.Style.FILL
     }
 
     canvas.drawArc(arcBounds, startAngle, sweepAngle, false, trackPaint)
-    val dotRadius = 2f * density
-    val dotCount = 31
-    for (index in 0 until dotCount) {
-        val angle = Math.toRadians(
-            (startAngle + sweepAngle * index.toFloat() / (dotCount - 1)).toDouble(),
+
+    if (arcSweep > 0.001f) {
+        // طرف النهاية مسطّح وبداية القوس مستديرة، كما في البطاقة داخل التطبيق.
+        canvas.drawArc(arcBounds, startAngle, arcSweep, false, progressPaint)
+        val startRadians = Math.toRadians(startAngle.toDouble())
+        canvas.drawCircle(
+            centerX + cos(startRadians).toFloat() * radius,
+            centerY + sin(startRadians).toFloat() * radius,
+            stroke / 2f,
+            progressCapPaint,
         )
+    }
+
+    val dotRadius = 2f * density
+    val dotStep = sweepAngle / (steps - 1)
+    for (index in 0 until steps) {
+        val dotSweep = dotStep * index
+        val angle = Math.toRadians((startAngle + dotSweep).toDouble())
+        val isActiveDot = index > 0 && dotSweep < arcSweep
+        val isPointerNeighbor = safeProgress > 0.001f &&
+            abs(dotSweep - progressSweep) <= dotStep * 0.55f
+        if (index == 0 && arcSweep > 0.001f) continue
+        if (isPointerNeighbor && !isActiveDot) continue
+
         canvas.drawCircle(
             centerX + cos(angle).toFloat() * radius,
             centerY + sin(angle).toFloat() * radius,
-            dotRadius,
-            dotPaint,
+            if (isActiveDot) dotRadius * 0.72f else dotRadius,
+            if (isActiveDot) activeDotPaint else dotPaint,
         )
     }
-    if (progress > 0.001f) {
-        canvas.drawArc(
-            arcBounds,
-            startAngle,
-            sweepAngle * progress.coerceIn(0f, 1f),
-            false,
-            progressPaint,
+
+    if (safeProgress > 0.001f) {
+        // قاعدة المؤشر مستوية ورأسه الخارجي دائري؛ وتبقى مسافته من القوس صغيرة.
+        val pointerAngle = Math.toRadians((startAngle + progressSweep).toDouble())
+        val pointerLength = radius * 0.18f
+        val pointerRadiusStart = radius - pointerLength / 2f
+        val pointerRadiusEnd = radius + pointerLength / 2f
+        val pointerX = cos(pointerAngle).toFloat()
+        val pointerY = sin(pointerAngle).toFloat()
+        val pointerStroke = stroke * 0.40f
+        val pointerEndX = centerX + pointerX * pointerRadiusEnd
+        val pointerEndY = centerY + pointerY * pointerRadiusEnd
+        val pointerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = context.getColor(R.color.widget_progress)
+            style = Paint.Style.STROKE
+            strokeWidth = pointerStroke
+            strokeCap = Paint.Cap.BUTT
+        }
+        canvas.drawLine(
+            centerX + pointerX * pointerRadiusStart,
+            centerY + pointerY * pointerRadiusStart,
+            pointerEndX,
+            pointerEndY,
+            pointerPaint,
+        )
+        canvas.drawCircle(
+            pointerEndX,
+            pointerEndY,
+            pointerStroke / 2f,
+            progressCapPaint,
         )
     }
     return bitmap

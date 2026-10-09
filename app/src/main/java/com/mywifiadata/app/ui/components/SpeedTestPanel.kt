@@ -2,7 +2,6 @@ package com.mywifiadata.app.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -41,13 +40,9 @@ import com.mywifiadata.app.ui.theme.LocalSpeedButtonContainerColor
 import com.mywifiadata.app.ui.theme.LocalSpeedButtonContentColor
 import com.mywifiadata.app.ui.theme.LocalUploadColor
 
-/** عرض الشاشة الذي يكفي لوضع النتائج في سطر العنوان نفسه (كما في التصميم). */
-private val INLINE_RESULTS_MIN_WIDTH = 300.dp
-
 /**
- * لوحة اختبار السرعة داخل بطاقة اليوم: زر تشغيل أزرق في البداية (يمينًا)،
- * ثم العنوان «اختبار السرعة» وسطر «يستخدم موقع fast.com»، ثم نتائج التنزيل
- * والرفع في الطرف الآخر — كما في التصميم المرجعي.
+ * لوحة اختبار السرعة داخل بطاقة اليوم: زر التشغيل والعنوان في الأعلى،
+ * ونتيجتا التنزيل والرفع في صفٍّ مستقل يتوسط البطاقة.
  *
  * تُضاف تحت ذلك رسالة الحالة: مرحلة القياس أثناء التشغيل، سبب التوقف عند
  * انقطاع الاتصال أو مرور وقت طويل دون نتيجة، أو وقت آخر اختبار محفوظ.
@@ -79,10 +74,7 @@ fun SpeedTestPanel(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         ),
     ) {
-        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            // على الشاشات الضيقة تُنقل النتائج إلى سطر ثانٍ حتى لا يُقتطع العنوان.
-            val stackResults = maxWidth < INLINE_RESULTS_MIN_WIDTH
-
+        Box(modifier = Modifier.fillMaxWidth()) {
             val controlButton: @Composable () -> Unit = {
                 Surface(
                     onClick = { if (running) onStop() else onStart() },
@@ -160,20 +152,14 @@ fun SpeedTestPanel(
                     controlButton()
                     Spacer(modifier = Modifier.width(10.dp))
                     titleBlock(Modifier.weight(1f))
-                    if (!stackResults) {
-                        Spacer(modifier = Modifier.width(10.dp))
-                        resultsRow(Modifier)
-                    }
                 }
 
-                if (stackResults) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    resultsRow(
-                        Modifier
-                            .fillMaxWidth()
-                            .wrapContentWidth(Alignment.End),
-                    )
-                }
+                Spacer(modifier = Modifier.height(12.dp))
+                resultsRow(
+                    Modifier
+                        .fillMaxWidth()
+                        .wrapContentWidth(Alignment.CenterHorizontally),
+                )
 
                 if (statusText != null) {
                     Spacer(modifier = Modifier.height(8.dp))
