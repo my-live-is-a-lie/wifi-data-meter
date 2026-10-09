@@ -53,7 +53,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -71,7 +70,7 @@ import com.mywifiadata.app.ui.theme.AppButtonShape
 import kotlin.math.roundToInt
 
 /**
- * شاشة الإعدادات: الباقة، التنبيهات، المراقبة، البيانات، وحول التطبيق.
+ * شاشة الإعدادات: الباقة، التنبيهات، المراقبة، البيانات، والمزيد.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -93,8 +92,8 @@ fun SettingsScreen(
 ) {
     var showQuotaDialog by rememberSaveable { mutableStateOf(false) }
     var showClearDialog by rememberSaveable { mutableStateOf(false) }
-    // قسم «حول التطبيق» مطوي افتراضيًا لتوفير مساحة أقل تمريرًا.
-    var aboutExpanded by rememberSaveable { mutableStateOf(false) }
+    // قسم «المزيد» فارغ حاليًا ومهيأ لإضافة إعدادات مخفية إليه لاحقًا.
+    var moreExpanded by rememberSaveable { mutableStateOf(false) }
     val settings = state.settings
 
     LazyColumn(
@@ -281,33 +280,24 @@ fun SettingsScreen(
         }
 
         item {
-            val context = LocalContext.current
-            val versionName = remember {
-                runCatching {
-                    context.packageManager
-                        .getPackageInfo(context.packageName, 0)
-                        .versionName
-                }.getOrNull().orEmpty()
-            }
             val chevronRotation by animateFloatAsState(
-                targetValue = if (aboutExpanded) 180f else 0f,
-                label = "aboutChevron",
+                targetValue = if (moreExpanded) 180f else 0f,
+                label = "moreChevron",
             )
             ExpressiveCard {
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    // رأس القسم نفسه هو زر التوسيع/الطيّ.
+                    // رأس القسم نفسه هو زر التوسيع/الطيّ، ومحتواه فارغ حاليًا.
                     SectionHeader(
-                        title = stringResource(R.string.settings_section_about),
-                        supportingText = stringResource(R.string.settings_version, versionName),
-                        modifier = Modifier.clickable { aboutExpanded = !aboutExpanded },
+                        title = stringResource(R.string.settings_section_more),
+                        modifier = Modifier.clickable { moreExpanded = !moreExpanded },
                         trailing = {
                             Icon(
                                 imageVector = Icons.Rounded.ExpandMore,
                                 contentDescription = stringResource(
-                                    if (aboutExpanded) {
-                                        R.string.settings_about_collapse
+                                    if (moreExpanded) {
+                                        R.string.settings_more_collapse
                                     } else {
-                                        R.string.settings_about_expand
+                                        R.string.settings_more_expand
                                     },
                                 ),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -315,14 +305,9 @@ fun SettingsScreen(
                             )
                         },
                     )
-                    AnimatedVisibility(visible = aboutExpanded) {
+                    AnimatedVisibility(visible = moreExpanded) {
                         Column(modifier = Modifier.fillMaxWidth()) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = stringResource(R.string.settings_about_body),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                            // موضع فارغ لإعدادات إضافية مستقبلًا.
                         }
                     }
                 }

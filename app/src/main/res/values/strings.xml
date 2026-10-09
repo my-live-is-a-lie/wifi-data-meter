@@ -170,11 +170,9 @@
     <string name="settings_usage_access">صلاحية الوصول إلى الاستخدام</string>
     <string name="settings_usage_access_granted">ممنوحة</string>
     <string name="settings_usage_access_missing">غير ممنوحة — اضغط للمنح</string>
-    <string name="settings_section_about">حول التطبيق</string>
-    <string name="settings_version">الإصدار %1$s</string>
-    <string name="settings_about_body">تطبيق مفتوح المصدر لقياس استهلاك الإنترنت على شبكة الواي فاي، مبني بـ Kotlin و Jetpack Compose و Material 3 Expressive. تُقرأ القياسات من NetworkStatsManager في نظام أندرويد ولا تُرسل أي بيانات إلى الإنترنت.</string>
-    <string name="settings_about_expand">عرض نص حول التطبيق</string>
-    <string name="settings_about_collapse">إخفاء نص حول التطبيق</string>
+    <string name="settings_section_more">المزيد</string>
+    <string name="settings_more_expand">عرض إعدادات إضافية</string>
+    <string name="settings_more_collapse">إخفاء إعدادات إضافية</string>
 
     <!-- الإشعارات -->
     <string name="channel_monitor_name">مراقبة الاستهلاك</string>
