@@ -141,6 +141,7 @@ private fun AppsPreview() {
             onAppsFilterChange = {},
             onAppsWeekChange = {},
             onAppsSliceChange = {},
+            onChartTypeChange = {},
             onOpenUsageAccess = {},
             onAppClick = {},
         )
@@ -155,6 +156,7 @@ private fun HistoryPreview() {
             state = sampleState(),
             onPeriodChange = {},
             onSelectDay = {},
+            onChartTypeChange = {},
             onOpenUsageAccess = {},
             onAppClick = {},
         )

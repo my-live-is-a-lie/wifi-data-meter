@@ -53,6 +53,8 @@ class SettingsStore(context: Context) {
         dynamicColorEnabled = prefs.getBoolean(KEY_DYNAMIC_COLOR, true),
         trackingEnabled = prefs.getBoolean(KEY_TRACKING, false),
         usageCardStyleIndex = prefs.getInt(KEY_USAGE_CARD_STYLE, 0).coerceAtLeast(0),
+        historyLineChartEnabled = prefs.getBoolean(KEY_HISTORY_LINE_CHART, false),
+        appsLineChartEnabled = prefs.getBoolean(KEY_APPS_LINE_CHART, false),
         themeMode = prefs.getString(KEY_THEME_MODE, null)
             ?.let { stored -> ThemeMode.entries.firstOrNull { it.name == stored } }
             ?: ThemeMode.SYSTEM,
@@ -89,6 +91,8 @@ class SettingsStore(context: Context) {
             .putBoolean(KEY_DYNAMIC_COLOR, settings.dynamicColorEnabled)
             .putBoolean(KEY_TRACKING, settings.trackingEnabled)
             .putInt(KEY_USAGE_CARD_STYLE, settings.usageCardStyleIndex)
+            .putBoolean(KEY_HISTORY_LINE_CHART, settings.historyLineChartEnabled)
+            .putBoolean(KEY_APPS_LINE_CHART, settings.appsLineChartEnabled)
             .putString(KEY_THEME_MODE, settings.themeMode.name)
             .putLong(KEY_SESSION_START, settings.sessionStartMillis)
             .putLong(KEY_SESSION_RX, settings.sessionBaseline.rxBytes)
@@ -114,6 +118,8 @@ class SettingsStore(context: Context) {
         private const val KEY_DYNAMIC_COLOR = "dynamic_color"
         private const val KEY_TRACKING = "tracking_enabled"
         private const val KEY_USAGE_CARD_STYLE = "usage_card_style"
+        private const val KEY_HISTORY_LINE_CHART = "history_line_chart_enabled"
+        private const val KEY_APPS_LINE_CHART = "apps_line_chart_enabled"
         private const val KEY_SESSION_START = "session_start"
         private const val KEY_SESSION_RX = "session_baseline_rx"
         private const val KEY_SESSION_TX = "session_baseline_tx"

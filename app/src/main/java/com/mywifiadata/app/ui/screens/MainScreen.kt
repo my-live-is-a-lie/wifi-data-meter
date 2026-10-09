@@ -302,6 +302,7 @@ fun MainScreen(
                             onAppsFilterChange = { viewModel.setAppsFilter(it) },
                             onAppsWeekChange = { viewModel.selectAppsWeek(it) },
                             onAppsSliceChange = { viewModel.selectAppsSlice(it) },
+                            onChartTypeChange = { viewModel.setAppsLineChartEnabled(it) },
                             onOpenUsageAccess = { SystemActions.openUsageAccessSettings(context) },
                             onAppClick = { viewModel.openAppDetail(it) },
                         )
@@ -312,6 +313,7 @@ fun MainScreen(
                     state = state,
                     onPeriodChange = { viewModel.setHistoryPeriod(it) },
                     onSelectDay = { viewModel.selectDay(it) },
+                    onChartTypeChange = { viewModel.setHistoryLineChartEnabled(it) },
                     onOpenUsageAccess = { SystemActions.openUsageAccessSettings(context) },
                     onAppClick = { viewModel.openAppDetail(it) },
                 )

@@ -125,6 +125,10 @@ data class AppSettings(
     val trackingEnabled: Boolean = false,
     /** فهرس تصميم بطاقة استهلاك الباقة المختار على لوحة المعلومات. */
     val usageCardStyleIndex: Int = 0,
+    /** نمط مخطط السجل محفوظ بشكل مستقل عن نمط مخططات التطبيقات. */
+    val historyLineChartEnabled: Boolean = false,
+    /** نمط مخططات التطبيقات محفوظ ليستمر بعد إعادة تشغيل التطبيق. */
+    val appsLineChartEnabled: Boolean = false,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val sessionStartMillis: Long = System.currentTimeMillis(),
     val sessionBaseline: TrafficTotals = TrafficTotals.Empty,

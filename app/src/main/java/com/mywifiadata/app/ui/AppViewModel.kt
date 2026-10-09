@@ -503,6 +503,14 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         }
     }
 
+    fun setHistoryLineChartEnabled(enabled: Boolean) {
+        repository.settingsStore.update { it.copy(historyLineChartEnabled = enabled) }
+    }
+
+    fun setAppsLineChartEnabled(enabled: Boolean) {
+        repository.settingsStore.update { it.copy(appsLineChartEnabled = enabled) }
+    }
+
     fun setCycleStartDay(day: Int) {
         repository.settingsStore.update { it.copy(cycleStartDay = day.coerceIn(1, 28)) }
         refreshNow()
