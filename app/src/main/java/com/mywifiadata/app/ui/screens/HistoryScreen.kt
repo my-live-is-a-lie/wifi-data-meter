@@ -81,6 +81,7 @@ fun HistoryScreen(
     onSelectDay: (Int?) -> Unit,
     onOpenUsageAccess: () -> Unit,
     onAppClick: (AppUsage) -> Unit,
+    onChartTypeChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(16.dp),
 ) {
@@ -113,7 +114,13 @@ fun HistoryScreen(
                 )
             }
         } else {
-            item { ChartCard(state = state, onSelectDay = onSelectDay) }
+            item {
+                ChartCard(
+                    state = state,
+                    onSelectDay = onSelectDay,
+                    onChartTypeChange = onChartTypeChange,
+                )
+            }
 
             // بطاقة اليوم المحدد تظهر فورًا فوق سجل الاستهلاك.
             if (selectedDay != null) {
@@ -177,7 +184,11 @@ fun HistoryScreen(
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun ChartCard(state: UiState, onSelectDay: (Int?) -> Unit) {
+private fun ChartCard(
+    state: UiState,
+    onSelectDay: (Int?) -> Unit,
+    onChartTypeChange: (Boolean) -> Unit,
+) {
     // فهرس اليوم الذي يشير إليه المؤشر: يوم السحب الحالي، وإلا اليوم المحدد،
     // وإلا أحدث يوم في الفترة (نهاية القائمة في هذا الترتيب).
     var scrubIndex by remember { mutableStateOf<Int?>(null) }
@@ -230,6 +241,8 @@ private fun ChartCard(state: UiState, onSelectDay: (Int?) -> Unit) {
             } else {
                 DailyBarChart(
                     entries = entries,
+                    lineChartEnabled = state.settings.historyLineChartEnabled,
+                    onChartTypeChange = onChartTypeChange,
                     activeIndex = scrubIndex,
                     onEntryClick = { index ->
                         onSelectDay(if (state.selectedDayIndex == index) null else index)
@@ -238,7 +251,7 @@ private fun ChartCard(state: UiState, onSelectDay: (Int?) -> Unit) {
                 if (entries.size > 1) {
                     Spacer(modifier = Modifier.height(6.dp))
                     // شريط تمرير لاختيار اليوم: يتحرك بالنقطة، ويتّسع عمود اليوم
-                    // المشار إليه ويظهر رقمه في صندوق فوقه أثناء السحب.
+                    // المشار إليه ويُبرز رقمه في صف التسميات أسفل المخطط أثناء السحب.
                     DayScrubber(
                         count = entries.size,
                         thumbIndex = thumbIndex.coerceIn(0, entries.lastIndex),

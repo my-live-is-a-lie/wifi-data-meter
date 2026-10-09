@@ -29,15 +29,16 @@ import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.zIndex
 import androidx.compose.material.icons.Icons
@@ -78,6 +79,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.mywifiadata.app.R
@@ -119,13 +121,15 @@ fun DashboardScreen(
     onStartSpeedTest: () -> Unit,
     onStopSpeedTest: () -> Unit,
     onAddUsageWidget: (Int) -> Unit,
-    initialSelectedCardStyle: Int = 0,
+    onUsageCardStyleChange: (Int) -> Unit,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(16.dp),
 ) {
     var isHeroCompact by rememberSaveable { mutableStateOf(false) }
     var selectedCardStyle by rememberSaveable {
-        mutableIntStateOf(initialSelectedCardStyle.coerceIn(0, UsageCardStyle.entries.lastIndex))
+        mutableIntStateOf(
+            state.settings.usageCardStyleIndex.coerceIn(0, UsageCardStyle.entries.lastIndex),
+        )
     }
     val layoutDirection = LocalLayoutDirection.current
     val horizontalStartPadding = contentPadding.calculateStartPadding(layoutDirection)
@@ -153,6 +157,7 @@ fun DashboardScreen(
                 onChangeStyle = { direction ->
                     val styleCount = UsageCardStyle.entries.size
                     selectedCardStyle = (selectedCardStyle + direction + styleCount) % styleCount
+                    onUsageCardStyleChange(selectedCardStyle)
                 },
                 onAddWidget = onAddUsageWidget,
             )
@@ -271,6 +276,9 @@ private fun HeroCard(
                 UsageCardCarousel(
                     state = state,
                     selectedStyleIndex = selectedStyleIndex,
+                    horizontalStartPadding = horizontalStartPadding,
+                    horizontalEndPadding = horizontalEndPadding,
+                    onOpenQuotaSettings = onOpenQuotaSettings,
                     onRestore = onRestore,
                     onChangeStyle = onChangeStyle,
                 )
@@ -278,9 +286,11 @@ private fun HeroCard(
                 FullUsageCard(
                     state = state,
                     selectedStyleIndex = selectedStyleIndex,
-                    horizontalStartPadding = horizontalStartPadding,
-                    horizontalEndPadding = horizontalEndPadding,
                     onOpenQuotaSettings = onOpenQuotaSettings,
+                    modifier = Modifier.padding(
+                        start = horizontalStartPadding,
+                        end = horizontalEndPadding,
+                    ),
                     onLongPress = onLongPress,
                 )
             }
@@ -319,13 +329,14 @@ private fun HeroCard(
 private fun FullUsageCard(
     state: UiState,
     selectedStyleIndex: Int,
-    horizontalStartPadding: androidx.compose.ui.unit.Dp,
-    horizontalEndPadding: androidx.compose.ui.unit.Dp,
     onOpenQuotaSettings: () -> Unit,
-    onLongPress: () -> Unit,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    onLongPress: (() -> Unit)? = null,
 ) {
     val hasQuota = state.hasQuota
     val progress = usageCardProgress(state)
+    val traffic = if (hasQuota) state.cycle else state.today
     val downloadColor = LocalDownloadColor.current
     val uploadColor = LocalUploadColor.current
     val usageValue = if (hasQuota) {
@@ -334,7 +345,7 @@ private fun FullUsageCard(
         Format.bytes(state.today.totalBytes)
     }
     val usageLabel = stringResource(if (hasQuota) R.string.label_used else R.string.label_today)
-    val usedValue = Format.bytes(state.cycle.totalBytes)
+    val usedValue = Format.bytes(if (hasQuota) state.cycle.totalBytes else state.today.totalBytes)
     val gaugeStartColor = if (state.quotaExceeded) {
         MaterialTheme.colorScheme.error
     } else {
@@ -347,37 +358,86 @@ private fun FullUsageCard(
     }
 
     ExpressiveCard(
-        modifier = Modifier.padding(start = horizontalStartPadding, end = horizontalEndPadding),
+        modifier = modifier,
         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        onClick = onClick,
         onLongClick = onLongPress,
     ) {
         Column(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            if (selectedStyleIndex == UsageCardStyle.DOTTED_RING.ordinal) {
-                DottedUsageGauge(
-                    progress = progress,
-                    modifier = Modifier.size(220.dp),
-                    strokeWidth = 11.dp,
-                    dotRadius = 2.5f.dp,
-                    dotCount = 39,
-                    dotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.72f),
-                    progressColor = gaugeStartColor,
-                    contentDescription = stringResource(R.string.quota_ring_title),
-                ) {
-                    FullGaugeCenter(usageValue, usageLabel, usedValue)
+            when (selectedStyleIndex) {
+                UsageCardStyle.DOTTED_RING.ordinal -> {
+                    DottedUsageGauge(
+                        progress = progress,
+                        modifier = Modifier.size(220.dp),
+                        strokeWidth = 11.dp,
+                        dotRadius = 2.5f.dp,
+                        dotCount = 39,
+                        dotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.72f),
+                        progressColor = gaugeStartColor,
+                        contentDescription = stringResource(R.string.quota_ring_title),
+                    ) {
+                        FullGaugeCenter(usageValue, usageLabel, usedValue)
+                    }
                 }
-            } else {
-                UsageRing(
-                    progress = progress,
-                    modifier = Modifier.size(220.dp),
-                    strokeWidth = 22.dp,
-                    startColor = gaugeStartColor,
-                    endColor = gaugeEndColor,
-                    contentDescription = stringResource(R.string.quota_ring_title),
-                ) {
-                    FullGaugeCenter(usageValue, usageLabel, usedValue)
+
+                UsageCardStyle.SPLIT.ordinal -> {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        UsageRing(
+                            progress = progress,
+                            modifier = Modifier.size(148.dp),
+                            strokeWidth = 16.dp,
+                            startColor = gaugeStartColor,
+                            endColor = gaugeEndColor,
+                            contentDescription = stringResource(R.string.quota_ring_title),
+                        ) {
+                            Text(
+                                text = usageValue,
+                                style = MaterialTheme.typography.titleLargeEmphasized,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                textAlign = TextAlign.Center,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.Center,
+                        ) {
+                            Text(
+                                text = usageLabel,
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = usedValue,
+                                style = MaterialTheme.typography.titleMediumEmphasized,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+
+                else -> {
+                    UsageRing(
+                        progress = progress,
+                        modifier = Modifier.size(220.dp),
+                        strokeWidth = 22.dp,
+                        startColor = gaugeStartColor,
+                        endColor = gaugeEndColor,
+                        contentDescription = stringResource(R.string.quota_ring_title),
+                    ) {
+                        FullGaugeCenter(usageValue, usageLabel, usedValue)
+                    }
                 }
             }
 
@@ -442,12 +502,12 @@ private fun FullUsageCard(
                 LegendItem(
                     color = downloadColor,
                     label = stringResource(R.string.label_download),
-                    value = Format.bytes(state.today.rxBytes),
+                    value = Format.bytes(traffic.rxBytes),
                 )
                 LegendItem(
                     color = uploadColor,
                     label = stringResource(R.string.label_upload),
-                    value = Format.bytes(state.today.txBytes),
+                    value = Format.bytes(traffic.txBytes),
                 )
             }
         }
@@ -461,7 +521,6 @@ private fun FullGaugeCenter(
     usedValue: String,
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Spacer(modifier = Modifier.height(24.dp))
         Text(
             text = usageValue,
             style = MaterialTheme.typography.displaySmallEmphasized,
@@ -488,6 +547,9 @@ private fun FullGaugeCenter(
 private fun UsageCardCarousel(
     state: UiState,
     selectedStyleIndex: Int,
+    horizontalStartPadding: androidx.compose.ui.unit.Dp,
+    horizontalEndPadding: androidx.compose.ui.unit.Dp,
+    onOpenQuotaSettings: () -> Unit,
     onRestore: () -> Unit,
     onChangeStyle: (Int) -> Unit,
 ) {
@@ -502,7 +564,7 @@ private fun UsageCardCarousel(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
-            .height(260.dp)
+            .heightIn(min = 260.dp)
             .clipToBounds()
             .pointerInput(selectedStyleIndex) {
                 var accumulatedDrag = 0f
@@ -543,9 +605,10 @@ private fun UsageCardCarousel(
                 )
             },
     ) {
-        val cardWidth = minOf(maxWidth * 0.60f, 244.dp)
-        val cardSpacing = maxWidth * 0.10f
-        val step = cardWidth + cardSpacing
+        val cardWidth = (maxWidth - horizontalStartPadding - horizontalEndPadding).coerceAtLeast(1.dp)
+        val previewWidth = minOf(maxWidth * 0.60f, 244.dp, cardWidth)
+        val previewScale = (previewWidth / cardWidth).coerceIn(0.01f, 1f)
+        val step = previewWidth + maxWidth * 0.10f
 
         UsageCardStyle.entries.forEach { style ->
             val relativeIndex = (style.ordinal - selectedStyleIndex + UsageCardStyle.entries.size) %
@@ -574,10 +637,11 @@ private fun UsageCardCarousel(
                 label = "usage-card-carousel-alpha-${style.name}",
             )
 
-            ExpressiveCard(
+            FullUsageCard(
+                state = state,
+                selectedStyleIndex = style.ordinal,
+                onOpenQuotaSettings = onOpenQuotaSettings,
                 modifier = Modifier
-                    .width(cardWidth)
-                    .height(244.dp)
                     .align(Alignment.Center)
                     .absoluteOffset(x = animatedOffset)
                     .graphicsLayer {
@@ -586,13 +650,12 @@ private fun UsageCardCarousel(
                         scaleY = animatedScale
                         alpha = animatedAlpha
                     }
+                    .heightIn(min = 244.dp)
+                    .scaleCarouselContent(previewScale)
+                    .width(cardWidth)
                     .zIndex(if (slot == 0) 1f else 0f),
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                 onClick = onRestore,
-                contentPadding = PaddingValues(14.dp),
-            ) {
-                CompactUsageCardContent(state = state, style = style)
-            }
+            )
         }
 
         // مناطق لمس شفافة على طرفي الشاشة: تضغط يمينًا للبطاقة التالية ويسارًا للسابقة.
@@ -615,247 +678,32 @@ private fun UsageCardCarousel(
     }
 }
 
-@Composable
-private fun CompactUsageCardContent(state: UiState, style: UsageCardStyle) {
-    val progress = usageCardProgress(state)
-    val downloadColor = LocalDownloadColor.current
-    val uploadColor = LocalUploadColor.current
-    val usageValue = if (state.hasQuota) {
-        stringResource(R.string.percent_format, (state.quotaProgress * 100).roundToInt())
+private fun Modifier.scaleCarouselContent(scale: Float): Modifier = layout { measurable, constraints ->
+    fun unscale(size: Int): Int = if (size == Constraints.Infinity) {
+        Constraints.Infinity
     } else {
-        Format.bytesShort(state.today.totalBytes)
-    }
-    val usedBytes = if (state.hasQuota) state.cycle.totalBytes else state.today.totalBytes
-    val usedLabel = stringResource(if (state.hasQuota) R.string.label_used else R.string.label_today)
-    val remainingText = if (state.hasQuota) {
-        stringResource(
-            R.string.quota_remaining_of,
-            Format.bytes(state.remainingBytes),
-            Format.bytes(state.quotaBytes),
-        )
-    } else {
-        stringResource(R.string.quota_not_set)
+        (size / scale).roundToInt()
     }
 
-    when (style) {
-        UsageCardStyle.RING, UsageCardStyle.DOTTED_RING -> {
-            CompactCircularUsageCardContent(
-                state = state,
-                progress = progress,
-                usageValue = usageValue,
-                usedBytes = usedBytes,
-                usedLabel = usedLabel,
-                remainingText = remainingText,
-                downloadColor = downloadColor,
-                uploadColor = uploadColor,
-                dotted = style == UsageCardStyle.DOTTED_RING,
-            )
+    val placeable = measurable.measure(
+        Constraints(
+            minWidth = unscale(constraints.minWidth),
+            maxWidth = unscale(constraints.maxWidth),
+            minHeight = unscale(constraints.minHeight),
+            maxHeight = unscale(constraints.maxHeight),
+        ),
+    )
+    val width = (placeable.width * scale).roundToInt()
+        .coerceIn(constraints.minWidth, constraints.maxWidth)
+    val height = (placeable.height * scale).roundToInt()
+        .coerceIn(constraints.minHeight, constraints.maxHeight)
+
+    layout(width, height) {
+        placeable.placeWithLayer(0, 0) {
+            scaleX = scale
+            scaleY = scale
+            transformOrigin = TransformOrigin(0f, 0f)
         }
-
-        UsageCardStyle.SPLIT -> {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    UsageRing(
-                        progress = progress,
-                        modifier = Modifier.size(94.dp),
-                        strokeWidth = 10.dp,
-                        startColor = if (state.quotaExceeded) {
-                            MaterialTheme.colorScheme.error
-                        } else {
-                            MaterialTheme.colorScheme.primary
-                        },
-                        endColor = if (state.quotaExceeded) {
-                            MaterialTheme.colorScheme.errorContainer
-                        } else {
-                            MaterialTheme.colorScheme.tertiary
-                        },
-                        contentDescription = stringResource(R.string.quota_ring_title),
-                    ) {
-                        Text(
-                            text = usageValue,
-                            style = MaterialTheme.typography.labelLargeEmphasized,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            textAlign = TextAlign.Center,
-                            maxLines = 1,
-                            overflow = TextOverflow.Clip,
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = usedLabel,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Text(
-                            text = Format.bytes(usedBytes),
-                            style = MaterialTheme.typography.titleSmallEmphasized,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Spacer(modifier = Modifier.height(5.dp))
-                        Text(
-                            text = remainingText,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.weight(1f))
-                CompactTrafficSummary(state, downloadColor, uploadColor)
-            }
-        }
-    }
-}
-
-@Composable
-private fun CompactCircularUsageCardContent(
-    state: UiState,
-    progress: Float,
-    usageValue: String,
-    usedBytes: Long,
-    usedLabel: String,
-    remainingText: String,
-    downloadColor: Color,
-    uploadColor: Color,
-    dotted: Boolean,
-) {
-    val startColor = if (state.quotaExceeded) {
-        MaterialTheme.colorScheme.error
-    } else {
-        MaterialTheme.colorScheme.primary
-    }
-    val endColor = if (state.quotaExceeded) {
-        MaterialTheme.colorScheme.errorContainer
-    } else {
-        MaterialTheme.colorScheme.tertiary
-    }
-
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        if (dotted) {
-            BoxWithConstraints(contentAlignment = Alignment.Center) {
-                val gaugeSize = minOf(maxWidth * 0.80f, 176.dp)
-                val centerOffsetY = gaugeSize * (-38f / 176f)
-                DottedUsageGauge(
-                    progress = progress,
-                    modifier = Modifier.size(gaugeSize),
-                    strokeWidth = 9.dp,
-                    dotRadius = 2.dp,
-                    dotCount = 31,
-                    dotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.72f),
-                    progressColor = startColor,
-                    contentDescription = stringResource(R.string.quota_ring_title),
-                ) {
-                    Box(modifier = Modifier.offset(y = centerOffsetY)) {
-                        CompactGaugeCenter(usageValue, usedLabel, usedBytes)
-                    }
-                }
-            }
-        } else {
-            UsageRing(
-                progress = progress,
-                modifier = Modifier.size(148.dp),
-                strokeWidth = 14.dp,
-                startColor = startColor,
-                endColor = endColor,
-                contentDescription = stringResource(R.string.quota_ring_title),
-            ) {
-                CompactGaugeCenter(usageValue, usedLabel, usedBytes)
-            }
-        }
-
-        if (dotted) {
-            Spacer(modifier = Modifier.weight(1f))
-        } else {
-            Spacer(modifier = Modifier.height(7.dp))
-        }
-        Text(
-            text = remainingText,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Spacer(modifier = Modifier.height(7.dp))
-        CompactTrafficSummary(state, downloadColor, uploadColor)
-    }
-}
-
-@Composable
-private fun CompactGaugeCenter(usageValue: String, usedLabel: String, usedBytes: Long) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = usageValue,
-            style = MaterialTheme.typography.titleLargeEmphasized,
-            color = MaterialTheme.colorScheme.onSurface,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            text = usedLabel,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = Format.bytes(usedBytes),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
-        )
-    }
-}
-
-@Composable
-private fun CompactTrafficSummary(
-    state: UiState,
-    downloadColor: Color,
-    uploadColor: Color,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        CompactTrafficItem(
-            label = stringResource(R.string.label_download),
-            value = Format.bytes(state.today.rxBytes),
-            color = downloadColor,
-        )
-        CompactTrafficItem(
-            label = stringResource(R.string.label_upload),
-            value = Format.bytes(state.today.txBytes),
-            color = uploadColor,
-        )
-    }
-}
-
-@Composable
-private fun CompactTrafficItem(label: String, value: String, color: Color) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Dot(color = color, size = 6.dp)
-        Spacer(modifier = Modifier.width(5.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Spacer(modifier = Modifier.width(5.dp))
-        Text(
-            text = value,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
     }
 }
 

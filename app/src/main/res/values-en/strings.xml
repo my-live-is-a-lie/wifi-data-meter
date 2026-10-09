@@ -140,10 +140,9 @@
     <string name="settings_threshold">Alert threshold</string>
     <string name="settings_section_monitor">Monitoring</string>
     <string name="settings_interval">Sampling rate</string>
-    <string name="settings_interval_5">5s</string>
-    <string name="settings_interval_15">15s</string>
-    <string name="settings_interval_30">30s</string>
-    <string name="settings_interval_60">60s</string>
+    <string name="settings_interval_unit_seconds">s</string>
+    <string name="settings_interval_unit_minutes">min</string>
+    <string name="settings_interval_unit_hours">h</string>
     <string name="settings_dynamic_color">System colors (Material You)</string>
     <string name="settings_dynamic_color_desc">Use wallpaper‑based colors on Android 12+.</string>
     <string name="settings_section_data">Permissions</string>
@@ -157,11 +156,9 @@
     <string name="settings_usage_access">Usage access permission</string>
     <string name="settings_usage_access_granted">Granted</string>
     <string name="settings_usage_access_missing">Not granted — tap to grant</string>
-    <string name="settings_section_about">About</string>
-    <string name="settings_version">Version %1$s</string>
-    <string name="settings_about_body">An open‑source app that measures internet usage on Wi‑Fi, built with Kotlin, Jetpack Compose and Material 3 Expressive. Measurements come from Android’s NetworkStatsManager and nothing is uploaded anywhere.</string>
-    <string name="settings_about_expand">Show about text</string>
-    <string name="settings_about_collapse">Hide about text</string>
+    <string name="settings_section_more">More</string>
+    <string name="settings_more_expand">Show additional settings</string>
+    <string name="settings_more_collapse">Hide additional settings</string>
 
     <string name="channel_monitor_name">Usage monitoring</string>
     <string name="channel_monitor_desc">Persistent notification showing current Wi‑Fi usage.</string>

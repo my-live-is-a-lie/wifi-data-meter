@@ -1,6 +1,16 @@
 package com.mywifiadata.app.ui.components
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -27,10 +37,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.geometry.CornerRadius
@@ -123,8 +134,9 @@ fun UsageRing(
 }
 
 /**
- * مؤشر استهلاك بقوس مفتوح ذي مسار منقّط، مع قوس تقدّم سميك في بدايته.
- * يبدأ المسار من أسفل اليسار ويمر أعلى البطاقة حتى أسفل اليمين مثل التصميم المرجعي.
+ * مؤشر استهلاك بقوس مفتوح ذي مسار منقّط. تظهر نقاط داكنة داخل قوس التقدّم الأزرق،
+ * مع طرف مستوٍ للقوس ورأس دائري للمؤشر الشعاعي. يبدأ المسار من أسفل اليسار ويمر
+ * أعلى البطاقة حتى أسفل اليمين مثل التصميم المرجعي.
  */
 @Composable
 fun DottedUsageGauge(
@@ -134,6 +146,8 @@ fun DottedUsageGauge(
     dotRadius: Dp = 2.dp,
     dotCount: Int = 31,
     dotColor: Color = MaterialTheme.colorScheme.primary.copy(alpha = 0.72f),
+    /** لون الثقوب الداكنة فوق جزء التقدّم المكتمل. */
+    activeDotColor: Color = MaterialTheme.colorScheme.surfaceContainerHigh,
     trackColor: Color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.55f),
     progressColor: Color = MaterialTheme.colorScheme.primary,
     contentDescription: String? = null,
@@ -158,9 +172,15 @@ fun DottedUsageGauge(
             val radius = (size.minDimension - stroke) / 2f
             val arcSize = Size(radius * 2f, radius * 2f)
             val topLeft = Offset(center.x - radius, center.y - radius)
-            val startAngle = 135f
-            val sweepAngle = 270f
+            // أطراف القوس مرفوعة قليلًا عن الوضع الافتراضي، فتكون الفتحة السفلية أوسع وأقصر.
+            val startAngle = 145f
+            val sweepAngle = 250f
             val steps = dotCount.coerceAtLeast(2)
+
+            val progressSweep = sweepAngle * animatedProgress
+            // فجوة صغيرة تعادل نصف سماكة الشريط، كي يقترب المؤشر من القوس دون أن يلتصق به.
+            val indicatorGap = Math.toDegrees((stroke * 0.5f / radius).toDouble()).toFloat()
+            val arcSweep = (progressSweep - indicatorGap).coerceAtLeast(0f)
 
             drawArc(
                 color = trackColor,
@@ -172,13 +192,42 @@ fun DottedUsageGauge(
                 style = Stroke(width = stroke, cap = StrokeCap.Round),
             )
 
-            for (index in 0 until steps) {
-                val angle = Math.toRadians(
-                    (startAngle + sweepAngle * index.toFloat() / (steps - 1)).toDouble(),
+            if (arcSweep > 0.001f) {
+                // نهاية التقدّم مسطّحة كما في المرجع، مع تدوير بداية الشريط فقط.
+                drawArc(
+                    color = progressColor,
+                    startAngle = startAngle,
+                    sweepAngle = arcSweep,
+                    useCenter = false,
+                    topLeft = topLeft,
+                    size = arcSize,
+                    style = Stroke(width = stroke, cap = StrokeCap.Butt),
                 )
+                val startRadians = Math.toRadians(startAngle.toDouble())
                 drawCircle(
-                    color = dotColor,
-                    radius = dot,
+                    color = progressColor,
+                    radius = stroke / 2f,
+                    center = Offset(
+                        x = center.x + cos(startRadians).toFloat() * radius,
+                        y = center.y + sin(startRadians).toFloat() * radius,
+                    ),
+                )
+            }
+
+            // النقاط غير المكتملة تبقى زرقاء، بينما تظهر نقاط داكنة داخل الشريط الأزرق.
+            // نخفي أقرب نقطة زرقاء للمؤشر حتى لا تظهر تحته أو خلف الشرطة.
+            val dotStep = sweepAngle / (steps - 1)
+            for (index in 0 until steps) {
+                val dotSweep = dotStep * index
+                val angle = Math.toRadians((startAngle + dotSweep).toDouble())
+                val isActiveDot = index > 0 && dotSweep < arcSweep
+                val isPointerNeighbor = animatedProgress > 0.001f &&
+                    abs(dotSweep - progressSweep) <= dotStep * 0.55f
+                if (index == 0 && arcSweep > 0.001f) continue
+                if (isPointerNeighbor && !isActiveDot) continue
+                drawCircle(
+                    color = if (isActiveDot) activeDotColor else dotColor,
+                    radius = if (isActiveDot) dot * 0.72f else dot,
                     center = Offset(
                         x = center.x + cos(angle).toFloat() * radius,
                         y = center.y + sin(angle).toFloat() * radius,
@@ -187,14 +236,32 @@ fun DottedUsageGauge(
             }
 
             if (animatedProgress > 0.001f) {
-                drawArc(
+                // المؤشر الشعاعي له قاعدة مستوية ورأس خارجي دائري، بدل الكبسولة الدائرية من الطرفين.
+                val pointerAngle = Math.toRadians((startAngle + progressSweep).toDouble())
+                val pointerLength = radius * 0.18f
+                val pointerRadiusStart = radius - pointerLength / 2f
+                val pointerRadiusEnd = radius + pointerLength / 2f
+                val pointerX = cos(pointerAngle).toFloat()
+                val pointerY = sin(pointerAngle).toFloat()
+                val pointerStroke = stroke * 0.40f
+                val pointerEnd = Offset(
+                    x = center.x + pointerX * pointerRadiusEnd,
+                    y = center.y + pointerY * pointerRadiusEnd,
+                )
+                drawLine(
                     color = progressColor,
-                    startAngle = startAngle,
-                    sweepAngle = sweepAngle * animatedProgress,
-                    useCenter = false,
-                    topLeft = topLeft,
-                    size = arcSize,
-                    style = Stroke(width = stroke, cap = StrokeCap.Round),
+                    start = Offset(
+                        x = center.x + pointerX * pointerRadiusStart,
+                        y = center.y + pointerY * pointerRadiusStart,
+                    ),
+                    end = pointerEnd,
+                    strokeWidth = pointerStroke,
+                    cap = StrokeCap.Butt,
+                )
+                drawCircle(
+                    color = progressColor,
+                    radius = pointerStroke / 2f,
+                    center = pointerEnd,
                 )
             }
         }
@@ -281,9 +348,9 @@ data class BarEntry(
 )
 
 /**
- * مخطط أعمدة لاستهلاك الأيام، مع إبراز اليوم الحالي، ودعم «المؤشر» (المتزلّج):
+ * مخطط إحصائي لاستهلاك الأيام، ويبدّل بالسحب الأفقي بين الأعمدة والخطّ.
  * عند تمرير المؤشر يتّسع عمود اليوم المشار إليه أفقيًا وتنكمش الأعمدة المجاورة
- * وتنزاح، ويظهر يومه في صندوق فوقه.
+ * وتنزاح، ويُبرز رقمه في صف التسميات أسفل الأعمدة.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -296,93 +363,242 @@ fun DailyBarChart(
     /** فهرس اليوم الذي يشير إليه المؤشر أثناء السحب (null عند عدم الاستخدام). */
     activeIndex: Int? = null,
     onEntryClick: ((Int) -> Unit)? = null,
+    lineChartEnabled: Boolean = false,
+    onChartTypeChange: (Boolean) -> Unit = {},
 ) {
     val maxValue = (entries.maxOfOrNull { it.value } ?: 0L).coerceAtLeast(1L)
     // نعرض عددًا محدودًا من التسميات (٦ كحد أقصى) لأن عمود اليوم الواحد ضيّق جدًا
     // عند عرض ٣٠ يومًا، فتتكسّر الكلمة العربية حرفًا في كل سطر.
     val labelStride = ((entries.size + MAX_LABELS - 1) / MAX_LABELS).coerceAtLeast(1)
     val spacing = chartSpacing(entries.size)
+    val currentOnChartTypeChange by rememberUpdatedState(onChartTypeChange)
 
-    Column(modifier = modifier.fillMaxWidth()) {
-        // صف الأعمدة: عرض كل عمود يتبع المؤشر (المشار إليه يتّسع والبقية تنزاح).
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(spacing),
-            verticalAlignment = Alignment.Bottom,
-        ) {
-            entries.forEachIndexed { index, entry ->
-                val fraction = (entry.value.toFloat() / maxValue.toFloat()).coerceIn(0.03f, 1f)
-                val animatedFraction by animateFloatAsState(
-                    targetValue = fraction,
-                    animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
-                    label = "bar-$index",
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .pointerInput(entries.size, lineChartEnabled) {
+                var dragDistance = 0f
+                detectHorizontalDragGestures(
+                    onHorizontalDrag = { change, dragAmount ->
+                        dragDistance += dragAmount
+                        change.consume()
+                    },
+                    onDragEnd = {
+                        if (entries.size > 1 && abs(dragDistance) > size.width * 0.14f) {
+                            currentOnChartTypeChange(!lineChartEnabled)
+                        }
+                        dragDistance = 0f
+                    },
+                    onDragCancel = { dragDistance = 0f },
                 )
-                val weight by animateFloatAsState(
-                    targetValue = barWeight(
-                        index = index,
-                        activeIndex = activeIndex,
-                        count = entries.size,
-                    ),
-                    animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
-                    label = "bar-weight-$index",
+            },
+    ) {
+        AnimatedContent(
+            targetState = lineChartEnabled,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clipToBounds(),
+            transitionSpec = {
+                val direction = if (targetState) 1 else -1
+                val easing = FastOutSlowInEasing
+                (
+                    fadeIn(animationSpec = tween(durationMillis = 260, easing = easing)) +
+                        scaleIn(
+                            animationSpec = tween(durationMillis = 260, easing = easing),
+                            initialScale = 0.96f,
+                        ) +
+                        slideInHorizontally(
+                            animationSpec = tween(durationMillis = 260, easing = easing),
+                        ) { fullWidth -> direction * fullWidth / 18 }
+                ) togetherWith (
+                    fadeOut(animationSpec = tween(durationMillis = 190, easing = easing)) +
+                        scaleOut(
+                            animationSpec = tween(durationMillis = 190, easing = easing),
+                            targetScale = 0.99f,
+                        ) +
+                        slideOutHorizontally(
+                            animationSpec = tween(durationMillis = 190, easing = easing),
+                        ) { fullWidth -> -direction * fullWidth / 18 }
                 )
-                val isActive = index == activeIndex
-
-                val clickModifier = if (onEntryClick != null) {
-                    Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable { onEntryClick(index) }
-                } else {
-                    Modifier
-                }
-
-                Column(
-                    modifier = Modifier
-                        .weight(weight)
-                        .then(clickModifier),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Bottom,
+            },
+            label = "daily-usage-chart-transition",
+        ) { showLineChart ->
+            if (showLineChart) {
+                DailyLineChartContent(
+                    entries = entries,
+                    activeIndex = activeIndex,
+                    barHeight = barHeight,
+                    barColor = barColor,
+                    highlightColor = highlightColor,
+                    spacing = spacing,
+                    onEntryClick = onEntryClick,
+                )
+            } else {
+                // صف الأعمدة: عرض كل عمود يتبع المؤشر (المشار إليه يتّسع والبقية تنزاح).
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(spacing),
+                    verticalAlignment = Alignment.Bottom,
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(barHeight),
-                        contentAlignment = Alignment.BottomCenter,
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                // سقف لعرض العمود حتى لا يبدو ضخمًا عند عرض يوم واحد
-                                // فقط، ويُرفع للعمود النشط ليتّسع أفقيًا.
-                                .widthIn(max = if (isActive) ACTIVE_BAR_MAX_WIDTH else 56.dp)
-                                .fillMaxWidth()
-                                .fillMaxHeight(animatedFraction)
-                                .clip(
-                                    RoundedCornerShape(
-                                        topStart = 8.dp,
-                                        topEnd = 8.dp,
-                                        bottomStart = 4.dp,
-                                        bottomEnd = 4.dp,
-                                    ),
-                                )
-                                .background(
-                                    if (entry.highlight || isActive) highlightColor else barColor,
-                                ),
+                    entries.forEachIndexed { index, entry ->
+                        val fraction = (entry.value.toFloat() / maxValue.toFloat())
+                            .coerceIn(0.03f, 1f)
+                        val animatedFraction by animateFloatAsState(
+                            targetValue = fraction,
+                            animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+                            label = "bar-$index",
                         )
+                        val weight by animateFloatAsState(
+                            targetValue = barWeight(
+                                index = index,
+                                activeIndex = activeIndex,
+                                count = entries.size,
+                            ),
+                            animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
+                            label = "bar-weight-$index",
+                        )
+                        val isActive = index == activeIndex
+
+                        val clickModifier = if (onEntryClick != null) {
+                            Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { onEntryClick(index) }
+                        } else {
+                            Modifier
+                        }
+
+                        Column(
+                            modifier = Modifier
+                                .weight(weight)
+                                .then(clickModifier),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Bottom,
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(barHeight),
+                                contentAlignment = Alignment.BottomCenter,
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        // سقف لعرض العمود حتى لا يبدو ضخمًا عند عرض يوم واحد
+                                        // فقط، ويُرفع للعمود النشط ليتّسع أفقيًا.
+                                        .widthIn(max = if (isActive) ACTIVE_BAR_MAX_WIDTH else 56.dp)
+                                        .fillMaxWidth()
+                                        .fillMaxHeight(animatedFraction)
+                                        .clip(
+                                            RoundedCornerShape(
+                                                topStart = 8.dp,
+                                                topEnd = 8.dp,
+                                                bottomStart = 4.dp,
+                                                bottomEnd = 4.dp,
+                                            ),
+                                        )
+                                        .background(
+                                            if (entry.highlight || isActive) highlightColor else barColor,
+                                        ),
+                                )
+                            }
+                        }
                     }
                 }
             }
         }
 
         Spacer(modifier = Modifier.height(6.dp))
-
-        // تسميات الأيام في طبقة مستقلة أسفل الأعمدة: تُقاس بحرّية ولا تخضع لعرض
-        // خانة العمود الضيقة، فلا يُقص رقم اليوم ولا صندوقه.
+        // صف واحد ثابت أسفل الرسم، سواء كان مخطط أعمدة أم خطيًا.
         DayLabelsRow(
             entries = entries,
             activeIndex = activeIndex,
             spacing = spacing,
             stride = labelStride,
         )
+    }
+}
+
+@Composable
+private fun DailyLineChartContent(
+    entries: List<BarEntry>,
+    activeIndex: Int?,
+    barHeight: Dp,
+    barColor: Color,
+    highlightColor: Color,
+    spacing: Dp,
+    onEntryClick: ((Int) -> Unit)?,
+) {
+    val layoutDirection = LocalLayoutDirection.current
+    val isRtl = layoutDirection == LayoutDirection.Rtl
+    val currentOnEntryClick by rememberUpdatedState(onEntryClick)
+    val maxValue = (entries.maxOfOrNull { it.value } ?: 0L).coerceAtLeast(1L)
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        val tapModifier = if (onEntryClick != null) {
+            Modifier.pointerInput(entries.size, isRtl) {
+                detectTapGestures { position ->
+                    if (entries.isNotEmpty()) {
+                        currentOnEntryClick?.invoke(
+                            scrubIndexAt(position.x, size.width.toFloat(), entries.size, isRtl),
+                        )
+                    }
+                }
+            }
+        } else {
+            Modifier
+        }
+
+        Canvas(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(barHeight)
+                .then(tapModifier),
+        ) {
+            if (entries.isEmpty()) return@Canvas
+
+            val spacingPx = spacing.toPx()
+            val availableWidth = (size.width - spacingPx * (entries.size - 1)).coerceAtLeast(0f)
+            val weights = entries.indices.map { index ->
+                barWeight(index = index, activeIndex = activeIndex, count = entries.size)
+            }
+            val totalWeight = weights.sum().coerceAtLeast(1f)
+            val topInset = 8.dp.toPx()
+            val bottomInset = 5.dp.toPx()
+            val graphBottom = size.height - bottomInset
+            val graphHeight = (graphBottom - topInset).coerceAtLeast(1f)
+            var cursorX = 0f
+            val points = entries.mapIndexed { index, entry ->
+                val slotWidth = availableWidth * weights[index] / totalWeight
+                val logicalCenter = cursorX + slotWidth / 2f
+                val fraction = (entry.value.toDouble() / maxValue.toDouble())
+                    .toFloat()
+                    .coerceIn(0.03f, 1f)
+                cursorX += slotWidth + spacingPx
+                Offset(
+                    x = if (isRtl) size.width - logicalCenter else logicalCenter,
+                    y = graphBottom - graphHeight * fraction,
+                )
+            }
+
+            val strokeWidth = 2.5.dp.toPx()
+            for (index in 0 until points.lastIndex) {
+                drawLine(
+                    color = barColor,
+                    start = points[index],
+                    end = points[index + 1],
+                    strokeWidth = strokeWidth,
+                    cap = StrokeCap.Round,
+                )
+            }
+
+            points.forEachIndexed { index, point ->
+                val isHighlighted = entries[index].highlight || index == activeIndex
+                drawCircle(
+                    color = if (isHighlighted) highlightColor else barColor,
+                    radius = (if (isHighlighted) 4.dp else 3.dp).toPx(),
+                    center = point,
+                )
+            }
+        }
     }
 }
 

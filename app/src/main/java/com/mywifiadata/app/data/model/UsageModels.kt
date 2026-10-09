@@ -1,5 +1,7 @@
 package com.mywifiadata.app.data.model
 
+import com.mywifiadata.app.core.SamplingIntervals
+
 /** إجماليات المرور (تنزيل/رفع). */
 data class TrafficTotals(
     val rxBytes: Long = 0L,
@@ -120,9 +122,16 @@ data class AppSettings(
     val cycleStartDay: Int = 1,
     val notificationsEnabled: Boolean = true,
     val alertThresholdPercent: Int = 80,
-    val sampleIntervalSeconds: Int = 15,
+    /** فهرس خيار المدة في [SamplingIntervals]؛ يحفظ الوحدة حتى مع تساوي المدد. */
+    val sampleIntervalIndex: Int = SamplingIntervals.DEFAULT_INDEX,
     val dynamicColorEnabled: Boolean = true,
     val trackingEnabled: Boolean = false,
+    /** فهرس تصميم بطاقة استهلاك الباقة المختار على لوحة المعلومات. */
+    val usageCardStyleIndex: Int = 0,
+    /** نمط مخطط السجل محفوظ بشكل مستقل عن نمط مخططات التطبيقات. */
+    val historyLineChartEnabled: Boolean = false,
+    /** نمط مخططات التطبيقات محفوظ ليستمر بعد إعادة تشغيل التطبيق. */
+    val appsLineChartEnabled: Boolean = false,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val sessionStartMillis: Long = System.currentTimeMillis(),
     val sessionBaseline: TrafficTotals = TrafficTotals.Empty,

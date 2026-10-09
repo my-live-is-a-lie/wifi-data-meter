@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.mywifiadata.app.core.Format
+import com.mywifiadata.app.core.SamplingIntervals
 import com.mywifiadata.app.core.SpeedTestEngine
 import com.mywifiadata.app.core.TimeRange
 import com.mywifiadata.app.core.TimeRanges
@@ -22,6 +23,7 @@ import com.mywifiadata.app.data.model.TrafficTotals
 import com.mywifiadata.app.data.model.UsageSlice
 import com.mywifiadata.app.data.model.WifiStatus
 import com.mywifiadata.app.monitor.MonitorService
+import com.mywifiadata.app.widget.UsageWidgetProvider
 import com.mywifiadata.app.widget.UsageWidgetUpdater
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -170,9 +172,13 @@ data class AppDetailState(
  */
 class AppViewModel(private val repository: UsageRepository) : ViewModel() {
 
-    // تُستعاد آخر نتيجة اختبار سرعة محفوظة فور إنشاء الحالة (قبل أي تحديث).
+    // تُستعاد الإعدادات وآخر نتيجة اختبار سرعة فور إنشاء الحالة (قبل أي تحديث).
+    private val initialSettings = repository.settingsStore.current
     private val _uiState = MutableStateFlow(
-        UiState(speedTest = repository.settingsStore.current.lastSpeedTest.toSpeedTestState()),
+        UiState(
+            settings = initialSettings,
+            speedTest = initialSettings.lastSpeedTest.toSpeedTestState(),
+        ),
     )
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
@@ -487,6 +493,25 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         refreshNow()
     }
 
+    fun setUsageCardStyle(styleIndex: Int) {
+        repository.settingsStore.update {
+            it.copy(
+                usageCardStyleIndex = styleIndex.coerceIn(
+                    UsageWidgetProvider.DEFAULT_USAGE_CARD_STYLE,
+                    UsageWidgetProvider.MAX_USAGE_CARD_STYLE_INDEX,
+                ),
+            )
+        }
+    }
+
+    fun setHistoryLineChartEnabled(enabled: Boolean) {
+        repository.settingsStore.update { it.copy(historyLineChartEnabled = enabled) }
+    }
+
+    fun setAppsLineChartEnabled(enabled: Boolean) {
+        repository.settingsStore.update { it.copy(appsLineChartEnabled = enabled) }
+    }
+
     fun setCycleStartDay(day: Int) {
         repository.settingsStore.update { it.copy(cycleStartDay = day.coerceIn(1, 28)) }
         refreshNow()
@@ -500,8 +525,10 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         repository.settingsStore.update { it.copy(alertThresholdPercent = percent.coerceIn(10, 100)) }
     }
 
-    fun setSampleInterval(seconds: Int) {
-        repository.settingsStore.update { it.copy(sampleIntervalSeconds = seconds.coerceIn(5, 300)) }
+    fun setSampleInterval(index: Int) {
+        repository.settingsStore.update {
+            it.copy(sampleIntervalIndex = SamplingIntervals.coerceIndex(index))
+        }
     }
 
     fun setDynamicColorEnabled(enabled: Boolean) {

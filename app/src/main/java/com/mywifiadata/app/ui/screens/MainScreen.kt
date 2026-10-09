@@ -78,7 +78,6 @@ private enum class AppTab(val labelRes: Int, val icon: ImageVector) {
 @Composable
 fun MainScreen(
     viewModel: AppViewModel,
-    initialUsageCardStyle: Int = UsageWidgetProvider.DEFAULT_USAGE_CARD_STYLE,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -286,10 +285,7 @@ fun MainScreen(
                     onStartSpeedTest = { viewModel.startSpeedTest() },
                     onStopSpeedTest = { viewModel.stopSpeedTest() },
                     onAddUsageWidget = { styleIndex -> requestUsageWidgetPin(styleIndex) },
-                    initialSelectedCardStyle = initialUsageCardStyle.coerceIn(
-                        UsageWidgetProvider.DEFAULT_USAGE_CARD_STYLE,
-                        UsageWidgetProvider.MAX_USAGE_CARD_STYLE_INDEX,
-                    ),
+                    onUsageCardStyleChange = { styleIndex -> viewModel.setUsageCardStyle(styleIndex) },
                 )
 
                 AppTab.APPS -> {
@@ -306,6 +302,7 @@ fun MainScreen(
                             onAppsFilterChange = { viewModel.setAppsFilter(it) },
                             onAppsWeekChange = { viewModel.selectAppsWeek(it) },
                             onAppsSliceChange = { viewModel.selectAppsSlice(it) },
+                            onChartTypeChange = { viewModel.setAppsLineChartEnabled(it) },
                             onOpenUsageAccess = { SystemActions.openUsageAccessSettings(context) },
                             onAppClick = { viewModel.openAppDetail(it) },
                         )
@@ -316,6 +313,7 @@ fun MainScreen(
                     state = state,
                     onPeriodChange = { viewModel.setHistoryPeriod(it) },
                     onSelectDay = { viewModel.selectDay(it) },
+                    onChartTypeChange = { viewModel.setHistoryLineChartEnabled(it) },
                     onOpenUsageAccess = { SystemActions.openUsageAccessSettings(context) },
                     onAppClick = { viewModel.openAppDetail(it) },
                 )
