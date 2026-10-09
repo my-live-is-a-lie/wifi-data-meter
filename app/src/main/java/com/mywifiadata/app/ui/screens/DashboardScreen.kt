@@ -35,8 +35,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.zIndex
 import androidx.compose.material.icons.Icons
@@ -77,6 +79,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.mywifiadata.app.R
@@ -602,8 +605,10 @@ private fun UsageCardCarousel(
                 )
             },
     ) {
-        val cardWidth = (maxWidth - horizontalStartPadding - horizontalEndPadding).coerceAtLeast(0.dp)
-        val step = cardWidth * 0.9f // overlap slightly to keep neighboring styles visible at the edges.
+        val cardWidth = (maxWidth - horizontalStartPadding - horizontalEndPadding).coerceAtLeast(1.dp)
+        val previewWidth = minOf(maxWidth * 0.60f, 244.dp, cardWidth)
+        val previewScale = (previewWidth / cardWidth).coerceIn(0.01f, 1f)
+        val step = previewWidth + maxWidth * 0.10f
 
         UsageCardStyle.entries.forEach { style ->
             val relativeIndex = (style.ordinal - selectedStyleIndex + UsageCardStyle.entries.size) %
@@ -637,7 +642,6 @@ private fun UsageCardCarousel(
                 selectedStyleIndex = style.ordinal,
                 onOpenQuotaSettings = onOpenQuotaSettings,
                 modifier = Modifier
-                    .width(cardWidth)
                     .align(Alignment.Center)
                     .absoluteOffset(x = animatedOffset)
                     .graphicsLayer {
@@ -646,6 +650,9 @@ private fun UsageCardCarousel(
                         scaleY = animatedScale
                         alpha = animatedAlpha
                     }
+                    .heightIn(min = 244.dp)
+                    .scaleCarouselContent(previewScale)
+                    .width(cardWidth)
                     .zIndex(if (slot == 0) 1f else 0f),
                 onClick = onRestore,
             )
@@ -668,6 +675,35 @@ private fun UsageCardCarousel(
                 .zIndex(5f)
                 .clickable(onClickLabel = nextLabel) { onChangeStyle(1) },
         )
+    }
+}
+
+private fun Modifier.scaleCarouselContent(scale: Float): Modifier = layout { measurable, constraints ->
+    fun unscale(size: Int): Int = if (size == Constraints.Infinity) {
+        Constraints.Infinity
+    } else {
+        (size / scale).roundToInt()
+    }
+
+    val placeable = measurable.measure(
+        Constraints(
+            minWidth = unscale(constraints.minWidth),
+            maxWidth = unscale(constraints.maxWidth),
+            minHeight = unscale(constraints.minHeight),
+            maxHeight = unscale(constraints.maxHeight),
+        ),
+    )
+    val width = (placeable.width * scale).roundToInt()
+        .coerceIn(constraints.minWidth, constraints.maxWidth)
+    val height = (placeable.height * scale).roundToInt()
+        .coerceIn(constraints.minHeight, constraints.maxHeight)
+
+    layout(width, height) {
+        placeable.placeWithLayer(0, 0) {
+            scaleX = scale
+            scaleY = scale
+            transformOrigin = TransformOrigin(0f, 0f)
+        }
     }
 }
 
