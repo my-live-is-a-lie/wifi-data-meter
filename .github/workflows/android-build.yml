@@ -78,8 +78,8 @@ jobs:
     timeout-minutes: 25
 
     env:
-      # يُستخدم داخل خطوة البناء لتفادي تشغيل الاختبارات عند اختيار المستخدم ذلك
-      RUN_TESTS: ${{ github.event_name != 'workflow_dispatch' || inputs.run_tests }}
+      # يمكن استخدام [skip tests] في رسالة دفع لتجميع/نشر APK دون اختبارات.
+      RUN_TESTS: ${{ (github.event_name != 'workflow_dispatch' || inputs.run_tests) && !(github.event_name == 'push' && contains(github.event.head_commit.message, '[skip tests]')) }}
       # الافتراضي: بناء الإصدار. اختيار debug متاح عند التشغيل اليدوي فقط.
       VARIANT: ${{ github.event_name == 'workflow_dispatch' && inputs.variant || 'release' }}
       FAST_BUILD: ${{ github.event_name == 'workflow_dispatch' && inputs.fast_build || 'false' }}
