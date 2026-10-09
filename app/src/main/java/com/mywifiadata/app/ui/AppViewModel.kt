@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.mywifiadata.app.core.Format
+import com.mywifiadata.app.core.SamplingIntervals
 import com.mywifiadata.app.core.SpeedTestEngine
 import com.mywifiadata.app.core.TimeRange
 import com.mywifiadata.app.core.TimeRanges
@@ -524,8 +525,10 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         repository.settingsStore.update { it.copy(alertThresholdPercent = percent.coerceIn(10, 100)) }
     }
 
-    fun setSampleInterval(seconds: Int) {
-        repository.settingsStore.update { it.copy(sampleIntervalSeconds = seconds.coerceIn(5, 300)) }
+    fun setSampleInterval(index: Int) {
+        repository.settingsStore.update {
+            it.copy(sampleIntervalIndex = SamplingIntervals.coerceIndex(index))
+        }
     }
 
     fun setDynamicColorEnabled(enabled: Boolean) {

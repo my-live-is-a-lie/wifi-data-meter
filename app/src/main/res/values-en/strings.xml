@@ -140,10 +140,9 @@
     <string name="settings_threshold">Alert threshold</string>
     <string name="settings_section_monitor">Monitoring</string>
     <string name="settings_interval">Sampling rate</string>
-    <string name="settings_interval_5">5s</string>
-    <string name="settings_interval_15">15s</string>
-    <string name="settings_interval_30">30s</string>
-    <string name="settings_interval_60">60s</string>
+    <string name="settings_interval_unit_seconds">s</string>
+    <string name="settings_interval_unit_minutes">min</string>
+    <string name="settings_interval_unit_hours">h</string>
     <string name="settings_dynamic_color">System colors (Material You)</string>
     <string name="settings_dynamic_color_desc">Use wallpaper‑based colors on Android 12+.</string>
     <string name="settings_section_data">Permissions</string>

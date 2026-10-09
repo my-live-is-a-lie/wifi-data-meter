@@ -1,6 +1,7 @@
 package com.mywifiadata.app.data
 
 import android.content.Context
+import com.mywifiadata.app.core.SamplingIntervals
 import com.mywifiadata.app.data.model.AppSettings
 import com.mywifiadata.app.data.model.SpeedTestRecord
 import com.mywifiadata.app.data.model.ThemeMode
@@ -8,6 +9,7 @@ import com.mywifiadata.app.data.model.TrafficTotals
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlin.math.abs
 
 /**
  * تخزين الإعدادات محليًا باستخدام SharedPreferences مع تعريضها كـ [StateFlow]
@@ -49,7 +51,12 @@ class SettingsStore(context: Context) {
         cycleStartDay = prefs.getInt(KEY_CYCLE_DAY, 1),
         notificationsEnabled = prefs.getBoolean(KEY_NOTIFICATIONS, true),
         alertThresholdPercent = prefs.getInt(KEY_THRESHOLD, 80),
-        sampleIntervalSeconds = prefs.getInt(KEY_INTERVAL, 15),
+        sampleIntervalIndex = if (prefs.contains(KEY_INTERVAL_INDEX)) {
+            SamplingIntervals.coerceIndex(prefs.getInt(KEY_INTERVAL_INDEX, SamplingIntervals.DEFAULT_INDEX))
+        } else {
+            val legacyMillis = prefs.getInt(KEY_INTERVAL_LEGACY_SECONDS, 15).toLong() * 1_000L
+            SamplingIntervals.closestIndex(legacyMillis)
+        },
         dynamicColorEnabled = prefs.getBoolean(KEY_DYNAMIC_COLOR, true),
         trackingEnabled = prefs.getBoolean(KEY_TRACKING, false),
         usageCardStyleIndex = prefs.getInt(KEY_USAGE_CARD_STYLE, 0).coerceAtLeast(0),
@@ -82,12 +89,18 @@ class SettingsStore(context: Context) {
     }
 
     private fun write(settings: AppSettings) {
+        val intervalIndex = SamplingIntervals.coerceIndex(settings.sampleIntervalIndex)
+        val intervalMillis = SamplingIntervals.options[intervalIndex].durationMillis
+        val legacyIntervalSeconds = listOf(5, 15, 30, 60).minBy { seconds ->
+            abs(seconds * 1_000L - intervalMillis)
+        }
         prefs.edit()
             .putLong(KEY_QUOTA_BYTES, settings.quotaBytes)
             .putInt(KEY_CYCLE_DAY, settings.cycleStartDay)
             .putBoolean(KEY_NOTIFICATIONS, settings.notificationsEnabled)
             .putInt(KEY_THRESHOLD, settings.alertThresholdPercent)
-            .putInt(KEY_INTERVAL, settings.sampleIntervalSeconds)
+            .putInt(KEY_INTERVAL_INDEX, intervalIndex)
+            .putInt(KEY_INTERVAL_LEGACY_SECONDS, legacyIntervalSeconds)
             .putBoolean(KEY_DYNAMIC_COLOR, settings.dynamicColorEnabled)
             .putBoolean(KEY_TRACKING, settings.trackingEnabled)
             .putInt(KEY_USAGE_CARD_STYLE, settings.usageCardStyleIndex)
@@ -114,7 +127,8 @@ class SettingsStore(context: Context) {
         private const val KEY_CYCLE_DAY = "cycle_day"
         private const val KEY_NOTIFICATIONS = "notifications"
         private const val KEY_THRESHOLD = "alert_threshold"
-        private const val KEY_INTERVAL = "sample_interval"
+        private const val KEY_INTERVAL_INDEX = "sample_interval_index"
+        private const val KEY_INTERVAL_LEGACY_SECONDS = "sample_interval"
         private const val KEY_DYNAMIC_COLOR = "dynamic_color"
         private const val KEY_TRACKING = "tracking_enabled"
         private const val KEY_USAGE_CARD_STYLE = "usage_card_style"

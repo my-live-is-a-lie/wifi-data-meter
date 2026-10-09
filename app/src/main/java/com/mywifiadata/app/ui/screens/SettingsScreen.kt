@@ -2,18 +2,27 @@ package com.mywifiadata.app.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
@@ -46,14 +55,20 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -61,6 +76,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mywifiadata.app.R
 import com.mywifiadata.app.core.Format
+import com.mywifiadata.app.core.SamplingIntervalUnit
+import com.mywifiadata.app.core.SamplingIntervals
 import com.mywifiadata.app.data.model.ThemeMode
 import com.mywifiadata.app.ui.UiState
 import com.mywifiadata.app.ui.components.ExpressiveCard
@@ -68,7 +85,9 @@ import com.mywifiadata.app.ui.components.InfoRow
 import com.mywifiadata.app.ui.components.SectionHeader
 import com.mywifiadata.app.ui.components.SettingSwitchRow
 import com.mywifiadata.app.ui.theme.AppButtonShape
+import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlinx.coroutines.flow.collect
 
 /**
  * شاشة الإعدادات: الباقة، التنبيهات، المراقبة، البيانات، والمزيد.
@@ -178,7 +197,7 @@ fun SettingsScreen(
                 Column(modifier = Modifier.fillMaxWidth()) {
                     SectionHeader(title = stringResource(R.string.settings_section_monitor))
                     IntervalSelector(
-                        intervalSeconds = settings.sampleIntervalSeconds,
+                        intervalIndex = settings.sampleIntervalIndex,
                         onIntervalChange = onIntervalChange,
                     )
                     SettingSwitchRow(
@@ -366,48 +385,158 @@ fun SettingsScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun IntervalSelector(intervalSeconds: Int, onIntervalChange: (Int) -> Unit) {
-    val labels = listOf(
-        stringResource(R.string.settings_interval_5),
-        stringResource(R.string.settings_interval_15),
-        stringResource(R.string.settings_interval_30),
-        stringResource(R.string.settings_interval_60),
+private fun IntervalSelector(intervalIndex: Int, onIntervalChange: (Int) -> Unit) {
+    val options = SamplingIntervals.options
+    val safeIntervalIndex = SamplingIntervals.coerceIndex(intervalIndex)
+    val initialListIndex = remember(options.size, safeIntervalIndex) {
+        val virtualCycleStart = (Int.MAX_VALUE / 2 / options.size) * options.size
+        virtualCycleStart + safeIntervalIndex
+    }
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = initialListIndex,
     )
-    val options = remember { listOf(5, 15, 30, 60) }
+    val centeredVirtualIndex by remember(listState) {
+        derivedStateOf {
+            val layoutInfo = listState.layoutInfo
+            val viewportCenter = layoutInfo.viewportSize.height / 2
+            layoutInfo.visibleItemsInfo
+                .minByOrNull { item ->
+                    abs(item.offset + item.size / 2 - viewportCenter)
+                }
+                ?.index ?: listState.firstVisibleItemIndex
+        }
+    }
+    val currentIntervalIndex by rememberUpdatedState(safeIntervalIndex)
+    val currentOnIntervalChange by rememberUpdatedState(onIntervalChange)
 
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = stringResource(R.string.settings_interval),
-            style = MaterialTheme.typography.bodyMediumEmphasized,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        // أزرار مقسّمة (SegmentedButtons) بدل ButtonGroup: تسميات قصيرة + قصّ بثلاث نقاط
-        // بدل تجاوز النص لحدود الزر كما كان يحدث مع الأرقام السابقة.
-        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-            options.forEachIndexed { index, seconds ->
-                SegmentedButton(
-                    selected = intervalSeconds == seconds,
-                    onClick = { onIntervalChange(seconds) },
-                    shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
-                    icon = {},
-                    label = {
+    // حفظ الخيار بعد الإفلات/اكتمال حركة الالتقاط (snap)، لا مع كل بكسل أثناء السحب.
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.isScrollInProgress }.collect { isScrolling ->
+            if (!isScrolling) {
+                val settledIndex = Math.floorMod(centeredVirtualIndex, options.size)
+                if (settledIndex != currentIntervalIndex) {
+                    currentOnIntervalChange(settledIndex)
+                }
+            }
+        }
+    }
+
+    // مزامنة العجلة إذا أعادت الإعدادات ضبط قيمة القياس من خارجها.
+    LaunchedEffect(safeIntervalIndex, listState) {
+        val currentVirtualIndex = centeredVirtualIndex
+        val currentOptionIndex = Math.floorMod(currentVirtualIndex, options.size)
+        if (currentOptionIndex != safeIntervalIndex) {
+            val forwardDistance = Math.floorMod(safeIntervalIndex - currentOptionIndex, options.size)
+            val shortestDistance = if (forwardDistance <= options.size / 2) {
+                forwardDistance
+            } else {
+                forwardDistance - options.size
+            }
+            listState.animateScrollToItem(currentVirtualIndex + shortestDistance)
+        }
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(INTERVAL_WHEEL_HEIGHT),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text(
+                text = stringResource(R.string.settings_interval),
+                style = MaterialTheme.typography.bodyMediumEmphasized,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .width(INTERVAL_WHEEL_WIDTH)
+                .height(INTERVAL_WHEEL_HEIGHT),
+        ) {
+            val selectionShape = RoundedCornerShape(12.dp)
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .fillMaxWidth()
+                    .height(INTERVAL_WHEEL_ITEM_HEIGHT)
+                    .clip(selectionShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f))
+                    .border(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.30f),
+                        shape = selectionShape,
+                    ),
+            )
+
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(vertical = INTERVAL_WHEEL_ITEM_HEIGHT),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                flingBehavior = rememberSnapFlingBehavior(lazyListState = listState),
+            ) {
+                items(count = Int.MAX_VALUE) { virtualIndex ->
+                    val option = options[Math.floorMod(virtualIndex, options.size)]
+                    val distanceFromCenter = abs(virtualIndex - centeredVirtualIndex)
+                    val layoutInfo = listState.layoutInfo
+                    val visibleItem = layoutInfo.visibleItemsInfo.firstOrNull { it.index == virtualIndex }
+                    val distanceFraction = visibleItem?.let { item ->
+                        val itemCenter = item.offset + item.size / 2
+                        val viewportCenter = layoutInfo.viewportSize.height / 2
+                        (abs(itemCenter - viewportCenter).toFloat() / item.size.coerceAtLeast(1).toFloat())
+                            .coerceIn(0f, 1f)
+                    } ?: 1f
+                    val itemAlpha = 1f - 0.84f * distanceFraction
+                    val itemScale = 1f - 0.18f * distanceFraction
+                    val unitLabel = stringResource(
+                        when (option.unit) {
+                            SamplingIntervalUnit.SECOND -> R.string.settings_interval_unit_seconds
+                            SamplingIntervalUnit.MINUTE -> R.string.settings_interval_unit_minutes
+                            SamplingIntervalUnit.HOUR -> R.string.settings_interval_unit_hours
+                        },
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(INTERVAL_WHEEL_ITEM_HEIGHT)
+                            .graphicsLayer {
+                                alpha = itemAlpha
+                                scaleX = itemScale
+                                scaleY = itemScale
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
                         Text(
-                            text = labels[index],
+                            text = "${option.amountLabel} $unitLabel",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = if (distanceFromCenter == 0) {
+                                MaterialTheme.colorScheme.onSurface
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                            textAlign = TextAlign.Center,
                             maxLines = 1,
                             softWrap = false,
-                            overflow = TextOverflow.Ellipsis,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth(),
                         )
-                    },
-                )
+                    }
+                }
             }
         }
     }
 }
+
+private val INTERVAL_WHEEL_ITEM_HEIGHT = 48.dp
+private val INTERVAL_WHEEL_HEIGHT = INTERVAL_WHEEL_ITEM_HEIGHT * 3
+private val INTERVAL_WHEEL_WIDTH = 124.dp
 
 /**
  * منتقي سمة التطبيق: أربعة خيارات (النظام / فاتح / داكن / مظلم)

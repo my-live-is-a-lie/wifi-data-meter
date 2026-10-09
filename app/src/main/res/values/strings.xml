@@ -153,10 +153,9 @@
     <string name="settings_threshold">نسبة التنبيه</string>
     <string name="settings_section_monitor">المراقبة</string>
     <string name="settings_interval">مُعدّل القياس</string>
-    <string name="settings_interval_5">5 ث</string>
-    <string name="settings_interval_15">15 ث</string>
-    <string name="settings_interval_30">30 ث</string>
-    <string name="settings_interval_60">60 ث</string>
+    <string name="settings_interval_unit_seconds">ث</string>
+    <string name="settings_interval_unit_minutes">د</string>
+    <string name="settings_interval_unit_hours">س</string>
     <string name="settings_dynamic_color">ألوان النظام (Material You)</string>
     <string name="settings_dynamic_color_desc">استخدام ألوان خلفية الشاشة على أندرويد 12 وما بعده.</string>
     <string name="settings_section_data">الصلاحيات</string>

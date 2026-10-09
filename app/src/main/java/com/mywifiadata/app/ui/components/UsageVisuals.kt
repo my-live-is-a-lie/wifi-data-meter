@@ -1,6 +1,16 @@
 package com.mywifiadata.app.ui.components
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -31,6 +41,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.geometry.CornerRadius
@@ -382,97 +393,128 @@ fun DailyBarChart(
                 )
             },
     ) {
-        if (lineChartEnabled) {
-            DailyLineChartContent(
-                entries = entries,
-                activeIndex = activeIndex,
-                barHeight = barHeight,
-                barColor = barColor,
-                highlightColor = highlightColor,
-                spacing = spacing,
-                labelStride = labelStride,
-                onEntryClick = onEntryClick,
-            )
-        } else {
-            // صف الأعمدة: عرض كل عمود يتبع المؤشر (المشار إليه يتّسع والبقية تنزاح).
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(spacing),
-                verticalAlignment = Alignment.Bottom,
-            ) {
-                entries.forEachIndexed { index, entry ->
-                    val fraction = (entry.value.toFloat() / maxValue.toFloat())
-                        .coerceIn(0.03f, 1f)
-                    val animatedFraction by animateFloatAsState(
-                        targetValue = fraction,
-                        animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
-                        label = "bar-$index",
-                    )
-                    val weight by animateFloatAsState(
-                        targetValue = barWeight(
-                            index = index,
-                            activeIndex = activeIndex,
-                            count = entries.size,
-                        ),
-                        animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
-                        label = "bar-weight-$index",
-                    )
-                    val isActive = index == activeIndex
+        AnimatedContent(
+            targetState = lineChartEnabled,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clipToBounds(),
+            transitionSpec = {
+                val direction = if (targetState) 1 else -1
+                val easing = FastOutSlowInEasing
+                (
+                    fadeIn(animationSpec = tween(durationMillis = 260, easing = easing)) +
+                        scaleIn(
+                            animationSpec = tween(durationMillis = 260, easing = easing),
+                            initialScale = 0.96f,
+                        ) +
+                        slideInHorizontally(
+                            animationSpec = tween(durationMillis = 260, easing = easing),
+                        ) { fullWidth -> direction * fullWidth / 18 }
+                ) togetherWith (
+                    fadeOut(animationSpec = tween(durationMillis = 190, easing = easing)) +
+                        scaleOut(
+                            animationSpec = tween(durationMillis = 190, easing = easing),
+                            targetScale = 0.99f,
+                        ) +
+                        slideOutHorizontally(
+                            animationSpec = tween(durationMillis = 190, easing = easing),
+                        ) { fullWidth -> -direction * fullWidth / 18 }
+                )
+            },
+            label = "daily-usage-chart-transition",
+        ) { showLineChart ->
+            if (showLineChart) {
+                DailyLineChartContent(
+                    entries = entries,
+                    activeIndex = activeIndex,
+                    barHeight = barHeight,
+                    barColor = barColor,
+                    highlightColor = highlightColor,
+                    spacing = spacing,
+                    labelStride = labelStride,
+                    onEntryClick = onEntryClick,
+                )
+            } else {
+                // صف الأعمدة: عرض كل عمود يتبع المؤشر (المشار إليه يتّسع والبقية تنزاح).
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(spacing),
+                    verticalAlignment = Alignment.Bottom,
+                ) {
+                    entries.forEachIndexed { index, entry ->
+                        val fraction = (entry.value.toFloat() / maxValue.toFloat())
+                            .coerceIn(0.03f, 1f)
+                        val animatedFraction by animateFloatAsState(
+                            targetValue = fraction,
+                            animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+                            label = "bar-$index",
+                        )
+                        val weight by animateFloatAsState(
+                            targetValue = barWeight(
+                                index = index,
+                                activeIndex = activeIndex,
+                                count = entries.size,
+                            ),
+                            animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
+                            label = "bar-weight-$index",
+                        )
+                        val isActive = index == activeIndex
 
-                    val clickModifier = if (onEntryClick != null) {
-                        Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable { onEntryClick(index) }
-                    } else {
-                        Modifier
-                    }
+                        val clickModifier = if (onEntryClick != null) {
+                            Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { onEntryClick(index) }
+                        } else {
+                            Modifier
+                        }
 
-                    Column(
-                        modifier = Modifier
-                            .weight(weight)
-                            .then(clickModifier),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Bottom,
-                    ) {
-                        Box(
+                        Column(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .height(barHeight),
-                            contentAlignment = Alignment.BottomCenter,
+                                .weight(weight)
+                                .then(clickModifier),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Bottom,
                         ) {
                             Box(
                                 modifier = Modifier
-                                    // سقف لعرض العمود حتى لا يبدو ضخمًا عند عرض يوم واحد
-                                    // فقط، ويُرفع للعمود النشط ليتّسع أفقيًا.
-                                    .widthIn(max = if (isActive) ACTIVE_BAR_MAX_WIDTH else 56.dp)
                                     .fillMaxWidth()
-                                    .fillMaxHeight(animatedFraction)
-                                    .clip(
-                                        RoundedCornerShape(
-                                            topStart = 8.dp,
-                                            topEnd = 8.dp,
-                                            bottomStart = 4.dp,
-                                            bottomEnd = 4.dp,
+                                    .height(barHeight),
+                                contentAlignment = Alignment.BottomCenter,
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        // سقف لعرض العمود حتى لا يبدو ضخمًا عند عرض يوم واحد
+                                        // فقط، ويُرفع للعمود النشط ليتّسع أفقيًا.
+                                        .widthIn(max = if (isActive) ACTIVE_BAR_MAX_WIDTH else 56.dp)
+                                        .fillMaxWidth()
+                                        .fillMaxHeight(animatedFraction)
+                                        .clip(
+                                            RoundedCornerShape(
+                                                topStart = 8.dp,
+                                                topEnd = 8.dp,
+                                                bottomStart = 4.dp,
+                                                bottomEnd = 4.dp,
+                                            ),
+                                        )
+                                        .background(
+                                            if (entry.highlight || isActive) highlightColor else barColor,
                                         ),
-                                    )
-                                    .background(
-                                        if (entry.highlight || isActive) highlightColor else barColor,
-                                    ),
-                            )
+                                )
+                            }
                         }
                     }
                 }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // تسميات الأيام في طبقة مستقلة أسفل الأعمدة، لتبقى كاملة مهما ضاقت الأعمدة.
+                DayLabelsRow(
+                    entries = entries,
+                    activeIndex = activeIndex,
+                    spacing = spacing,
+                    stride = labelStride,
+                )
             }
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            // تسميات الأيام في طبقة مستقلة أسفل الأعمدة، لتبقى كاملة مهما ضاقت الأعمدة.
-            DayLabelsRow(
-                entries = entries,
-                activeIndex = activeIndex,
-                spacing = spacing,
-                stride = labelStride,
-            )
         }
     }
 }
