@@ -20,6 +20,7 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.MonetizationOn
+import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Remove
@@ -243,6 +244,9 @@ fun SettingsScreen(
                             Text(
                                 text = stringResource(R.string.settings_usage_access),
                                 style = MaterialTheme.typography.bodyLargeEmphasized,
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Ellipsis,
                             )
                             Text(
                                 text = if (state.hasUsageAccess) {
@@ -254,8 +258,12 @@ fun SettingsScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        TextButton(onClick = onOpenUsageAccess, shape = AppButtonShape) {
-                            Text(text = stringResource(R.string.action_open_usage_access))
+                        IconButton(onClick = onOpenUsageAccess) {
+                            Icon(
+                                imageVector = Icons.Rounded.OpenInNew,
+                                contentDescription = stringResource(R.string.action_open_usage_access),
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
                         }
                     }
 
