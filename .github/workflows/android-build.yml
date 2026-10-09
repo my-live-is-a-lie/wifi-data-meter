@@ -71,6 +71,8 @@ permissions:
 jobs:
   # ———————————————————————————— بناء APK للتصحيح + الاختبارات ————————————————————————————
   build:
+    # عند طلب إصدار يدوي، تتولى مهمة release البناء لتجنّب تكرار APK/الـ artifact.
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.variant != 'release' }}
     name: Release APK (arm64-v8a) + Unit tests
     runs-on: ubuntu-latest
     timeout-minutes: 25
