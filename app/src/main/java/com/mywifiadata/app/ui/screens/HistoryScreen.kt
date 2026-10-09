@@ -251,7 +251,7 @@ private fun ChartCard(
                 if (entries.size > 1) {
                     Spacer(modifier = Modifier.height(6.dp))
                     // شريط تمرير لاختيار اليوم: يتحرك بالنقطة، ويتّسع عمود اليوم
-                    // المشار إليه ويظهر رقمه في صندوق فوقه أثناء السحب.
+                    // المشار إليه ويُبرز رقمه في صف التسميات أسفل المخطط أثناء السحب.
                     DayScrubber(
                         count = entries.size,
                         thumbIndex = thumbIndex.coerceIn(0, entries.lastIndex),

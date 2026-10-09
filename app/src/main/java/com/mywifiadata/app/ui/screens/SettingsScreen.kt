@@ -519,7 +519,11 @@ private fun IntervalSelector(intervalIndex: Int, onIntervalChange: (Int) -> Unit
                     ) {
                         Text(
                             text = "${option.amountLabel} $unitLabel",
-                            style = MaterialTheme.typography.titleMedium,
+                            style = if (distanceFromCenter == 0) {
+                                MaterialTheme.typography.titleMedium
+                            } else {
+                                MaterialTheme.typography.titleSmall
+                            },
                             color = if (distanceFromCenter == 0) {
                                 MaterialTheme.colorScheme.onSurface
                             } else {
@@ -538,7 +542,7 @@ private fun IntervalSelector(intervalIndex: Int, onIntervalChange: (Int) -> Unit
 
 private val INTERVAL_WHEEL_ITEM_HEIGHT = 24.dp
 private val INTERVAL_WHEEL_HEIGHT = INTERVAL_WHEEL_ITEM_HEIGHT * 3
-private val INTERVAL_WHEEL_WIDTH = 96.dp
+private val INTERVAL_WHEEL_WIDTH = 84.dp
 
 /**
  * منتقي سمة التطبيق: أربعة خيارات (النظام / فاتح / داكن / مظلم)

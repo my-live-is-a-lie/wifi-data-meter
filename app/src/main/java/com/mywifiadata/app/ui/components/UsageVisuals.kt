@@ -350,7 +350,7 @@ data class BarEntry(
 /**
  * مخطط إحصائي لاستهلاك الأيام، ويبدّل بالسحب الأفقي بين الأعمدة والخطّ.
  * عند تمرير المؤشر يتّسع عمود اليوم المشار إليه أفقيًا وتنكمش الأعمدة المجاورة
- * وتنزاح، ويظهر يومه في صندوق فوقه.
+ * وتنزاح، ويُبرز رقمه في صف التسميات أسفل الأعمدة.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -431,7 +431,6 @@ fun DailyBarChart(
                     barColor = barColor,
                     highlightColor = highlightColor,
                     spacing = spacing,
-                    labelStride = labelStride,
                     onEntryClick = onEntryClick,
                 )
             } else {
@@ -504,18 +503,17 @@ fun DailyBarChart(
                         }
                     }
                 }
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                // تسميات الأيام في طبقة مستقلة أسفل الأعمدة، لتبقى كاملة مهما ضاقت الأعمدة.
-                DayLabelsRow(
-                    entries = entries,
-                    activeIndex = activeIndex,
-                    spacing = spacing,
-                    stride = labelStride,
-                )
             }
         }
+
+        Spacer(modifier = Modifier.height(6.dp))
+        // صف واحد ثابت أسفل الرسم، سواء كان مخطط أعمدة أم خطيًا.
+        DayLabelsRow(
+            entries = entries,
+            activeIndex = activeIndex,
+            spacing = spacing,
+            stride = labelStride,
+        )
     }
 }
 
@@ -527,7 +525,6 @@ private fun DailyLineChartContent(
     barColor: Color,
     highlightColor: Color,
     spacing: Dp,
-    labelStride: Int,
     onEntryClick: ((Int) -> Unit)?,
 ) {
     val layoutDirection = LocalLayoutDirection.current
@@ -602,14 +599,6 @@ private fun DailyLineChartContent(
                 )
             }
         }
-
-        Spacer(modifier = Modifier.height(6.dp))
-        DayLabelsRow(
-            entries = entries,
-            activeIndex = activeIndex,
-            spacing = spacing,
-            stride = labelStride,
-        )
     }
 }
 
