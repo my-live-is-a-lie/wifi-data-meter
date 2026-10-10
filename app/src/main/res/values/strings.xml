@@ -199,6 +199,7 @@
     <string name="hide_app_icon_guide_hold">اضغط مطولًا على البلاطة المظللة لفتح التطبيق.</string>
     <string name="hide_app_icon_demo_swipe">اسحب للأسفل لفتح ستارة الإشعارات</string>
     <string name="hide_app_icon_demo_panel_open">ظهرت لوحة الإعدادات السريعة</string>
+    <string name="hide_app_icon_demo_icon_hidden">تختفي أيقونة التطبيق من الشاشة الرئيسية</string>
     <string name="hide_app_icon_demo_edit_caption">اضغط «تعديل» لفتح قائمة البلاطات</string>
     <string name="hide_app_icon_demo_tap_more">اضغط زر النقاط الثلاث</string>
     <string name="hide_app_icon_demo_choose_edit">اختر «تعديل» من القائمة</string>
