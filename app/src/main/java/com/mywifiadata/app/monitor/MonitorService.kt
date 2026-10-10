@@ -6,10 +6,12 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.mywifiadata.app.MyWifiApplication
 import com.mywifiadata.app.R
+import com.mywifiadata.app.core.AppLanguage
 import com.mywifiadata.app.core.Format
 import com.mywifiadata.app.core.SamplingIntervals
 import com.mywifiadata.app.core.TimeRange
@@ -34,6 +36,10 @@ import kotlinx.coroutines.withTimeoutOrNull
  */
 class MonitorService : Service() {
 
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(AppLanguage.localizedContext(newBase))
+    }
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var loopJob: Job? = null
 
@@ -54,11 +60,20 @@ class MonitorService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
             repository.settingsStore.update { it.copy(trackingEnabled = false) }
+            MonitoringTileService.requestRefresh(this)
             stopSelfSafely()
             return START_NOT_STICKY
         }
 
-        startAsForeground()
+        try {
+            startAsForeground()
+        } catch (exception: RuntimeException) {
+            Log.e(TAG, "Could not promote the monitoring service to foreground", exception)
+            repository.settingsStore.update { it.copy(trackingEnabled = false) }
+            MonitoringTileService.requestRefresh(this)
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
 
         if (loopJob?.isActive != true) {
             loopJob = scope.launch { monitorLoop() }
@@ -79,6 +94,7 @@ class MonitorService : Service() {
      */
     override fun onTimeout(startId: Int) {
         repository.settingsStore.update { it.copy(trackingEnabled = false) }
+        MonitoringTileService.requestRefresh(this)
         notifier.notifyAlert(
             Notifier.ALERT_TIMEOUT_ID,
             getString(R.string.notification_timeout_title),
@@ -236,6 +252,7 @@ class MonitorService : Service() {
     }
 
     companion object {
+        private const val TAG = "MonitorService"
         const val ACTION_STOP = "com.mywifiadata.app.action.STOP_MONITOR"
 
         fun start(context: Context) {

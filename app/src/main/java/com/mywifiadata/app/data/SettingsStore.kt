@@ -1,7 +1,9 @@
 package com.mywifiadata.app.data
 
 import android.content.Context
+import com.mywifiadata.app.core.AppLanguage
 import com.mywifiadata.app.core.SamplingIntervals
+import com.mywifiadata.app.data.model.AccentColor
 import com.mywifiadata.app.data.model.AppSettings
 import com.mywifiadata.app.data.model.SpeedTestRecord
 import com.mywifiadata.app.data.model.ThemeMode
@@ -32,8 +34,17 @@ class SettingsStore(context: Context) {
     }
 
     fun clearAll() {
-        prefs.edit().clear().apply()
-        _settings.value = AppSettings()
+        // يحتفظ بحالة البلاطة المثبتة ولغة الواجهة؛ فهما لا تمثلان بيانات القياس المحلية.
+        val current = _settings.value
+        prefs.edit()
+            .clear()
+            .putBoolean(KEY_QUICK_SETTINGS_TILE_ADDED, current.quickSettingsTileAdded)
+            .putString(AppLanguage.PREFERENCE_KEY, current.appLanguage)
+            .apply()
+        _settings.value = AppSettings(
+            quickSettingsTileAdded = current.quickSettingsTileAdded,
+            appLanguage = current.appLanguage,
+        )
     }
 
     /** يضيف كمية إلى «خط الأساس» للجلسة (يُستخدم عند تصفير الجلسة). */
@@ -58,6 +69,15 @@ class SettingsStore(context: Context) {
             SamplingIntervals.closestIndex(legacyMillis)
         },
         dynamicColorEnabled = prefs.getBoolean(KEY_DYNAMIC_COLOR, true),
+        accentColor = prefs.getString(KEY_ACCENT_COLOR, null)
+            ?.let { stored -> AccentColor.entries.firstOrNull { it.name == stored } }
+            ?: AccentColor.DEFAULT,
+        quickSettingsTileEnabled = prefs.getBoolean(KEY_QUICK_SETTINGS_TILE, false),
+        quickSettingsTileAdded = prefs.getBoolean(KEY_QUICK_SETTINGS_TILE_ADDED, false),
+        appIconHidden = prefs.getBoolean(KEY_APP_ICON_HIDDEN, false),
+        appLanguage = AppLanguage.normalize(
+            prefs.getString(AppLanguage.PREFERENCE_KEY, AppLanguage.SYSTEM),
+        ),
         trackingEnabled = prefs.getBoolean(KEY_TRACKING, false),
         usageCardStyleIndex = prefs.getInt(KEY_USAGE_CARD_STYLE, 0).coerceAtLeast(0),
         historyLineChartEnabled = prefs.getBoolean(KEY_HISTORY_LINE_CHART, false),
@@ -102,6 +122,11 @@ class SettingsStore(context: Context) {
             .putInt(KEY_INTERVAL_INDEX, intervalIndex)
             .putInt(KEY_INTERVAL_LEGACY_SECONDS, legacyIntervalSeconds)
             .putBoolean(KEY_DYNAMIC_COLOR, settings.dynamicColorEnabled)
+            .putString(KEY_ACCENT_COLOR, settings.accentColor.name)
+            .putBoolean(KEY_QUICK_SETTINGS_TILE, settings.quickSettingsTileEnabled)
+            .putBoolean(KEY_QUICK_SETTINGS_TILE_ADDED, settings.quickSettingsTileAdded)
+            .putBoolean(KEY_APP_ICON_HIDDEN, settings.appIconHidden)
+            .putString(AppLanguage.PREFERENCE_KEY, AppLanguage.normalize(settings.appLanguage))
             .putBoolean(KEY_TRACKING, settings.trackingEnabled)
             .putInt(KEY_USAGE_CARD_STYLE, settings.usageCardStyleIndex)
             .putBoolean(KEY_HISTORY_LINE_CHART, settings.historyLineChartEnabled)
@@ -121,7 +146,7 @@ class SettingsStore(context: Context) {
     }
 
     companion object {
-        const val PREFS_NAME = "mywifi_settings"
+        const val PREFS_NAME = AppLanguage.PREFERENCES_NAME
 
         private const val KEY_QUOTA_BYTES = "quota_bytes"
         private const val KEY_CYCLE_DAY = "cycle_day"
@@ -130,6 +155,10 @@ class SettingsStore(context: Context) {
         private const val KEY_INTERVAL_INDEX = "sample_interval_index"
         private const val KEY_INTERVAL_LEGACY_SECONDS = "sample_interval"
         private const val KEY_DYNAMIC_COLOR = "dynamic_color"
+        private const val KEY_ACCENT_COLOR = "accent_color"
+        private const val KEY_QUICK_SETTINGS_TILE = "quick_settings_tile_enabled"
+        private const val KEY_QUICK_SETTINGS_TILE_ADDED = "quick_settings_tile_added"
+        private const val KEY_APP_ICON_HIDDEN = "app_icon_hidden"
         private const val KEY_TRACKING = "tracking_enabled"
         private const val KEY_USAGE_CARD_STYLE = "usage_card_style"
         private const val KEY_HISTORY_LINE_CHART = "history_line_chart_enabled"
