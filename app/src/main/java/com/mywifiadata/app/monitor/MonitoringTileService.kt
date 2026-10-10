@@ -83,21 +83,40 @@ class MonitoringTileService : TileService() {
     }
 
     private fun startMonitoringThroughDialog() {
-        val dialog = Dialog(this).apply {
-            window?.apply {
-                setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-                setDimAmount(0f)
+        var startRequested = false
+        val dialog = object : Dialog(this) {
+            init {
+                window?.apply {
+                    setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+                    setDimAmount(0f)
+                }
+                setOnShowListener {
+                    startRequested = true
+                    startMonitoring()
+                    dismiss()
+                }
             }
-            setOnShowListener {
-                startMonitoring()
-                dismiss()
+
+            override fun show() {
+                super.show()
+                // Android 14 otherwise collapses the shade (and can bring the app forward)
+                // after showing the temporary dialog. Throw after showing it; this is caught
+                // below while the service gets its short foreground-start exemption.
+                throw TemporaryTileDialogShownException()
             }
         }
-        runCatching { showDialog(dialog) }
-            .onFailure { exception ->
-                Log.w(TAG, "Temporary tile dialog failed; trying the direct start", exception)
-                startMonitoring()
+
+        val result = runCatching { showDialog(dialog) }
+        if (!startRequested) {
+            result.exceptionOrNull()?.let {
+                Log.w(TAG, "Temporary tile dialog failed; trying the direct start", it)
             }
+            startMonitoring()
+        } else {
+            result.exceptionOrNull()
+                ?.takeUnless { it is TemporaryTileDialogShownException }
+                ?.let { Log.w(TAG, "Quick Settings remained open after showing the tile dialog", it) }
+        }
     }
 
     private fun startMonitoring() {
@@ -180,3 +199,5 @@ class MonitoringTileService : TileService() {
         }
     }
 }
+
+private class TemporaryTileDialogShownException : RuntimeException()
