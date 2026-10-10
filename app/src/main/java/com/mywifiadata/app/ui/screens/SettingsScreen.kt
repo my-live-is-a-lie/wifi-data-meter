@@ -71,6 +71,7 @@ import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material.icons.rounded.WbSunny
 import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -576,40 +577,42 @@ private fun HideAppIconGuideIllustration() {
         ),
         label = "guide-cycle-progress",
     )
+    val launcherAppIconVisible = cycleProgress < 0.045f
     val panelProgress = when {
-        cycleProgress < 0.15f -> hideGuideSegment(cycleProgress, 0f, 0.15f)
-        cycleProgress < 0.75f -> 1f
-        cycleProgress < 0.762f -> 1f - hideGuideSegment(cycleProgress, 0.75f, 0.762f)
+        cycleProgress < 0.06f -> 0f
+        cycleProgress < 0.20f -> hideGuideSegment(cycleProgress, 0.06f, 0.20f)
+        cycleProgress < 0.79f -> 1f
+        cycleProgress < 0.8141f -> 1f - hideGuideSegment(cycleProgress, 0.79f, 0.8141f)
         else -> 0f
     }
-    val overflowMenuOpen = cycleProgress in 0.29f..0.37f
-    val isEditing = cycleProgress in 0.37f..0.67f
-    val tileAdded = cycleProgress >= 0.59f
+    val overflowMenuOpen = cycleProgress in 0.33f..0.41f
+    val isEditing = cycleProgress in 0.41f..0.71f
+    val tileAdded = cycleProgress >= 0.63f
     val addTileHoldProgress = when {
-        cycleProgress < 0.46f || cycleProgress >= 0.52f -> 0f
-        cycleProgress < 0.48f -> hideGuideSegment(cycleProgress, 0.46f, 0.48f)
-        cycleProgress < 0.50f -> 1f
-        else -> 1f - hideGuideSegment(cycleProgress, 0.50f, 0.52f)
+        cycleProgress < 0.50f || cycleProgress >= 0.56f -> 0f
+        cycleProgress < 0.52f -> hideGuideSegment(cycleProgress, 0.50f, 0.52f)
+        cycleProgress < 0.54f -> 1f
+        else -> 1f - hideGuideSegment(cycleProgress, 0.54f, 0.56f)
     }
     val launchHoldProgress = when {
-        cycleProgress < 0.70f || cycleProgress >= 0.75f -> 0f
-        cycleProgress < 0.715f -> hideGuideSegment(cycleProgress, 0.70f, 0.715f)
-        cycleProgress < 0.735f -> 1f
-        else -> 1f - hideGuideSegment(cycleProgress, 0.735f, 0.75f)
+        cycleProgress < 0.74f || cycleProgress >= 0.79f -> 0f
+        cycleProgress < 0.755f -> hideGuideSegment(cycleProgress, 0.74f, 0.755f)
+        cycleProgress < 0.775f -> 1f
+        else -> 1f - hideGuideSegment(cycleProgress, 0.775f, 0.79f)
     }
     val holdProgress = maxOf(addTileHoldProgress, launchHoldProgress)
     val tileDragProgress = when {
-        cycleProgress < 0.52f -> 0f
-        cycleProgress < 0.59f -> hideGuideSegment(cycleProgress, 0.52f, 0.59f)
+        cycleProgress < 0.56f -> 0f
+        cycleProgress < 0.63f -> hideGuideSegment(cycleProgress, 0.56f, 0.63f)
         else -> 0f
     }
     val launchTileShrinkProgress = when {
-        cycleProgress < 0.735f -> 0f
-        cycleProgress < 0.75f -> hideGuideSegment(cycleProgress, 0.735f, 0.75f)
+        cycleProgress < 0.775f -> 0f
+        cycleProgress < 0.79f -> hideGuideSegment(cycleProgress, 0.775f, 0.79f)
         else -> 0f
     }
     val tapRippleProgress = hideGuideTapRipple(cycleProgress)
-    val isAppScreenVisible = cycleProgress in 0.773f..0.96f
+    val isAppScreenVisible = cycleProgress in 0.8215f..0.96f
     val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
 
     val fallbackTargets = hideGuideDefaultTargets(isRtl)
@@ -667,13 +670,14 @@ private fun HideAppIconGuideIllustration() {
     )
     val pointerPosition = hideGuidePointerPosition(cycleProgress, pointerTargets)
     val captionResource = when {
-        cycleProgress < 0.15f -> R.string.hide_app_icon_demo_swipe
-        cycleProgress < 0.18f -> R.string.hide_app_icon_demo_panel_open
-        cycleProgress < 0.29f -> R.string.hide_app_icon_demo_tap_more
-        cycleProgress < 0.37f -> R.string.hide_app_icon_demo_choose_edit
-        cycleProgress < 0.59f -> R.string.hide_app_icon_demo_add
-        cycleProgress < 0.67f -> R.string.hide_app_icon_demo_finish_edit
-        cycleProgress < 0.75f -> R.string.hide_app_icon_demo_long_press
+        cycleProgress < 0.06f -> R.string.hide_app_icon_demo_icon_hidden
+        cycleProgress < 0.20f -> R.string.hide_app_icon_demo_swipe
+        cycleProgress < 0.22f -> R.string.hide_app_icon_demo_panel_open
+        cycleProgress < 0.33f -> R.string.hide_app_icon_demo_tap_more
+        cycleProgress < 0.41f -> R.string.hide_app_icon_demo_choose_edit
+        cycleProgress < 0.63f -> R.string.hide_app_icon_demo_add
+        cycleProgress < 0.71f -> R.string.hide_app_icon_demo_finish_edit
+        cycleProgress < 0.79f -> R.string.hide_app_icon_demo_long_press
         else -> R.string.hide_app_icon_demo_app_open
     }
 
@@ -730,7 +734,11 @@ private fun HideAppIconGuideIllustration() {
                 },
                 label = "home-to-app-screen",
             ) { appIsVisible ->
-                if (appIsVisible) HideAppIconDemoAppScreen() else HideAppIconDemoHomeScreen()
+                if (appIsVisible) {
+                    HideAppIconDemoAppScreen()
+                } else {
+                    HideAppIconDemoHomeScreen(showLauncherAppIcon = launcherAppIconVisible)
+                }
             }
 
             Column(
@@ -748,13 +756,13 @@ private fun HideAppIconGuideIllustration() {
                     }
                     .clip(RoundedCornerShape(22.dp))
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                    .padding(horizontal = 9.dp, vertical = 7.dp),
+                    .padding(horizontal = 9.dp, vertical = 6.dp),
                 verticalArrangement = Arrangement.spacedBy(3.dp),
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(20.dp),
+                        .height(18.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -794,7 +802,7 @@ private fun HideAppIconGuideIllustration() {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(24.dp),
+                        .height(20.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -821,6 +829,12 @@ private fun HideAppIconGuideIllustration() {
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(3.dp),
                         ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Settings,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp),
+                            )
                             Box(
                                 modifier = Modifier
                                     .size(24.dp)
@@ -837,12 +851,6 @@ private fun HideAppIconGuideIllustration() {
                                     modifier = Modifier.size(20.dp),
                                 )
                             }
-                            Icon(
-                                imageVector = Icons.Rounded.Settings,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(18.dp),
-                            )
                         }
                     }
                 }
@@ -850,23 +858,49 @@ private fun HideAppIconGuideIllustration() {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(8.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceContainerLow),
+                        .height(18.dp),
                 ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceContainerLow),
+                    )
                     Box(
                         modifier = Modifier
                             .fillMaxWidth(0.68f)
                             .fillMaxHeight()
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary),
-                    )
+                            .align(Alignment.CenterStart),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary),
+                        )
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.CenterEnd)
+                                .size(20.dp)
+                                .shadow(2.dp, CircleShape)
+                                .background(MaterialTheme.colorScheme.surface, CircleShape)
+                                .border(1.dp, MaterialTheme.colorScheme.primary, CircleShape),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.WbSunny,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(11.dp),
+                            )
+                        }
+                    }
                 }
 
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(40.dp),
+                        .height(38.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     HideAppIconDemoTile(
@@ -898,7 +932,7 @@ private fun HideAppIconGuideIllustration() {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(40.dp),
+                        .height(38.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     HideAppIconDemoTile(
@@ -1000,13 +1034,7 @@ private fun HideAppIconGuideIllustration() {
                             .height(30.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(
-                            text = stringResource(R.string.hide_app_icon_demo_available_tiles),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            modifier = Modifier.weight(1f),
-                        )
+                        Spacer(modifier = Modifier.weight(1f))
                         Box(
                             modifier = Modifier
                                 .width(120.dp)
@@ -1115,7 +1143,7 @@ private fun HideAppIconGuideIllustration() {
                 }
             }
 
-            if (cycleProgress < 0.75f) {
+            if (cycleProgress >= 0.06f && cycleProgress < 0.79f) {
                 val pointerSize = 34.dp
                 val longPressPulse = (
                     0.5 + 0.5 * sin(cycleProgress.toDouble() * 2.0 * PI * 24.0)
@@ -1188,7 +1216,7 @@ private fun HideAppIconGuideIllustration() {
 }
 
 @Composable
-private fun HideAppIconDemoHomeScreen() {
+private fun HideAppIconDemoHomeScreen(showLauncherAppIcon: Boolean) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -1273,7 +1301,14 @@ private fun HideAppIconDemoHomeScreen() {
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(9.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .shadow(3.dp, RoundedCornerShape(1.dp))
+                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)),
+            )
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = stringResource(R.string.hide_app_icon_demo_time),
                 style = MaterialTheme.typography.displaySmall.copy(fontSize = 32.sp),
@@ -1345,6 +1380,25 @@ private fun HideAppIconDemoHomeScreen() {
                         modifier = Modifier.size(23.dp),
                     )
                 }
+                AnimatedVisibility(
+                    visible = showLauncherAppIcon,
+                    enter = fadeIn(tween(180)) + scaleIn(initialScale = 0.82f, animationSpec = tween(180)),
+                    exit = fadeOut(tween(180)) + scaleOut(targetScale = 0.82f, animationSpec = tween(180)),
+                ) {
+                    HideAppIconHomeShortcut(
+                        label = stringResource(R.string.app_name),
+                        modifier = Modifier.width(36.dp),
+                        background = MaterialTheme.colorScheme.primary,
+                        foreground = Color.White,
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_stat_usage),
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
+                }
             }
             Spacer(modifier = Modifier.height(8.dp))
         }
@@ -1366,7 +1420,7 @@ private fun HideAppIconHomeShortcut(
     ) {
         Box(
             modifier = Modifier
-                .size(40.dp)
+                .size(36.dp)
                 .shadow(3.dp, RoundedCornerShape(14.dp))
                 .clip(RoundedCornerShape(14.dp))
                 .background(background)
@@ -1657,49 +1711,50 @@ private fun hideGuidePointerPosition(
     value: Float,
     targets: HideGuideTargets,
 ): HideGuidePoint {
-    val homeStart = HideGuidePoint(x = 0.50f, y = 0.10f)
+    val homeStart = HideGuidePoint(x = 0.50f, y = 0.015f)
     val swipeEnd = HideGuidePoint(x = 0.50f, y = 0.62f)
 
     return when {
-        value < 0.15f -> hideGuideInterpolate(
+        value < 0.06f -> homeStart
+        value < 0.20f -> hideGuideInterpolate(
             homeStart,
             swipeEnd,
-            hideGuideSegment(value, 0f, 0.15f),
+            hideGuideSegment(value, 0.06f, 0.20f),
         )
-        value < 0.18f -> swipeEnd
-        value < 0.23f -> hideGuideInterpolate(
+        value < 0.22f -> swipeEnd
+        value < 0.27f -> hideGuideInterpolate(
             swipeEnd,
             targets.moreButton,
-            hideGuideSegment(value, 0.18f, 0.23f),
+            hideGuideSegment(value, 0.22f, 0.27f),
         )
-        value < 0.29f -> targets.moreButton
-        value < 0.33f -> hideGuideInterpolate(
+        value < 0.33f -> targets.moreButton
+        value < 0.37f -> hideGuideInterpolate(
             targets.moreButton,
             targets.menuEdit,
-            hideGuideSegment(value, 0.29f, 0.33f),
+            hideGuideSegment(value, 0.33f, 0.37f),
         )
-        value < 0.37f -> targets.menuEdit
-        value < 0.46f -> hideGuideInterpolate(
+        value < 0.41f -> targets.menuEdit
+        value < 0.50f -> hideGuideInterpolate(
             targets.menuEdit,
             targets.availableTile,
-            hideGuideSegment(value, 0.37f, 0.46f),
+            hideGuideSegment(value, 0.41f, 0.50f),
         )
-        value < 0.52f -> targets.availableTile
-        value < 0.59f -> hideGuideInterpolate(
+        value < 0.56f -> targets.availableTile
+        value < 0.63f -> hideGuideInterpolate(
             targets.availableTile,
             targets.addedTile,
-            hideGuideSegment(value, 0.52f, 0.59f),
+            hideGuideSegment(value, 0.56f, 0.63f),
         )
-        value < 0.63f -> hideGuideInterpolate(
+        value < 0.67f -> hideGuideInterpolate(
             targets.addedTile,
             targets.doneButton,
-            hideGuideSegment(value, 0.59f, 0.63f),
+            hideGuideSegment(value, 0.63f, 0.67f),
         )
-        value < 0.67f -> targets.doneButton
-        value < 0.70f -> hideGuideInterpolate(
+        value < 0.71f -> targets.doneButton
+        value < 0.74f -> hideGuideInterpolate(
             targets.doneButton,
             targets.addedTile,
-            hideGuideSegment(value, 0.67f, 0.70f),
+            hideGuideSegment(value, 0.71f, 0.74f),
         )
         else -> targets.addedTile
     }
@@ -1722,9 +1777,9 @@ private fun hideGuideTapRipple(value: Float): Float {
     }
 
     return maxOf(
-        progressFrom(0.26f),
-        progressFrom(0.34f),
-        progressFrom(0.64f),
+        progressFrom(0.30f),
+        progressFrom(0.38f),
+        progressFrom(0.68f),
     )
 }
 
