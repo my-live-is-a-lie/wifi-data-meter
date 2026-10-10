@@ -116,6 +116,22 @@ data class SpeedTestRecord(
  */
 enum class ThemeMode { SYSTEM, LIGHT, DARK, BLACK }
 
+/** لون التمييز المختار من لوحة الألوان الجاهزة. */
+enum class AccentColor {
+    /** ألوان السمة الافتراضية (ألوان النظام إن كانت مفعّلة). */
+    DEFAULT,
+    INDIGO,
+    BLUE,
+    CYAN,
+    TEAL,
+    GREEN,
+    AMBER,
+    ORANGE,
+    RED,
+    PINK,
+    PURPLE,
+}
+
 /** إعدادات التطبيق المخزّنة محليًا. */
 data class AppSettings(
     val quotaBytes: Long = 0L,
@@ -125,6 +141,7 @@ data class AppSettings(
     /** فهرس خيار المدة في [SamplingIntervals]؛ يحفظ الوحدة حتى مع تساوي المدد. */
     val sampleIntervalIndex: Int = SamplingIntervals.DEFAULT_INDEX,
     val dynamicColorEnabled: Boolean = true,
+    val accentColor: AccentColor = AccentColor.DEFAULT,
     val trackingEnabled: Boolean = false,
     /** فهرس تصميم بطاقة استهلاك الباقة المختار على لوحة المعلومات. */
     val usageCardStyleIndex: Int = 0,

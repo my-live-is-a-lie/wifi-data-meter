@@ -69,6 +69,7 @@ class MainActivity : ComponentActivity() {
                 darkTheme = darkTheme,
                 dynamicColor = settings.dynamicColorEnabled,
                 amoled = settings.themeMode == ThemeMode.BLACK,
+                accentColor = settings.accentColor,
             ) {
                 CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
                     Surface(
