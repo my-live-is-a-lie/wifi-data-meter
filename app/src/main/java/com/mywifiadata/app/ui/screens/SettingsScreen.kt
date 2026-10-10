@@ -40,6 +40,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Bluetooth
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.GridView
@@ -89,6 +90,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -456,14 +458,6 @@ fun SettingsScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(text = stringResource(R.string.hide_app_icon_dialog_intro))
                     HideAppIconGuideIllustration()
-                    HideAppIconInstructionStep(
-                        number = 1,
-                        text = stringResource(R.string.hide_app_icon_step_open_panel),
-                    )
-                    HideAppIconInstructionStep(
-                        number = 2,
-                        text = stringResource(R.string.hide_app_icon_step_long_press),
-                    )
                     if (hideAppIconFailed) {
                         Text(
                             text = stringResource(R.string.hide_app_icon_failed),
@@ -510,31 +504,32 @@ private fun HideAppIconGuideIllustration() {
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 9_000, easing = LinearEasing),
+            animation = tween(durationMillis = 18_000, easing = LinearEasing),
             repeatMode = RepeatMode.Restart,
         ),
         label = "guide-cycle-progress",
     )
     val panelProgress = when {
         cycleProgress < 0.06f -> 0f
-        cycleProgress < 0.20f -> hideGuideSegment(cycleProgress, 0.06f, 0.20f)
-        cycleProgress < 0.70f -> 1f
-        cycleProgress < 0.80f -> 1f - hideGuideSegment(cycleProgress, 0.70f, 0.80f)
+        cycleProgress < 0.22f -> hideGuideSegment(cycleProgress, 0.06f, 0.22f)
+        cycleProgress < 0.77f -> 1f
+        cycleProgress < 0.87f -> 1f - hideGuideSegment(cycleProgress, 0.77f, 0.87f)
         else -> 0f
     }
-    val isEditing = cycleProgress in 0.32f..0.50f
-    val tileAdded = cycleProgress >= 0.50f
+    val isEditing = cycleProgress in 0.34f..0.56f
+    val tileAdded = cycleProgress >= 0.56f
     val holdProgress = when {
-        cycleProgress < 0.55f || cycleProgress > 0.72f -> 0f
-        cycleProgress < 0.60f -> hideGuideSegment(cycleProgress, 0.55f, 0.60f)
-        cycleProgress < 0.67f -> 1f
-        else -> 1f - hideGuideSegment(cycleProgress, 0.67f, 0.72f)
+        cycleProgress < 0.61f || cycleProgress > 0.77f -> 0f
+        cycleProgress < 0.66f -> hideGuideSegment(cycleProgress, 0.61f, 0.66f)
+        cycleProgress < 0.72f -> 1f
+        else -> 1f - hideGuideSegment(cycleProgress, 0.72f, 0.77f)
     }
     val pulse = ((sin(cycleProgress.toDouble() * 2.0 * PI * 10.0) + 1.0) / 2.0).toFloat()
     val captionResource = when {
-        cycleProgress < 0.20f -> R.string.hide_app_icon_demo_swipe
-        cycleProgress < 0.50f -> R.string.hide_app_icon_demo_add
-        cycleProgress < 0.72f -> R.string.hide_app_icon_demo_long_press
+        cycleProgress < 0.22f -> R.string.hide_app_icon_demo_swipe
+        cycleProgress < 0.34f -> R.string.hide_app_icon_demo_panel_open
+        cycleProgress < 0.56f -> R.string.hide_app_icon_demo_add
+        cycleProgress < 0.77f -> R.string.hide_app_icon_demo_long_press
         else -> R.string.hide_app_icon_demo_app_open
     }
 
@@ -544,7 +539,7 @@ private fun HideAppIconGuideIllustration() {
             .clip(RoundedCornerShape(18.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .padding(8.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(7.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
@@ -564,8 +559,8 @@ private fun HideAppIconGuideIllustration() {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(116.dp)
-                .clip(RoundedCornerShape(14.dp))
+                .height(204.dp)
+                .clip(RoundedCornerShape(16.dp))
                 .background(MaterialTheme.colorScheme.surfaceContainerHighest),
         ) {
             HideAppIconDemoAppScreen()
@@ -574,16 +569,56 @@ private fun HideAppIconGuideIllustration() {
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
-                    .height(108.dp)
+                    .height(192.dp)
                     .graphicsLayer {
                         translationY = -size.height * (1f - panelProgress)
                         alpha = panelProgress
                     }
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(22.dp))
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                    .padding(7.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                    .padding(horizontal = 9.dp, vertical = 7.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp),
             ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = stringResource(R.string.hide_app_icon_demo_time),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Spacer(modifier = Modifier.weight(1f))
+                    Icon(
+                        imageVector = Icons.Rounded.Wifi,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(13.dp),
+                    )
+                    Spacer(modifier = Modifier.width(5.dp))
+                    Box(
+                        modifier = Modifier
+                            .width(17.dp)
+                            .height(9.dp)
+                            .border(
+                                width = 1.dp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                shape = RoundedCornerShape(2.dp),
+                            )
+                            .padding(1.dp),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(0.72f)
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(1.dp))
+                                .background(MaterialTheme.colorScheme.onSurfaceVariant),
+                        )
+                    }
+                }
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -595,9 +630,8 @@ private fun HideAppIconGuideIllustration() {
                             if (isEditing) R.string.hide_app_icon_demo_add_tiles
                             else R.string.hide_app_icon_demo_quick_settings,
                         ),
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
                     )
                     Spacer(modifier = Modifier.weight(1f))
                     Text(
@@ -610,35 +644,118 @@ private fun HideAppIconGuideIllustration() {
                     )
                 }
 
-                Row(
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(42.dp),
-                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                        .height(8.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceContainerLow),
                 ) {
                     Box(
                         modifier = Modifier
-                            .weight(1.15f)
+                            .fillMaxWidth(0.68f)
+                            .fillMaxHeight()
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary),
+                    )
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(40.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    HideAppIconDemoTile(
+                        title = stringResource(R.string.hide_app_icon_demo_internet),
+                        selected = true,
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                    ) { tint ->
+                        Icon(
+                            imageVector = Icons.Rounded.Wifi,
+                            contentDescription = null,
+                            tint = tint,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                    HideAppIconDemoTile(
+                        title = stringResource(R.string.hide_app_icon_demo_bluetooth),
+                        selected = false,
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                    ) { tint ->
+                        Icon(
+                            imageVector = Icons.Rounded.Bluetooth,
+                            contentDescription = null,
+                            tint = tint,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(40.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    HideAppIconDemoTile(
+                        title = stringResource(R.string.hide_app_icon_demo_notifications),
+                        selected = false,
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                    ) { tint ->
+                        Icon(
+                            imageVector = Icons.Rounded.Notifications,
+                            contentDescription = null,
+                            tint = tint,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
                             .fillMaxHeight(),
                     ) {
                         AnimatedContent(
                             targetState = tileAdded,
                             label = "quick-settings-tile-added",
                         ) { added ->
-                            HideAppIconGuideTile(
-                                selected = added,
-                                modifier = Modifier.fillMaxSize(),
-                            )
+                            if (added) {
+                                HideAppIconDemoTile(
+                                    title = stringResource(R.string.qs_tile_label),
+                                    selected = true,
+                                    modifier = Modifier.fillMaxSize(),
+                                ) { tint ->
+                                    Icon(
+                                        painter = painterResource(R.drawable.ic_stat_usage),
+                                        contentDescription = null,
+                                        tint = tint,
+                                        modifier = Modifier.fillMaxSize(),
+                                    )
+                                }
+                            } else {
+                                HideAppIconDemoTile(
+                                    title = stringResource(R.string.hide_app_icon_demo_settings),
+                                    selected = false,
+                                    modifier = Modifier.fillMaxSize(),
+                                ) { tint ->
+                                    Icon(
+                                        imageVector = Icons.Rounded.Tune,
+                                        contentDescription = null,
+                                        tint = tint,
+                                        modifier = Modifier.fillMaxSize(),
+                                    )
+                                }
+                            }
                         }
                         if (holdProgress > 0f) {
                             Box(
                                 modifier = Modifier
                                     .matchParentSize()
-                                    .graphicsLayer { alpha = 0.30f + pulse * 0.45f }
+                                    .graphicsLayer { alpha = 0.35f + pulse * 0.45f }
                                     .border(
                                         width = (1f + pulse).dp,
                                         color = MaterialTheme.colorScheme.primary,
-                                        shape = RoundedCornerShape(10.dp),
+                                        shape = RoundedCornerShape(12.dp),
                                     ),
                             )
                             Icon(
@@ -647,25 +764,17 @@ private fun HideAppIconGuideIllustration() {
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier
                                     .align(Alignment.BottomEnd)
-                                    .size(15.dp)
+                                    .size(18.dp)
                                     .graphicsLayer { alpha = holdProgress },
                             )
                         }
                     }
-                    HideAppIconGuideTile(
-                        selected = false,
-                        modifier = Modifier.weight(1f).fillMaxHeight(),
-                    )
-                    HideAppIconGuideTile(
-                        selected = false,
-                        modifier = Modifier.weight(1f).fillMaxHeight(),
-                    )
                 }
 
                 AnimatedVisibility(
                     visible = isEditing,
-                    enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { it / 2 },
-                    exit = fadeOut(tween(140)) + slideOutVertically(tween(140)) { it / 2 },
+                    enter = fadeIn(tween(240)) + slideInVertically(tween(240)) { it / 2 },
+                    exit = fadeOut(tween(200)) + slideOutVertically(tween(200)) { it / 2 },
                 ) {
                     Row(
                         modifier = Modifier
@@ -683,12 +792,12 @@ private fun HideAppIconGuideIllustration() {
                         Row(
                             modifier = Modifier
                                 .graphicsLayer {
-                                    scaleX = 1f + pulse * 0.08f
-                                    scaleY = 1f + pulse * 0.08f
+                                    scaleX = 1f + pulse * 0.10f
+                                    scaleY = 1f + pulse * 0.10f
                                 }
-                                .clip(RoundedCornerShape(7.dp))
+                                .clip(RoundedCornerShape(8.dp))
                                 .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                                .padding(horizontal = 4.dp, vertical = 2.dp),
+                                .padding(horizontal = 5.dp, vertical = 2.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Icon(
@@ -704,7 +813,7 @@ private fun HideAppIconGuideIllustration() {
                                 color = MaterialTheme.colorScheme.onSurface,
                                 maxLines = 1,
                             )
-                            Spacer(modifier = Modifier.width(3.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
                             Box(
                                 modifier = Modifier
                                     .size(15.dp)
@@ -724,15 +833,15 @@ private fun HideAppIconGuideIllustration() {
                 }
             }
 
-            if (cycleProgress in 0.04f..0.20f) {
+            if (cycleProgress in 0.04f..0.22f) {
                 Icon(
                     imageVector = Icons.Rounded.TouchApp,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier
                         .align(Alignment.TopCenter)
-                        .offset(y = (hideGuideSegment(cycleProgress, 0.04f, 0.20f) * 54f - 10f).dp)
-                        .size(18.dp)
+                        .offset(y = (hideGuideSegment(cycleProgress, 0.04f, 0.22f) * 88f - 18f).dp)
+                        .size(20.dp)
                         .graphicsLayer { alpha = panelProgress },
                 )
             }
@@ -752,14 +861,14 @@ private fun HideAppIconDemoAppScreen() {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(10.dp),
+            .padding(14.dp),
         verticalArrangement = Arrangement.Center,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
-                    .size(30.dp)
-                    .clip(RoundedCornerShape(9.dp))
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(12.dp))
                     .background(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center,
             ) {
@@ -767,14 +876,14 @@ private fun HideAppIconDemoAppScreen() {
                     painter = painterResource(R.drawable.ic_stat_usage),
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(24.dp),
                 )
             }
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(9.dp))
             Column {
                 Text(
                     text = stringResource(R.string.app_name),
-                    style = MaterialTheme.typography.labelLarge,
+                    style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
@@ -784,37 +893,48 @@ private fun HideAppIconDemoAppScreen() {
                 )
             }
         }
-        Spacer(modifier = Modifier.height(8.dp))
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(30.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                .padding(horizontal = 10.dp),
-            contentAlignment = Alignment.CenterStart,
+        Spacer(modifier = Modifier.height(10.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(
-                text = stringResource(R.string.action_start_tracking),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            repeat(2) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(44.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                        .padding(8.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(0.56f)
+                            .height(5.dp)
+                            .align(Alignment.CenterStart)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)),
+                    )
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun HideAppIconGuideTile(
+private fun HideAppIconDemoTile(
+    title: String,
     selected: Boolean,
     modifier: Modifier = Modifier,
+    icon: @Composable (Color) -> Unit,
 ) {
-    val shape = RoundedCornerShape(10.dp)
+    val shape = RoundedCornerShape(12.dp)
     val foreground = if (selected) {
         MaterialTheme.colorScheme.onPrimaryContainer
     } else {
         MaterialTheme.colorScheme.onSurfaceVariant
     }
-    Column(
+    Row(
         modifier = modifier
             .clip(shape)
             .background(
@@ -825,75 +945,29 @@ private fun HideAppIconGuideTile(
                 if (selected) Modifier.border(1.dp, MaterialTheme.colorScheme.primary, shape)
                 else Modifier,
             )
-            .padding(horizontal = 2.dp, vertical = 3.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
+            .padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (selected) {
-            Icon(
-                painter = painterResource(R.drawable.ic_stat_usage),
-                contentDescription = null,
-                tint = foreground,
-                modifier = Modifier.size(14.dp),
-            )
-            Spacer(modifier = Modifier.height(1.dp))
-            Text(
-                text = stringResource(R.string.qs_tile_label),
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
-                color = foreground,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        } else {
-            Icon(
-                imageVector = Icons.Rounded.Wifi,
-                contentDescription = null,
-                tint = foreground,
-                modifier = Modifier.size(17.dp),
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Box(
-                modifier = Modifier
-                    .width(24.dp)
-                    .height(3.dp)
-                    .clip(CircleShape)
-                    .background(foreground.copy(alpha = 0.28f)),
-            )
+        Box(
+            modifier = Modifier.size(19.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            icon(foreground)
         }
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelSmall,
+            color = foreground,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
 private fun hideGuideSegment(value: Float, start: Float, end: Float): Float {
     val fraction = ((value - start) / (end - start)).coerceIn(0f, 1f)
     return fraction * fraction * (3f - 2f * fraction)
-}
-
-@Composable
-private fun HideAppIconInstructionStep(number: Int, text: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(24.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = number.toString(),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-            )
-        }
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-    }
 }
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3ExpressiveApi::class)

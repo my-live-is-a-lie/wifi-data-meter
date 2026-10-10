@@ -198,6 +198,7 @@
     <string name="hide_app_icon_guide_panel">مثال على بلاطة الإعدادات السريعة</string>
     <string name="hide_app_icon_guide_hold">اضغط مطولًا على البلاطة المظللة لفتح التطبيق.</string>
     <string name="hide_app_icon_demo_swipe">اسحب للأسفل لفتح ستارة الإشعارات</string>
+    <string name="hide_app_icon_demo_panel_open">ظهرت لوحة الإعدادات السريعة</string>
     <string name="hide_app_icon_demo_add">اضغط «تعديل» ثم أضف بلاطة «مراقبة الشبكة»</string>
     <string name="hide_app_icon_demo_long_press">اضغط مطولًا على البلاطة لفتح التطبيق</string>
     <string name="hide_app_icon_demo_app_open">يفتح التطبيق، ثم تتكرر الخطوات تلقائيًا</string>
@@ -206,6 +207,11 @@
     <string name="hide_app_icon_demo_done">تم</string>
     <string name="hide_app_icon_demo_add_tiles">إضافة بلاطات</string>
     <string name="hide_app_icon_demo_available_tiles">البلاطات المتاحة</string>
+    <string name="hide_app_icon_demo_time">9:41</string>
+    <string name="hide_app_icon_demo_internet">الإنترنت</string>
+    <string name="hide_app_icon_demo_bluetooth">بلوتوث</string>
+    <string name="hide_app_icon_demo_notifications">الإشعارات</string>
+    <string name="hide_app_icon_demo_settings">الإعدادات</string>
     <string name="hide_app_icon_confirm">تأكيد وإخفاء الأيقونة</string>
     <string name="hide_app_icon_failed">تعذّر تغيير ظهور الأيقونة. حاول مرة أخرى.</string>
     <string name="qs_tile_label">مراقبة الشبكة</string>
