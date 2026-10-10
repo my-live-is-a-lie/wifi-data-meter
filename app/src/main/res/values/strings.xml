@@ -161,8 +161,8 @@
     <string name="settings_section_data">الصلاحيات</string>
     <string name="settings_section_appearance">المظهر</string>
     <string name="settings_accent_color">لون التمييز</string>
-    <string name="settings_accent_color_desc">اختر لونًا جاهزًا لعناصر التمييز. اختيار لون يدوي يعطّل ألوان النظام تلقائيًا.</string>
-    <string name="settings_accent_color_current">اللون المستخدم: %1$s</string>
+    <string name="settings_accent_color_desc">اختيار لون يدوي يعطّل ألوان النظام.</string>
+    <string name="settings_accent_color_current">المستخدم: %1$s</string>
     <string name="settings_accent_color_system_active">ألوان النظام</string>
     <string name="accent_color_default">افتراضي</string>
     <string name="accent_color_indigo">نيلي</string>
