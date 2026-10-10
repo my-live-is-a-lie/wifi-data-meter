@@ -16,13 +16,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -44,6 +44,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -70,12 +72,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -609,114 +608,116 @@ private fun AccentColorSelector(
     dynamicColorEnabled: Boolean,
     onAccentColorChange: (AccentColor) -> Unit,
 ) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
     val options = remember { AccentColor.entries.toList() }
-    val colorRows = options.chunked(6)
     val currentColorLabel = if (dynamicColorEnabled) {
         stringResource(R.string.settings_accent_color_system_active)
     } else {
         stringResource(accentColor.labelResource())
     }
+    val currentSwatchColor = if (dynamicColorEnabled) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        accentColor.swatchColor()
+    }
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 6.dp),
+            .padding(top = 4.dp),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(role = Role.Button) { expanded = true }
+                .padding(vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = stringResource(R.string.settings_accent_color),
-                style = MaterialTheme.typography.bodyMediumEmphasized,
-                color = MaterialTheme.colorScheme.onSurface,
+            Icon(
+                imageVector = Icons.Rounded.Palette,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp),
             )
-            Text(
-                text = stringResource(R.string.settings_accent_color_current, currentColorLabel),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-                maxLines = 1,
-            )
-        }
-        Text(
-            text = stringResource(R.string.settings_accent_color_desc),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 2.dp),
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-
-        colorRows.forEachIndexed { rowIndex, rowOptions ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                rowOptions.forEach { option ->
-                    val label = stringResource(option.labelResource())
-                    AccentColorSwatch(
-                        color = option.swatchColor(),
-                        label = label,
-                        selected = !dynamicColorEnabled && accentColor == option,
-                        onClick = { onAccentColorChange(option) },
-                        modifier = Modifier.weight(1f),
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.settings_accent_color),
+                    style = MaterialTheme.typography.bodyLargeEmphasized,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(12.dp)
+                            .clip(CircleShape)
+                            .background(currentSwatchColor),
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = currentColorLabel,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
                     )
                 }
-                repeat(6 - rowOptions.size) {
-                    Spacer(modifier = Modifier.weight(1f))
-                }
             }
-            if (rowIndex < colorRows.lastIndex) {
-                Spacer(modifier = Modifier.height(2.dp))
-            }
-        }
-    }
-}
-
-@Composable
-private fun AccentColorSwatch(
-    color: Color,
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Box(
-        modifier = modifier
-            .height(48.dp)
-            .selectable(
-                selected = selected,
-                onClick = onClick,
-                role = Role.RadioButton,
+            Spacer(modifier = Modifier.width(8.dp))
+            Icon(
+                imageVector = Icons.Rounded.ExpandMore,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.rotate(if (expanded) 180f else 0f),
             )
-            .semantics { contentDescription = label },
-        contentAlignment = Alignment.Center,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(32.dp)
-                .clip(CircleShape)
-                .background(color)
-                .border(
-                    width = if (selected) 2.dp else 1.dp,
-                    color = if (selected) {
-                        MaterialTheme.colorScheme.onSurface
-                    } else {
-                        MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
-                    },
-                    shape = CircleShape,
-                ),
-            contentAlignment = Alignment.Center,
+        }
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.heightIn(max = 480.dp),
         ) {
-            if (selected) {
-                Icon(
-                    imageVector = Icons.Rounded.Check,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(20.dp),
+            options.forEach { option ->
+                val label = stringResource(option.labelResource())
+                val selected = accentColor == option
+                val swatchColor = if (option == AccentColor.DEFAULT && dynamicColorEnabled) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    option.swatchColor()
+                }
+                DropdownMenuItem(
+                    text = { Text(text = label, maxLines = 1) },
+                    onClick = {
+                        expanded = false
+                        onAccentColorChange(option)
+                    },
+                    leadingIcon = {
+                        Box(
+                            modifier = Modifier
+                                .size(14.dp)
+                                .clip(CircleShape)
+                                .background(swatchColor)
+                                .border(
+                                    width = 1.dp,
+                                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.7f),
+                                    shape = CircleShape,
+                                ),
+                        )
+                    },
+                    trailingIcon = if (selected) {
+                        {
+                            Icon(
+                                imageVector = Icons.Rounded.Check,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                    } else {
+                        null
+                    },
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                 )
             }
         }
