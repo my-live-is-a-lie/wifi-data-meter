@@ -4,6 +4,8 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
@@ -46,6 +48,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Bluetooth
@@ -63,7 +66,7 @@ import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Remove
-import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.Tune
@@ -568,29 +571,45 @@ private fun HideAppIconGuideIllustration() {
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 22_000, easing = LinearEasing),
+            animation = tween(durationMillis = 27_000, easing = LinearEasing),
             repeatMode = RepeatMode.Restart,
         ),
         label = "guide-cycle-progress",
     )
     val panelProgress = when {
-        cycleProgress < 0.22f -> hideGuideSegment(cycleProgress, 0f, 0.22f)
-        cycleProgress < 0.78f -> 1f
-        cycleProgress < 0.88f -> 1f - hideGuideSegment(cycleProgress, 0.78f, 0.88f)
+        cycleProgress < 0.15f -> hideGuideSegment(cycleProgress, 0f, 0.15f)
+        cycleProgress < 0.75f -> 1f
+        cycleProgress < 0.762f -> 1f - hideGuideSegment(cycleProgress, 0.75f, 0.762f)
         else -> 0f
     }
-    val overflowMenuOpen = cycleProgress in 0.32f..0.39f
-    val isEditing = cycleProgress in 0.39f..0.61f
-    val tileAdded = cycleProgress >= 0.52f
-    val holdProgress = when {
-        cycleProgress < 0.66f || cycleProgress > 0.78f -> 0f
-        cycleProgress < 0.69f -> hideGuideSegment(cycleProgress, 0.66f, 0.69f)
-        cycleProgress < 0.75f -> 1f
-        else -> 1f - hideGuideSegment(cycleProgress, 0.75f, 0.78f)
+    val overflowMenuOpen = cycleProgress in 0.29f..0.37f
+    val isEditing = cycleProgress in 0.37f..0.67f
+    val tileAdded = cycleProgress >= 0.59f
+    val addTileHoldProgress = when {
+        cycleProgress < 0.46f || cycleProgress >= 0.52f -> 0f
+        cycleProgress < 0.48f -> hideGuideSegment(cycleProgress, 0.46f, 0.48f)
+        cycleProgress < 0.50f -> 1f
+        else -> 1f - hideGuideSegment(cycleProgress, 0.50f, 0.52f)
+    }
+    val launchHoldProgress = when {
+        cycleProgress < 0.70f || cycleProgress >= 0.75f -> 0f
+        cycleProgress < 0.715f -> hideGuideSegment(cycleProgress, 0.70f, 0.715f)
+        cycleProgress < 0.735f -> 1f
+        else -> 1f - hideGuideSegment(cycleProgress, 0.735f, 0.75f)
+    }
+    val holdProgress = maxOf(addTileHoldProgress, launchHoldProgress)
+    val tileDragProgress = when {
+        cycleProgress < 0.52f -> 0f
+        cycleProgress < 0.59f -> hideGuideSegment(cycleProgress, 0.52f, 0.59f)
+        else -> 0f
+    }
+    val launchTileShrinkProgress = when {
+        cycleProgress < 0.735f -> 0f
+        cycleProgress < 0.75f -> hideGuideSegment(cycleProgress, 0.735f, 0.75f)
+        else -> 0f
     }
     val tapRippleProgress = hideGuideTapRipple(cycleProgress)
-    val pulse = ((sin(cycleProgress.toDouble() * 2.0 * PI * 10.0) + 1.0) / 2.0).toFloat()
-    val isAppScreenVisible = cycleProgress in 0.78f..0.96f
+    val isAppScreenVisible = cycleProgress in 0.773f..0.96f
     val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
 
     val fallbackTargets = hideGuideDefaultTargets(isRtl)
@@ -648,13 +667,13 @@ private fun HideAppIconGuideIllustration() {
     )
     val pointerPosition = hideGuidePointerPosition(cycleProgress, pointerTargets)
     val captionResource = when {
-        cycleProgress < 0.22f -> R.string.hide_app_icon_demo_swipe
-        cycleProgress < 0.25f -> R.string.hide_app_icon_demo_panel_open
-        cycleProgress < 0.32f -> R.string.hide_app_icon_demo_tap_more
-        cycleProgress < 0.39f -> R.string.hide_app_icon_demo_choose_edit
-        cycleProgress < 0.52f -> R.string.hide_app_icon_demo_add
-        cycleProgress < 0.61f -> R.string.hide_app_icon_demo_finish_edit
-        cycleProgress < 0.78f -> R.string.hide_app_icon_demo_long_press
+        cycleProgress < 0.15f -> R.string.hide_app_icon_demo_swipe
+        cycleProgress < 0.18f -> R.string.hide_app_icon_demo_panel_open
+        cycleProgress < 0.29f -> R.string.hide_app_icon_demo_tap_more
+        cycleProgress < 0.37f -> R.string.hide_app_icon_demo_choose_edit
+        cycleProgress < 0.59f -> R.string.hide_app_icon_demo_add
+        cycleProgress < 0.67f -> R.string.hide_app_icon_demo_finish_edit
+        cycleProgress < 0.75f -> R.string.hide_app_icon_demo_long_press
         else -> R.string.hide_app_icon_demo_app_open
     }
 
@@ -692,16 +711,21 @@ private fun HideAppIconGuideIllustration() {
                     updateGuideTargetPoints()
                 },
         ) {
+            val tileDragOffsetX =
+                maxWidth * (pointerTargets.addedTile.x - pointerTargets.availableTile.x) * tileDragProgress
+            val tileDragOffsetY =
+                maxHeight * (pointerTargets.addedTile.y - pointerTargets.availableTile.y) * tileDragProgress
+
             AnimatedContent(
                 targetState = isAppScreenVisible,
                 modifier = Modifier.fillMaxSize(),
                 transitionSpec = {
                     if (targetState) {
-                        (fadeIn(tween(520)) + slideInVertically(tween(520)) { it / 6 }) togetherWith
-                            fadeOut(tween(240))
+                        (fadeIn(tween(500)) + scaleIn(initialScale = 0.08f, animationSpec = tween(500))) togetherWith
+                            (fadeOut(tween(220)) + scaleOut(targetScale = 0.92f, animationSpec = tween(220)))
                     } else {
-                        (fadeIn(tween(360)) + slideInVertically(tween(360)) { -it / 8 }) togetherWith
-                            fadeOut(tween(180))
+                        (fadeIn(tween(260)) + scaleIn(initialScale = 0.92f, animationSpec = tween(260))) togetherWith
+                            (fadeOut(tween(260)) + scaleOut(targetScale = 0.08f, animationSpec = tween(260)))
                     }
                 },
                 label = "home-to-app-screen",
@@ -793,20 +817,31 @@ private fun HideAppIconGuideIllustration() {
                             color = MaterialTheme.colorScheme.primary,
                         )
                     } else {
-                        Box(
-                            modifier = Modifier
-                                .size(24.dp)
-                                .onGloballyPositioned {
-                                    moreButtonCoordinates = it
-                                    updateGuideTargetPoints()
-                                },
-                            contentAlignment = Alignment.Center,
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(3.dp),
                         ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .onGloballyPositioned {
+                                        moreButtonCoordinates = it
+                                        updateGuideTargetPoints()
+                                    },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.MoreVert,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
                             Icon(
-                                imageVector = Icons.Rounded.MoreVert,
+                                imageVector = Icons.Rounded.Settings,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(20.dp),
+                                modifier = Modifier.size(18.dp),
                             )
                         }
                     }
@@ -889,13 +924,22 @@ private fun HideAppIconGuideIllustration() {
                     ) {
                         AnimatedContent(
                             targetState = tileAdded,
+                            transitionSpec = {
+                                (fadeIn(tween(260)) + slideInVertically(tween(260)) { it / 3 }) togetherWith
+                                    fadeOut(tween(160))
+                            },
                             label = "quick-settings-tile-added",
                         ) { added ->
-                            if (added) {
-                                HideAppIconDemoTile(
+                            when {
+                                added -> HideAppIconDemoTile(
                                     title = stringResource(R.string.qs_tile_label),
                                     selected = true,
-                                    modifier = Modifier.fillMaxSize(),
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .graphicsLayer {
+                                            scaleX = 1f - 0.08f * launchTileShrinkProgress
+                                            scaleY = 1f - 0.08f * launchTileShrinkProgress
+                                        },
                                 ) { tint ->
                                     Icon(
                                         painter = painterResource(R.drawable.ic_stat_usage),
@@ -904,40 +948,42 @@ private fun HideAppIconGuideIllustration() {
                                         modifier = Modifier.fillMaxSize(),
                                     )
                                 }
-                            } else {
-                                HideAppIconDemoTile(
-                                    title = stringResource(R.string.hide_app_icon_demo_settings),
-                                    selected = false,
-                                    modifier = Modifier.fillMaxSize(),
-                                ) { tint ->
+                                isEditing -> Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(
+                                            MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.45f),
+                                        )
+                                        .border(
+                                            width = 1.dp + tileDragProgress.dp,
+                                            color = MaterialTheme.colorScheme.primary.copy(
+                                                alpha = 0.35f + 0.5f * tileDragProgress,
+                                            ),
+                                            shape = RoundedCornerShape(12.dp),
+                                        ),
+                                    contentAlignment = Alignment.Center,
+                                ) {
                                     Icon(
-                                        imageVector = Icons.Rounded.Tune,
+                                        imageVector = Icons.Rounded.Add,
                                         contentDescription = null,
-                                        tint = tint,
-                                        modifier = Modifier.fillMaxSize(),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(18.dp),
                                     )
                                 }
+                                else -> Spacer(modifier = Modifier.fillMaxSize())
                             }
                         }
-                        if (holdProgress > 0f) {
+                        if (launchHoldProgress > 0f) {
                             Box(
                                 modifier = Modifier
                                     .matchParentSize()
-                                    .graphicsLayer { alpha = 0.35f + pulse * 0.45f }
+                                    .graphicsLayer { alpha = 0.28f + launchHoldProgress * 0.28f }
                                     .border(
-                                        width = (1f + pulse).dp,
+                                        width = 1.dp + launchHoldProgress.dp,
                                         color = MaterialTheme.colorScheme.primary,
                                         shape = RoundedCornerShape(12.dp),
                                     ),
-                            )
-                            Icon(
-                                imageVector = Icons.Rounded.TouchApp,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier
-                                    .align(Alignment.BottomEnd)
-                                    .size(18.dp)
-                                    .graphicsLayer { alpha = holdProgress },
                             )
                         }
                     }
@@ -951,7 +997,7 @@ private fun HideAppIconGuideIllustration() {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(20.dp),
+                            .height(30.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
@@ -961,64 +1007,70 @@ private fun HideAppIconGuideIllustration() {
                             maxLines = 1,
                             modifier = Modifier.weight(1f),
                         )
-                        AnimatedContent(
-                            targetState = tileAdded,
+                        Box(
                             modifier = Modifier
-                                .graphicsLayer {
-                                    scaleX = 1f + pulse * 0.10f
-                                    scaleY = 1f + pulse * 0.10f
-                                }
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                                .padding(horizontal = 5.dp, vertical = 2.dp),
-                            label = "available-tile-selection",
-                        ) { added ->
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                .width(120.dp)
+                                .height(26.dp)
+                                .onGloballyPositioned {
+                                    availableTileCoordinates = it
+                                    updateGuideTargetPoints()
+                                },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            AnimatedContent(
+                                targetState = tileAdded,
+                                modifier = Modifier.fillMaxSize(),
+                                label = "available-tile-selection",
+                            ) { added ->
                                 if (added) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Check,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(13.dp),
-                                    )
-                                    Spacer(modifier = Modifier.width(3.dp))
-                                    Text(
-                                        text = stringResource(R.string.hide_app_icon_demo_added),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        maxLines = 1,
-                                    )
-                                } else {
-                                    Icon(
-                                        painter = painterResource(R.drawable.ic_stat_usage),
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(13.dp),
-                                    )
-                                    Spacer(modifier = Modifier.width(3.dp))
-                                    Text(
-                                        text = stringResource(R.string.qs_tile_label),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        maxLines = 1,
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Box(
+                                    Row(
                                         modifier = Modifier
-                                            .size(15.dp)
-                                            .clip(CircleShape)
-                                            .background(MaterialTheme.colorScheme.primaryContainer)
-                                            .onGloballyPositioned {
-                                                availableTileCoordinates = it
-                                                updateGuideTargetPoints()
-                                            },
-                                        contentAlignment = Alignment.Center,
+                                            .fillMaxSize()
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                                            .padding(horizontal = 5.dp, vertical = 2.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Rounded.Add,
+                                            imageVector = Icons.Rounded.Check,
                                             contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                            modifier = Modifier.size(12.dp),
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(13.dp),
+                                        )
+                                        Spacer(modifier = Modifier.width(3.dp))
+                                        Text(
+                                            text = stringResource(R.string.hide_app_icon_demo_added),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            maxLines = 1,
+                                        )
+                                    }
+                                } else {
+                                    HideAppIconDemoTile(
+                                        title = stringResource(R.string.qs_tile_label),
+                                        selected = false,
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .absoluteOffset(
+                                                x = tileDragOffsetX,
+                                                y = tileDragOffsetY,
+                                            )
+                                            .shadow(
+                                                elevation = (5f * tileDragProgress).dp,
+                                                shape = RoundedCornerShape(12.dp),
+                                            )
+                                            .graphicsLayer {
+                                                val pressScale = 1f - 0.06f * addTileHoldProgress
+                                                val dragScale = 1f + 0.04f * tileDragProgress
+                                                scaleX = pressScale * dragScale
+                                                scaleY = pressScale * dragScale
+                                            },
+                                    ) { tint ->
+                                        Icon(
+                                            painter = painterResource(R.drawable.ic_stat_usage),
+                                            contentDescription = null,
+                                            tint = tint,
+                                            modifier = Modifier.fillMaxSize(),
                                         )
                                     }
                                 }
@@ -1063,64 +1115,66 @@ private fun HideAppIconGuideIllustration() {
                 }
             }
 
-            val pointerSize = 34.dp
-            val longPressPulse = (
-                0.5 + 0.5 * sin(cycleProgress.toDouble() * 2.0 * PI * 12.0)
-            ).toFloat()
-            Box(
-                modifier = Modifier
-                    .align(AbsoluteAlignment.TopLeft)
-                    .absoluteOffset(
-                        x = maxWidth * pointerPosition.x - pointerSize / 2,
-                        y = maxHeight * pointerPosition.y - pointerSize / 2,
+            if (cycleProgress < 0.75f) {
+                val pointerSize = 34.dp
+                val longPressPulse = (
+                    0.5 + 0.5 * sin(cycleProgress.toDouble() * 2.0 * PI * 24.0)
+                ).toFloat()
+                Box(
+                    modifier = Modifier
+                        .align(AbsoluteAlignment.TopLeft)
+                        .absoluteOffset(
+                            x = maxWidth * pointerPosition.x - pointerSize / 2,
+                            y = maxHeight * pointerPosition.y - pointerSize / 2 + 9.dp,
+                        )
+                        .size(pointerSize),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (tapRippleProgress > 0f) {
+                        val tapAlpha = 1f - tapRippleProgress
+                        Box(
+                            modifier = Modifier
+                                .offset(y = (-10).dp)
+                                .size((8f + 26f * tapRippleProgress).dp)
+                                .shadow(7.dp, CircleShape)
+                                .background(Color.White.copy(alpha = 0.32f * tapAlpha), CircleShape)
+                                .border(
+                                    width = 1.75.dp,
+                                    color = Color.White.copy(alpha = 0.88f * tapAlpha),
+                                    shape = CircleShape,
+                                ),
+                        )
+                    }
+                    if (holdProgress > 0f) {
+                        Box(
+                            modifier = Modifier
+                                .offset(y = (-10).dp)
+                                .size((16f + longPressPulse * 14f).dp)
+                                .shadow(8.dp, CircleShape)
+                                .background(
+                                    Color.White.copy(alpha = 0.14f + 0.24f * longPressPulse),
+                                    CircleShape,
+                                )
+                                .border(
+                                    width = 1.75.dp,
+                                    color = Color.White.copy(alpha = 0.52f + 0.40f * longPressPulse),
+                                    shape = CircleShape,
+                                ),
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.Rounded.TouchApp,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(27.dp),
                     )
-                    .size(pointerSize),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (tapRippleProgress > 0f) {
-                    val tapAlpha = 1f - tapRippleProgress
-                    Box(
-                        modifier = Modifier
-                            .offset(y = 10.dp)
-                            .size((8f + 26f * tapRippleProgress).dp)
-                            .shadow(7.dp, CircleShape)
-                            .background(Color.White.copy(alpha = 0.32f * tapAlpha), CircleShape)
-                            .border(
-                                width = 1.75.dp,
-                                color = Color.White.copy(alpha = 0.88f * tapAlpha),
-                                shape = CircleShape,
-                            ),
+                    Icon(
+                        imageVector = Icons.Rounded.TouchApp,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp),
                     )
                 }
-                if (holdProgress > 0f) {
-                    Box(
-                        modifier = Modifier
-                            .offset(y = 10.dp)
-                            .size((16f + longPressPulse * 14f).dp)
-                            .shadow(8.dp, CircleShape)
-                            .background(
-                                Color.White.copy(alpha = 0.14f + 0.24f * longPressPulse),
-                                CircleShape,
-                            )
-                            .border(
-                                width = 1.75.dp,
-                                color = Color.White.copy(alpha = 0.52f + 0.40f * longPressPulse),
-                                shape = CircleShape,
-                            ),
-                    )
-                }
-                Icon(
-                    imageVector = Icons.Rounded.TouchApp,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(27.dp),
-                )
-                Icon(
-                    imageVector = Icons.Rounded.TouchApp,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(22.dp),
-                )
             }
         }
 
@@ -1605,56 +1659,49 @@ private fun hideGuidePointerPosition(
 ): HideGuidePoint {
     val homeStart = HideGuidePoint(x = 0.50f, y = 0.10f)
     val swipeEnd = HideGuidePoint(x = 0.50f, y = 0.62f)
-    val dashboardCard = HideGuidePoint(x = 0.50f, y = 0.40f)
 
     return when {
-        value < 0.22f -> hideGuideInterpolate(
+        value < 0.15f -> hideGuideInterpolate(
             homeStart,
             swipeEnd,
-            hideGuideSegment(value, 0f, 0.22f),
+            hideGuideSegment(value, 0f, 0.15f),
         )
-        value < 0.25f -> swipeEnd
-        value < 0.28f -> hideGuideInterpolate(
+        value < 0.18f -> swipeEnd
+        value < 0.23f -> hideGuideInterpolate(
             swipeEnd,
             targets.moreButton,
-            hideGuideSegment(value, 0.25f, 0.28f),
+            hideGuideSegment(value, 0.18f, 0.23f),
         )
-        value < 0.32f -> targets.moreButton
-        value < 0.35f -> hideGuideInterpolate(
+        value < 0.29f -> targets.moreButton
+        value < 0.33f -> hideGuideInterpolate(
             targets.moreButton,
             targets.menuEdit,
-            hideGuideSegment(value, 0.32f, 0.35f),
+            hideGuideSegment(value, 0.29f, 0.33f),
         )
-        value < 0.39f -> targets.menuEdit
-        value < 0.48f -> hideGuideInterpolate(
+        value < 0.37f -> targets.menuEdit
+        value < 0.46f -> hideGuideInterpolate(
             targets.menuEdit,
             targets.availableTile,
-            hideGuideSegment(value, 0.39f, 0.48f),
+            hideGuideSegment(value, 0.37f, 0.46f),
         )
         value < 0.52f -> targets.availableTile
-        value < 0.57f -> hideGuideInterpolate(
+        value < 0.59f -> hideGuideInterpolate(
             targets.availableTile,
-            targets.doneButton,
-            hideGuideSegment(value, 0.52f, 0.57f),
+            targets.addedTile,
+            hideGuideSegment(value, 0.52f, 0.59f),
         )
-        value < 0.61f -> targets.doneButton
-        value < 0.66f -> hideGuideInterpolate(
+        value < 0.63f -> hideGuideInterpolate(
+            targets.addedTile,
+            targets.doneButton,
+            hideGuideSegment(value, 0.59f, 0.63f),
+        )
+        value < 0.67f -> targets.doneButton
+        value < 0.70f -> hideGuideInterpolate(
             targets.doneButton,
             targets.addedTile,
-            hideGuideSegment(value, 0.61f, 0.66f),
+            hideGuideSegment(value, 0.67f, 0.70f),
         )
-        value < 0.78f -> targets.addedTile
-        value < 0.88f -> hideGuideInterpolate(
-            targets.addedTile,
-            dashboardCard,
-            hideGuideSegment(value, 0.78f, 0.88f),
-        )
-        value < 0.96f -> dashboardCard
-        else -> hideGuideInterpolate(
-            dashboardCard,
-            homeStart,
-            hideGuideSegment(value, 0.96f, 1f),
-        )
+        else -> targets.addedTile
     }
 }
 
@@ -1669,16 +1716,15 @@ private fun hideGuideInterpolate(
 
 private fun hideGuideTapRipple(value: Float): Float {
     fun progressFrom(start: Float): Float {
-        val duration = 0.04f
+        val duration = 0.016f
         if (value < start || value >= start + duration) return 0f
         return ((value - start) / duration).coerceIn(0f, 1f)
     }
 
     return maxOf(
-        progressFrom(0.285f),
-        progressFrom(0.35f),
-        progressFrom(0.48f),
-        progressFrom(0.57f),
+        progressFrom(0.26f),
+        progressFrom(0.34f),
+        progressFrom(0.64f),
     )
 }
 
