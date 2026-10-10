@@ -10,6 +10,7 @@ import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.mywifiadata.app.MyWifiApplication
 import com.mywifiadata.app.R
+import com.mywifiadata.app.core.AppLanguage
 import com.mywifiadata.app.core.Format
 import com.mywifiadata.app.core.SamplingIntervals
 import com.mywifiadata.app.core.TimeRange
@@ -33,6 +34,10 @@ import kotlinx.coroutines.withTimeoutOrNull
  * وتُطلق تنبيهات عند اقتراب انتهاء الباقة.
  */
 class MonitorService : Service() {
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(AppLanguage.localizedContext(newBase))
+    }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var loopJob: Job? = null

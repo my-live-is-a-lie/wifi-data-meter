@@ -11,20 +11,36 @@ import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 import com.mywifiadata.app.MyWifiApplication
 import com.mywifiadata.app.R
+import com.mywifiadata.app.core.AppLanguage
+import com.mywifiadata.app.core.LauncherIconVisibility
 
 /** زر الإعدادات السريعة لتشغيل مراقبة الشبكة وإيقافها. */
 class MonitoringTileService : TileService() {
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(AppLanguage.localizedContext(newBase))
+    }
 
     private val repository by lazy { (application as MyWifiApplication).repository }
 
     override fun onTileAdded() {
         super.onTileAdded()
-        repository.settingsStore.update { it.copy(quickSettingsTileEnabled = true) }
+        repository.settingsStore.update {
+            it.copy(quickSettingsTileEnabled = true, quickSettingsTileAdded = true)
+        }
         updateTileState()
     }
 
     override fun onTileRemoved() {
-        repository.settingsStore.update { it.copy(quickSettingsTileEnabled = false) }
+        // لا تترك المستخدم بلا مدخل: إذا أزال البلاطة، أعد أيقونة المشغّل تلقائيًا.
+        LauncherIconVisibility.setVisible(this, visible = true)
+        repository.settingsStore.update {
+            it.copy(
+                quickSettingsTileEnabled = false,
+                quickSettingsTileAdded = false,
+                appIconHidden = false,
+            )
+        }
         super.onTileRemoved()
     }
 

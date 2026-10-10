@@ -5,7 +5,9 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.mywifiadata.app.core.AppLanguage
 import com.mywifiadata.app.core.Format
+import com.mywifiadata.app.core.LauncherIconVisibility
 import com.mywifiadata.app.core.SamplingIntervals
 import com.mywifiadata.app.core.SpeedTestEngine
 import com.mywifiadata.app.core.TimeRange
@@ -483,8 +485,38 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
     }
 
     fun setQuickSettingsTileEnabled(enabled: Boolean) {
-        repository.settingsStore.update { it.copy(quickSettingsTileEnabled = enabled) }
+        val settingsStore = repository.settingsStore
+        if (!enabled && settingsStore.current.appIconHidden) {
+            if (!LauncherIconVisibility.setVisible(repository.context, visible = true)) return
+        }
+        settingsStore.update {
+            it.copy(
+                quickSettingsTileEnabled = enabled,
+                appIconHidden = if (enabled) it.appIconHidden else false,
+            )
+        }
         MonitoringTileService.requestRefresh(repository.context)
+    }
+
+    fun setQuickSettingsTileAdded(added: Boolean) {
+        repository.settingsStore.update { it.copy(quickSettingsTileAdded = added) }
+        MonitoringTileService.requestRefresh(repository.context)
+    }
+
+    fun setAppLanguage(languageTag: String) {
+        val language = AppLanguage.normalize(languageTag)
+        repository.settingsStore.update { it.copy(appLanguage = language) }
+    }
+
+    /** Changes the launcher alias only after the recovery tile has actually been added. */
+    fun setAppIconHidden(hidden: Boolean): Boolean {
+        val settings = repository.settingsStore.current
+        if (hidden && (!settings.quickSettingsTileEnabled || !settings.quickSettingsTileAdded)) {
+            return false
+        }
+        if (!LauncherIconVisibility.setVisible(repository.context, visible = !hidden)) return false
+        repository.settingsStore.update { it.copy(appIconHidden = hidden) }
+        return true
     }
 
     fun resetSession() {
@@ -561,8 +593,10 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
     }
 
     fun clearData() {
+        LauncherIconVisibility.setVisible(repository.context, visible = true)
         stopTracking()
         repository.settingsStore.clearAll()
+        MonitoringTileService.requestRefresh(repository.context)
         _uiState.update {
             UiState(
                 isLoading = false,

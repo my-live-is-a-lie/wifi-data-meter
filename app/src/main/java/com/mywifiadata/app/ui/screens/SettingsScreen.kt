@@ -38,7 +38,9 @@ import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Timer
+import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -60,6 +62,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -74,11 +77,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mywifiadata.app.R
@@ -113,6 +119,7 @@ fun SettingsScreen(
     onDynamicColorChange: (Boolean) -> Unit,
     onAccentColorChange: (AccentColor) -> Unit,
     onQuickSettingsTileEnabledChange: (Boolean) -> Unit,
+    onAppIconHiddenChange: (Boolean) -> Boolean,
     onTrackingChange: (Boolean) -> Unit,
     onThemeModeChange: (ThemeMode) -> Unit,
     onOpenUsageAccess: () -> Unit,
@@ -123,8 +130,11 @@ fun SettingsScreen(
 ) {
     var showQuotaDialog by rememberSaveable { mutableStateOf(false) }
     var showClearDialog by rememberSaveable { mutableStateOf(false) }
+    var showHideAppIconDialog by rememberSaveable { mutableStateOf(false) }
+    var hideAppIconFailed by rememberSaveable { mutableStateOf(false) }
     var moreExpanded by rememberSaveable { mutableStateOf(false) }
     val settings = state.settings
+    val quickSettingsTileReady = settings.quickSettingsTileEnabled && settings.quickSettingsTileAdded
 
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
@@ -330,7 +340,7 @@ fun SettingsScreen(
             )
             ExpressiveCard {
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    // رأس القسم نفسه هو زر التوسيع/الطيّ، ومحتواه فارغ حاليًا.
+                    // رأس القسم نفسه هو زر التوسيع/الطيّ.
                     SectionHeader(
                         title = stringResource(R.string.settings_section_more),
                         modifier = Modifier.clickable { moreExpanded = !moreExpanded },
@@ -357,6 +367,21 @@ fun SettingsScreen(
                                 subtitle = stringResource(R.string.settings_quick_settings_tile_desc),
                                 checked = settings.quickSettingsTileEnabled,
                                 onCheckedChange = onQuickSettingsTileEnabledChange,
+                            )
+                            SettingSwitchRow(
+                                icon = Icons.Rounded.VisibilityOff,
+                                title = stringResource(R.string.settings_hide_app_icon),
+                                subtitle = stringResource(R.string.settings_hide_app_icon_desc),
+                                checked = settings.appIconHidden,
+                                enabled = quickSettingsTileReady,
+                                onCheckedChange = { hide ->
+                                    if (hide) {
+                                        hideAppIconFailed = false
+                                        showHideAppIconDialog = true
+                                    } else {
+                                        onAppIconHiddenChange(false)
+                                    }
+                                },
                             )
                         }
                     }
@@ -404,6 +429,215 @@ fun SettingsScreen(
                     Text(text = stringResource(R.string.action_cancel))
                 }
             },
+        )
+    }
+
+    if (showHideAppIconDialog) {
+        AlertDialog(
+            onDismissRequest = { showHideAppIconDialog = false },
+            icon = { Icon(imageVector = Icons.Rounded.VisibilityOff, contentDescription = null) },
+            title = { Text(text = stringResource(R.string.hide_app_icon_dialog_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(text = stringResource(R.string.hide_app_icon_dialog_intro))
+                    HideAppIconGuideIllustration()
+                    HideAppIconInstructionStep(
+                        number = 1,
+                        text = stringResource(R.string.hide_app_icon_step_open_panel),
+                    )
+                    HideAppIconInstructionStep(
+                        number = 2,
+                        text = stringResource(R.string.hide_app_icon_step_long_press),
+                    )
+                    if (hideAppIconFailed) {
+                        Text(
+                            text = stringResource(R.string.hide_app_icon_failed),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (onAppIconHiddenChange(true)) {
+                            hideAppIconFailed = false
+                            showHideAppIconDialog = false
+                        } else {
+                            hideAppIconFailed = true
+                        }
+                    },
+                    shape = AppButtonShape,
+                ) {
+                    Text(text = stringResource(R.string.hide_app_icon_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        hideAppIconFailed = false
+                        showHideAppIconDialog = false
+                    },
+                    shape = AppButtonShape,
+                ) {
+                    Text(text = stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun HideAppIconGuideIllustration() {
+    val tileShape = RoundedCornerShape(14.dp)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = Icons.Rounded.GridView,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = stringResource(R.string.hide_app_icon_guide_panel),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            HideAppIconGuideTile(
+                selected = true,
+                shape = tileShape,
+                modifier = Modifier.weight(1.15f),
+            )
+            HideAppIconGuideTile(
+                selected = false,
+                shape = tileShape,
+                modifier = Modifier.weight(1f),
+            )
+            HideAppIconGuideTile(
+                selected = false,
+                shape = tileShape,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = Icons.Rounded.TouchApp,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = stringResource(R.string.hide_app_icon_guide_hold),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun HideAppIconGuideTile(
+    selected: Boolean,
+    shape: RoundedCornerShape,
+    modifier: Modifier = Modifier,
+) {
+    val foreground = if (selected) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Column(
+        modifier = modifier
+            .height(72.dp)
+            .clip(shape)
+            .background(
+                if (selected) MaterialTheme.colorScheme.primaryContainer
+                else MaterialTheme.colorScheme.surfaceContainerHighest,
+            )
+            .then(
+                if (selected) {
+                    Modifier.border(1.dp, MaterialTheme.colorScheme.primary, shape)
+                } else {
+                    Modifier
+                },
+            )
+            .padding(horizontal = 4.dp, vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        if (selected) {
+            Icon(
+                painter = painterResource(R.drawable.ic_stat_usage),
+                contentDescription = null,
+                tint = foreground,
+                modifier = Modifier.size(24.dp),
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = stringResource(R.string.qs_tile_label),
+                style = MaterialTheme.typography.labelSmall,
+                color = foreground,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Rounded.Wifi,
+                contentDescription = null,
+                tint = foreground,
+                modifier = Modifier.size(22.dp),
+            )
+            Spacer(modifier = Modifier.height(5.dp))
+            Box(
+                modifier = Modifier
+                    .width(32.dp)
+                    .height(4.dp)
+                    .clip(CircleShape)
+                    .background(foreground.copy(alpha = 0.28f)),
+            )
+        }
+    }
+}
+
+@Composable
+private fun HideAppIconInstructionStep(number: Int, text: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(24.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = number.toString(),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
         )
     }
 }
@@ -616,6 +850,7 @@ private fun AccentColorSelector(
     onAccentColorChange: (AccentColor) -> Unit,
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
+    val contentLayoutDirection = LocalLayoutDirection.current
     val options = remember { AccentColor.entries.toList() }
     val currentColorLabel = if (dynamicColorEnabled) {
         stringResource(R.string.settings_accent_color_system_active)
@@ -680,52 +915,56 @@ private fun AccentColorSelector(
             )
         }
 
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier.heightIn(max = 480.dp),
-        ) {
-            options.forEach { option ->
-                val label = stringResource(option.labelResource())
-                val selected = accentColor == option
-                val swatchColor = if (option == AccentColor.DEFAULT && dynamicColorEnabled) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    option.swatchColor()
-                }
-                DropdownMenuItem(
-                    text = { Text(text = label, maxLines = 1) },
-                    onClick = {
-                        expanded = false
-                        onAccentColorChange(option)
-                    },
-                    leadingIcon = {
-                        Box(
-                            modifier = Modifier
-                                .size(14.dp)
-                                .clip(CircleShape)
-                                .background(swatchColor)
-                                .border(
-                                    width = 1.dp,
-                                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.7f),
-                                    shape = CircleShape,
-                                ),
-                        )
-                    },
-                    trailingIcon = if (selected) {
-                        {
-                            Icon(
-                                imageVector = Icons.Rounded.Check,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.size(20.dp),
-                            )
+        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                modifier = Modifier.heightIn(max = 480.dp),
+            ) {
+                CompositionLocalProvider(LocalLayoutDirection provides contentLayoutDirection) {
+                    options.forEach { option ->
+                        val label = stringResource(option.labelResource())
+                        val selected = accentColor == option
+                        val swatchColor = if (option == AccentColor.DEFAULT && dynamicColorEnabled) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            option.swatchColor()
                         }
-                    } else {
-                        null
-                    },
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                )
+                        DropdownMenuItem(
+                            text = { Text(text = label, maxLines = 1) },
+                            onClick = {
+                                expanded = false
+                                onAccentColorChange(option)
+                            },
+                            leadingIcon = {
+                                Box(
+                                    modifier = Modifier
+                                        .size(14.dp)
+                                        .clip(CircleShape)
+                                        .background(swatchColor)
+                                        .border(
+                                            width = 1.dp,
+                                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.7f),
+                                            shape = CircleShape,
+                                        ),
+                                )
+                            },
+                            trailingIcon = if (selected) {
+                                {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Check,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.size(20.dp),
+                                    )
+                                }
+                            } else {
+                                null
+                            },
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        )
+                    }
+                }
             }
         }
     }

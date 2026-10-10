@@ -142,6 +142,10 @@
 
     <!-- الإعدادات -->
     <string name="settings_screen_title">الإعدادات</string>
+    <string name="cd_change_language">تغيير لغة التطبيق</string>
+    <string name="language_system">لغة الجهاز</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_english">English</string>
     <string name="settings_section_quota">الباقة والفاتورة</string>
     <string name="settings_quota_size">حجم الباقة الشهرية (جيجابايت)</string>
     <string name="settings_quota_hint">مثال: 100</string>
@@ -185,6 +189,16 @@
     <string name="settings_section_more">المزيد</string>
     <string name="settings_quick_settings_tile">زر مراقبة الشبكة في الإعدادات السريعة</string>
     <string name="settings_quick_settings_tile_desc">إضافة زر لتشغيل المراقبة من لوحة الإعدادات السريعة. قد يطلب النظام موافقتك أو يتطلب إضافته يدويًا. إيقاف هذا الخيار يعطّل الزر داخل التطبيق ولا يحذفه؛ أزِله يدويًا من اللوحة.</string>
+    <string name="settings_hide_app_icon">إخفاء أيقونة التطبيق</string>
+    <string name="settings_hide_app_icon_desc">يتطلب تفعيل خيار بلاطة الإعدادات السريعة وإضافتها فعليًا. بعد الإخفاء، اضغط مطولًا على بلاطة «مراقبة الشبكة» لفتح التطبيق مجددًا. إزالة البلاطة تعيد إظهار الأيقونة تلقائيًا.</string>
+    <string name="hide_app_icon_dialog_title">إخفاء أيقونة التطبيق؟</string>
+    <string name="hide_app_icon_dialog_intro">ستختفي الأيقونة من مشغّل التطبيقات، لكن التطبيق سيبقى مثبتًا ويمكن فتحه من البلاطة:</string>
+    <string name="hide_app_icon_step_open_panel">اسحب من أعلى الشاشة لفتح لوحة الإعدادات السريعة.</string>
+    <string name="hide_app_icon_step_long_press">اضغط مطولًا على بلاطة «مراقبة الشبكة» لفتح التطبيق مرة أخرى.</string>
+    <string name="hide_app_icon_guide_panel">مثال على بلاطة الإعدادات السريعة</string>
+    <string name="hide_app_icon_guide_hold">اضغط مطولًا على البلاطة المظللة لفتح التطبيق.</string>
+    <string name="hide_app_icon_confirm">تأكيد وإخفاء الأيقونة</string>
+    <string name="hide_app_icon_failed">تعذّر تغيير ظهور الأيقونة. حاول مرة أخرى.</string>
     <string name="qs_tile_label">مراقبة الشبكة</string>
     <string name="qs_tile_state_running">المراقبة تعمل</string>
     <string name="qs_tile_state_stopped">المراقبة متوقفة</string>

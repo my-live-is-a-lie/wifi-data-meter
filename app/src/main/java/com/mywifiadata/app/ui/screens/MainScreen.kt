@@ -1,10 +1,13 @@
 package com.mywifiadata.app.ui.screens
 
 import android.Manifest
+import android.app.Activity
 import android.app.PendingIntent
 import android.app.StatusBarManager
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
+import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.drawable.Icon as AndroidIcon
@@ -20,15 +23,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Apps
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -60,6 +67,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mywifiadata.app.R
+import com.mywifiadata.app.core.AppLanguage
 import com.mywifiadata.app.core.SystemActions
 import com.mywifiadata.app.monitor.MonitoringTileService
 import com.mywifiadata.app.ui.AppViewModel
@@ -88,6 +96,7 @@ fun MainScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     var selectedTabIndex by rememberSaveable { mutableIntStateOf(0) }
+    var languageMenuExpanded by rememberSaveable { mutableStateOf(false) }
 
     val permissionMessage = stringResource(R.string.permission_needed_title)
     val openSettingsLabel = stringResource(R.string.action_open_usage_access)
@@ -181,7 +190,12 @@ fun MainScreen(
         }
 
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-            scope.launch { snackbarHostState.showSnackbar(quickSettingsTileManualAddMessage) }
+            val message = if (viewModel.uiState.value.settings.quickSettingsTileAdded) {
+                quickSettingsTileAlreadyAddedMessage
+            } else {
+                quickSettingsTileManualAddMessage
+            }
+            scope.launch { snackbarHostState.showSnackbar(message) }
             return
         }
 
@@ -200,10 +214,12 @@ fun MainScreen(
             ) { result ->
                 when (result) {
                     StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ADDED -> {
+                        viewModel.setQuickSettingsTileAdded(true)
                         scope.launch { snackbarHostState.showSnackbar(quickSettingsTileAddedMessage) }
                     }
 
                     StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED -> {
+                        viewModel.setQuickSettingsTileAdded(true)
                         scope.launch { snackbarHostState.showSnackbar(quickSettingsTileAlreadyAddedMessage) }
                     }
 
@@ -217,6 +233,15 @@ fun MainScreen(
             viewModel.setQuickSettingsTileEnabled(false)
             scope.launch { snackbarHostState.showSnackbar(quickSettingsTileAddCancelledMessage) }
         }
+    }
+
+    fun selectAppLanguage(languageTag: String) {
+        languageMenuExpanded = false
+        val language = AppLanguage.normalize(languageTag)
+        if (state.settings.appLanguage == language) return
+        viewModel.setAppLanguage(language)
+        MonitoringTileService.requestRefresh(context)
+        context.findActivity()?.recreate()
     }
 
     fun requestUsageWidgetPin(selectedStyleIndex: Int) {
@@ -292,11 +317,69 @@ fun MainScreen(
             TopAppBar(
                 title = { Text(text = stringResource(currentTab.labelRes)) },
                 actions = {
-                    IconButton(onClick = { viewModel.refreshNow() }) {
-                        Icon(
-                            imageVector = Icons.Rounded.Refresh,
-                            contentDescription = stringResource(R.string.cd_refresh),
-                        )
+                    if (currentTab == AppTab.SETTINGS) {
+                        Box {
+                            IconButton(onClick = { languageMenuExpanded = true }) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Language,
+                                    contentDescription = stringResource(R.string.cd_change_language),
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = languageMenuExpanded,
+                                onDismissRequest = { languageMenuExpanded = false },
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text(text = stringResource(R.string.language_system)) },
+                                    onClick = { selectAppLanguage(AppLanguage.SYSTEM) },
+                                    trailingIcon = if (state.settings.appLanguage == AppLanguage.SYSTEM) {
+                                        {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Check,
+                                                contentDescription = null,
+                                            )
+                                        }
+                                    } else {
+                                        null
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(text = stringResource(R.string.language_arabic)) },
+                                    onClick = { selectAppLanguage(AppLanguage.ARABIC) },
+                                    trailingIcon = if (state.settings.appLanguage == AppLanguage.ARABIC) {
+                                        {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Check,
+                                                contentDescription = null,
+                                            )
+                                        }
+                                    } else {
+                                        null
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(text = stringResource(R.string.language_english)) },
+                                    onClick = { selectAppLanguage(AppLanguage.ENGLISH) },
+                                    trailingIcon = if (state.settings.appLanguage == AppLanguage.ENGLISH) {
+                                        {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Check,
+                                                contentDescription = null,
+                                            )
+                                        }
+                                    } else {
+                                        null
+                                    },
+                                )
+                            }
+                        }
+                    } else {
+                        IconButton(onClick = { viewModel.refreshNow() }) {
+                            Icon(
+                                imageVector = Icons.Rounded.Refresh,
+                                contentDescription = stringResource(R.string.cd_refresh),
+                            )
+                        }
                     }
                 },
             )
@@ -382,6 +465,7 @@ fun MainScreen(
                     onDynamicColorChange = { viewModel.setDynamicColorEnabled(it) },
                     onAccentColorChange = { viewModel.setAccentColor(it) },
                     onQuickSettingsTileEnabledChange = { configureQuickSettingsTile(it) },
+                    onAppIconHiddenChange = { viewModel.setAppIconHidden(it) },
                     onTrackingChange = { toggleTracking(it) },
                     onThemeModeChange = { viewModel.setThemeMode(it) },
                     onOpenUsageAccess = { SystemActions.openUsageAccessSettings(context) },
@@ -391,4 +475,13 @@ fun MainScreen(
             }
         }
     }
+}
+
+private fun Context.findActivity(): Activity? {
+    var current: Context? = this
+    while (current != null) {
+        if (current is Activity) return current
+        current = (current as? ContextWrapper)?.baseContext
+    }
+    return null
 }

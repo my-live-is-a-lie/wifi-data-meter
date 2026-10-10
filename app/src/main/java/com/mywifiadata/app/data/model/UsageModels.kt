@@ -1,5 +1,6 @@
 package com.mywifiadata.app.data.model
 
+import com.mywifiadata.app.core.AppLanguage
 import com.mywifiadata.app.core.SamplingIntervals
 
 /** إجماليات المرور (تنزيل/رفع). */
@@ -143,6 +144,12 @@ data class AppSettings(
     val dynamicColorEnabled: Boolean = true,
     val accentColor: AccentColor = AccentColor.DEFAULT,
     val quickSettingsTileEnabled: Boolean = false,
+    /** True only after the user has added the tile through system UI/manual edit. */
+    val quickSettingsTileAdded: Boolean = false,
+    /** Hide the launcher alias; the QS tile remains the way back into the app. */
+    val appIconHidden: Boolean = false,
+    /** `system`, `ar`, or `en`. */
+    val appLanguage: String = AppLanguage.SYSTEM,
     val trackingEnabled: Boolean = false,
     /** فهرس تصميم بطاقة استهلاك الباقة المختار على لوحة المعلومات. */
     val usageCardStyleIndex: Int = 0,

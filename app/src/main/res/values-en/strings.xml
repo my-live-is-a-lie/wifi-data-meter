@@ -129,6 +129,10 @@
     <string name="history_today_title">Today\'s history</string>
 
     <string name="settings_screen_title">Settings</string>
+    <string name="cd_change_language">Change app language</string>
+    <string name="language_system">Device language</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_english">English</string>
     <string name="settings_section_quota">Plan and billing</string>
     <string name="settings_quota_size">Monthly plan size (GB)</string>
     <string name="settings_quota_hint">e.g. 100</string>
@@ -172,6 +176,16 @@
     <string name="settings_section_more">More</string>
     <string name="settings_quick_settings_tile">Network monitoring Quick Settings tile</string>
     <string name="settings_quick_settings_tile_desc">Add a tile to toggle monitoring from Quick Settings. The system may ask for confirmation, or require manual adding. Turning this option off disables the tile in the app but does not remove it; remove it manually from Quick Settings.</string>
+    <string name="settings_hide_app_icon">Hide app icon</string>
+    <string name="settings_hide_app_icon_desc">Requires enabling the Quick Settings tile option and adding the tile. After hiding the icon, long-press “Network monitoring” in Quick Settings to reopen the app. Removing the tile automatically restores the app icon.</string>
+    <string name="hide_app_icon_dialog_title">Hide the app icon?</string>
+    <string name="hide_app_icon_dialog_intro">The icon will disappear from your launcher, but the app stays installed and can be opened from its tile:</string>
+    <string name="hide_app_icon_step_open_panel">Swipe down from the top of the screen to open Quick Settings.</string>
+    <string name="hide_app_icon_step_long_press">Long-press the “Network monitoring” tile to open the app again.</string>
+    <string name="hide_app_icon_guide_panel">Quick Settings tile preview</string>
+    <string name="hide_app_icon_guide_hold">Long-press the highlighted tile to open the app.</string>
+    <string name="hide_app_icon_confirm">Confirm and hide icon</string>
+    <string name="hide_app_icon_failed">Could not change the icon visibility. Please try again.</string>
     <string name="qs_tile_label">Network monitoring</string>
     <string name="qs_tile_state_running">Monitoring is on</string>
     <string name="qs_tile_state_stopped">Monitoring is off</string>

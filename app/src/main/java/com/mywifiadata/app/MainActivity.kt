@@ -1,5 +1,6 @@
 package com.mywifiadata.app
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -16,6 +17,8 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.mywifiadata.app.core.AppLanguage
+import com.mywifiadata.app.core.LauncherIconVisibility
 import com.mywifiadata.app.data.model.ThemeMode
 import com.mywifiadata.app.ui.AppViewModel
 import com.mywifiadata.app.ui.screens.MainScreen
@@ -27,11 +30,19 @@ import com.mywifiadata.app.widget.UsageWidgetProvider
  */
 class MainActivity : ComponentActivity() {
 
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(AppLanguage.localizedContext(newBase))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
         val repository = (application as MyWifiApplication).repository
+        LauncherIconVisibility.setVisible(
+            this,
+            visible = !repository.settingsStore.current.appIconHidden,
+        )
         // فتح الأداة اختيار صريح لشكلها؛ أما التشغيل العادي فيستعيد القيمة دون الكتابة فوقها.
         val hasWidgetStyle = intent.hasExtra(UsageWidgetProvider.EXTRA_OPEN_USAGE_CARD_STYLE)
         if (savedInstanceState == null && hasWidgetStyle) {
