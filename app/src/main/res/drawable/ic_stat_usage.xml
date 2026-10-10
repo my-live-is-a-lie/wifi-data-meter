@@ -5,39 +5,22 @@
     android:viewportWidth="24"
     android:viewportHeight="24"
     android:tint="#FFFFFFFF">
-    <!-- Three clean Wi-Fi bands, matching the app mark and staying inside the tile bounds. -->
+    <!-- The Wi-Fi mark of the new brand logo: two clean bands over a dot. -->
     <path
         android:fillColor="#00000000"
-        android:pathData="M3.7,6.4 C8.3,2.3 15.7,2.3 20.3,6.4"
+        android:pathData="M4.79,12.73 A7.5,7.5 0 0 1 19.21,12.73"
         android:strokeColor="#FFFFFFFF"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
-        android:strokeWidth="2" />
+        android:strokeWidth="1.85" />
     <path
         android:fillColor="#00000000"
-        android:pathData="M6.4,8.8 C9.5,5.9 14.5,5.9 17.6,8.8"
+        android:pathData="M7.91,13.63 A4.25,4.25 0 0 1 16.09,13.63"
         android:strokeColor="#FFFFFFFF"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
-        android:strokeWidth="2" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M9.1,10.9 C10.8,9.3 13.2,9.3 14.9,10.9"
-        android:strokeColor="#FFFFFFFF"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:strokeWidth="2" />
-    <!-- The dot and rising bars turn the Wi-Fi mark into a compact data-monitor logo. -->
+        android:strokeWidth="1.85" />
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M12,12.3a0.9,0.9 0,1 0,0 1.8a0.9,0.9 0,1 0,0 -1.8z" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M7.9,18.4h0.7c0.6,0 1,0.4 1,1v2.5c0,0.6 -0.4,1 -1,1h-0.7c-0.6,0 -1,-0.4 -1,-1v-2.5c0,-0.6 0.4,-1 1,-1z" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M11.7,16.4h0.7c0.6,0 1,0.4 1,1v4.5c0,0.6 -0.4,1 -1,1h-0.7c-0.6,0 -1,-0.4 -1,-1v-4.5c0,-0.6 0.4,-1 1,-1z" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M15.5,14.8h0.7c0.6,0 1,0.4 1,1v6.1c0,0.6 -0.4,1 -1,1h-0.7c-0.6,0 -1,-0.4 -1,-1v-6.1c0,-0.6 0.4,-1 1,-1z" />
+        android:pathData="M12,12.8a2,2 0,1 0,0 4a2,2 0,1 0,0 -4z" />
 </vector>
