@@ -200,6 +200,8 @@
     <string name="hide_app_icon_demo_swipe">اسحب للأسفل لفتح ستارة الإشعارات</string>
     <string name="hide_app_icon_demo_panel_open">ظهرت لوحة الإعدادات السريعة</string>
     <string name="hide_app_icon_demo_edit_caption">اضغط «تعديل» لفتح قائمة البلاطات</string>
+    <string name="hide_app_icon_demo_tap_more">اضغط زر النقاط الثلاث</string>
+    <string name="hide_app_icon_demo_choose_edit">اختر «تعديل» من القائمة</string>
     <string name="hide_app_icon_demo_add">اختر بلاطة «مراقبة الشبكة» من البلاطات المتاحة</string>
     <string name="hide_app_icon_demo_finish_edit">اضغط «تم» لحفظ البلاطة</string>
     <string name="hide_app_icon_demo_long_press">اضغط مطولًا على البلاطة لفتح التطبيق</string>
@@ -212,6 +214,8 @@
     <string name="hide_app_icon_demo_added">تمت الإضافة</string>
     <string name="hide_app_icon_demo_time">9:41</string>
     <string name="hide_app_icon_demo_home_date">الثلاثاء، 10 أكتوبر</string>
+    <string name="hide_app_icon_demo_phone">الهاتف</string>
+    <string name="hide_app_icon_demo_camera">الكاميرا</string>
     <string name="hide_app_icon_demo_apps">التطبيقات</string>
     <string name="hide_app_icon_demo_browser">المتصفح</string>
     <string name="hide_app_icon_demo_messages">الرسائل</string>

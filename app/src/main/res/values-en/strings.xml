@@ -187,6 +187,8 @@
     <string name="hide_app_icon_demo_swipe">Swipe down to open the notification shade</string>
     <string name="hide_app_icon_demo_panel_open">Quick Settings is open</string>
     <string name="hide_app_icon_demo_edit_caption">Tap Edit to manage tiles</string>
+    <string name="hide_app_icon_demo_tap_more">Tap the three-dot menu</string>
+    <string name="hide_app_icon_demo_choose_edit">Choose Edit from the menu</string>
     <string name="hide_app_icon_demo_add">Choose Network monitoring from available tiles</string>
     <string name="hide_app_icon_demo_finish_edit">Tap Done to save the tile</string>
     <string name="hide_app_icon_demo_long_press">Long-press the tile to open the app</string>
@@ -199,6 +201,8 @@
     <string name="hide_app_icon_demo_added">Added</string>
     <string name="hide_app_icon_demo_time">9:41</string>
     <string name="hide_app_icon_demo_home_date">Tuesday, October 10</string>
+    <string name="hide_app_icon_demo_phone">Phone</string>
+    <string name="hide_app_icon_demo_camera">Camera</string>
     <string name="hide_app_icon_demo_apps">Apps</string>
     <string name="hide_app_icon_demo_browser">Browser</string>
     <string name="hide_app_icon_demo_messages">Messages</string>
