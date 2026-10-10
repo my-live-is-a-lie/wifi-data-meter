@@ -62,6 +62,7 @@ class SettingsStore(context: Context) {
         accentColor = prefs.getString(KEY_ACCENT_COLOR, null)
             ?.let { stored -> AccentColor.entries.firstOrNull { it.name == stored } }
             ?: AccentColor.DEFAULT,
+        quickSettingsTileEnabled = prefs.getBoolean(KEY_QUICK_SETTINGS_TILE, false),
         trackingEnabled = prefs.getBoolean(KEY_TRACKING, false),
         usageCardStyleIndex = prefs.getInt(KEY_USAGE_CARD_STYLE, 0).coerceAtLeast(0),
         historyLineChartEnabled = prefs.getBoolean(KEY_HISTORY_LINE_CHART, false),
@@ -107,6 +108,7 @@ class SettingsStore(context: Context) {
             .putInt(KEY_INTERVAL_LEGACY_SECONDS, legacyIntervalSeconds)
             .putBoolean(KEY_DYNAMIC_COLOR, settings.dynamicColorEnabled)
             .putString(KEY_ACCENT_COLOR, settings.accentColor.name)
+            .putBoolean(KEY_QUICK_SETTINGS_TILE, settings.quickSettingsTileEnabled)
             .putBoolean(KEY_TRACKING, settings.trackingEnabled)
             .putInt(KEY_USAGE_CARD_STYLE, settings.usageCardStyleIndex)
             .putBoolean(KEY_HISTORY_LINE_CHART, settings.historyLineChartEnabled)
@@ -136,6 +138,7 @@ class SettingsStore(context: Context) {
         private const val KEY_INTERVAL_LEGACY_SECONDS = "sample_interval"
         private const val KEY_DYNAMIC_COLOR = "dynamic_color"
         private const val KEY_ACCENT_COLOR = "accent_color"
+        private const val KEY_QUICK_SETTINGS_TILE = "quick_settings_tile_enabled"
         private const val KEY_TRACKING = "tracking_enabled"
         private const val KEY_USAGE_CARD_STYLE = "usage_card_style"
         private const val KEY_HISTORY_LINE_CHART = "history_line_chart_enabled"

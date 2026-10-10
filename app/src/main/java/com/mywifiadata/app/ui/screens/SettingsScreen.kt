@@ -29,6 +29,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.MonetizationOn
 import androidx.compose.material.icons.rounded.OpenInNew
@@ -111,6 +112,7 @@ fun SettingsScreen(
     onIntervalChange: (Int) -> Unit,
     onDynamicColorChange: (Boolean) -> Unit,
     onAccentColorChange: (AccentColor) -> Unit,
+    onQuickSettingsTileEnabledChange: (Boolean) -> Unit,
     onTrackingChange: (Boolean) -> Unit,
     onThemeModeChange: (ThemeMode) -> Unit,
     onOpenUsageAccess: () -> Unit,
@@ -121,7 +123,6 @@ fun SettingsScreen(
 ) {
     var showQuotaDialog by rememberSaveable { mutableStateOf(false) }
     var showClearDialog by rememberSaveable { mutableStateOf(false) }
-    // قسم «المزيد» فارغ حاليًا ومهيأ لإضافة إعدادات مخفية إليه لاحقًا.
     var moreExpanded by rememberSaveable { mutableStateOf(false) }
     val settings = state.settings
 
@@ -350,7 +351,13 @@ fun SettingsScreen(
                     )
                     AnimatedVisibility(visible = moreExpanded) {
                         Column(modifier = Modifier.fillMaxWidth()) {
-                            // موضع فارغ لإعدادات إضافية مستقبلًا.
+                            SettingSwitchRow(
+                                icon = Icons.Rounded.GridView,
+                                title = stringResource(R.string.settings_quick_settings_tile),
+                                subtitle = stringResource(R.string.settings_quick_settings_tile_desc),
+                                checked = settings.quickSettingsTileEnabled,
+                                onCheckedChange = onQuickSettingsTileEnabledChange,
+                            )
                         }
                     }
                 }

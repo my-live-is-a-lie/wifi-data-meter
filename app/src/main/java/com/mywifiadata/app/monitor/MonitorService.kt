@@ -54,6 +54,7 @@ class MonitorService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
             repository.settingsStore.update { it.copy(trackingEnabled = false) }
+            MonitoringTileService.requestRefresh(this)
             stopSelfSafely()
             return START_NOT_STICKY
         }
@@ -79,6 +80,7 @@ class MonitorService : Service() {
      */
     override fun onTimeout(startId: Int) {
         repository.settingsStore.update { it.copy(trackingEnabled = false) }
+        MonitoringTileService.requestRefresh(this)
         notifier.notifyAlert(
             Notifier.ALERT_TIMEOUT_ID,
             getString(R.string.notification_timeout_title),
