@@ -579,8 +579,8 @@ private fun HideAppIconGuideIllustration() {
         ),
         label = "guide-cycle-progress",
     )
-    // تبقى أيقونة التطبيق ظاهرة أولًا، ثم تتلاشى خلال 900ms قبل بدء فتح الستارة عند 0.09.
-    val launcherAppIconVisible = cycleProgress < 0.055f
+    // تبقى الأيقونة ظاهرة أولًا، وتتلاشى خلال 900ms قبل فتح الستارة، ثم تعود فور رجوع الشاشة الرئيسية.
+    val launcherAppIconVisible = cycleProgress < 0.055f || cycleProgress >= 0.96f
     val panelProgress = when {
         cycleProgress < 0.09f -> 0f
         cycleProgress < 0.23f -> hideGuideSegment(cycleProgress, 0.09f, 0.23f)
@@ -615,7 +615,8 @@ private fun HideAppIconGuideIllustration() {
         else -> 0f
     }
     val tapRippleProgress = hideGuideTapRipple(cycleProgress)
-    val isAppScreenVisible = cycleProgress in 0.8515f..0.96f
+    // بعد اكتمال إغلاق الستارة عند 0.8441، تبقى الشاشة الرئيسية ظاهرة 0.1 ثانية.
+    val isAppScreenVisible = cycleProgress >= 0.8478f && cycleProgress < 0.96f
     val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
 
     val fallbackTargets = hideGuideDefaultTargets(isRtl)
@@ -673,7 +674,7 @@ private fun HideAppIconGuideIllustration() {
     )
     val pointerPosition = hideGuidePointerPosition(cycleProgress, pointerTargets)
     val captionResource = when {
-        cycleProgress < 0.055f -> R.string.hide_app_icon_demo_icon_visible
+        cycleProgress < 0.055f || cycleProgress >= 0.96f -> R.string.hide_app_icon_demo_icon_visible
         cycleProgress < 0.09f -> R.string.hide_app_icon_demo_icon_hidden
         cycleProgress < 0.23f -> R.string.hide_app_icon_demo_swipe
         cycleProgress < 0.25f -> R.string.hide_app_icon_demo_panel_open
