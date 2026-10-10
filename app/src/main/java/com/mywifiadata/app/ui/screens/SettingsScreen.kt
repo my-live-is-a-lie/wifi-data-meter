@@ -226,7 +226,9 @@ fun SettingsScreen(
         }
 
         item {
-            ExpressiveCard {
+            ExpressiveCard(
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
+            ) {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     SectionHeader(title = stringResource(R.string.settings_section_appearance))
                     ThemeModeSelector(
@@ -608,6 +610,7 @@ private fun AccentColorSelector(
     onAccentColorChange: (AccentColor) -> Unit,
 ) {
     val options = remember { AccentColor.entries.toList() }
+    val colorRows = options.chunked(6)
     val currentColorLabel = if (dynamicColorEnabled) {
         stringResource(R.string.settings_accent_color_system_active)
     } else {
@@ -617,31 +620,39 @@ private fun AccentColorSelector(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 8.dp),
+            .padding(top = 6.dp),
     ) {
-        Text(
-            text = stringResource(R.string.settings_accent_color),
-            style = MaterialTheme.typography.bodyMediumEmphasized,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.settings_accent_color),
+                style = MaterialTheme.typography.bodyMediumEmphasized,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = stringResource(R.string.settings_accent_color_current, currentColorLabel),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                maxLines = 1,
+            )
+        }
         Text(
             text = stringResource(R.string.settings_accent_color_desc),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 2.dp),
         )
-        Text(
-            text = stringResource(R.string.settings_accent_color_current, currentColorLabel),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(top = 4.dp),
-        )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(4.dp))
 
-        options.chunked(4).forEach { rowOptions ->
+        colorRows.forEachIndexed { rowIndex, rowOptions ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 rowOptions.forEach { option ->
@@ -654,9 +665,12 @@ private fun AccentColorSelector(
                         modifier = Modifier.weight(1f),
                     )
                 }
-                repeat(4 - rowOptions.size) {
+                repeat(6 - rowOptions.size) {
                     Spacer(modifier = Modifier.weight(1f))
                 }
+            }
+            if (rowIndex < colorRows.lastIndex) {
+                Spacer(modifier = Modifier.height(2.dp))
             }
         }
     }
@@ -683,7 +697,7 @@ private fun AccentColorSwatch(
     ) {
         Box(
             modifier = Modifier
-                .size(36.dp)
+                .size(32.dp)
                 .clip(CircleShape)
                 .background(color)
                 .border(
