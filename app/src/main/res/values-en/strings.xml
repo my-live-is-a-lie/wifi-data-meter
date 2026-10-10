@@ -186,6 +186,7 @@
     <string name="hide_app_icon_guide_hold">Long-press the highlighted tile to open the app.</string>
     <string name="hide_app_icon_demo_swipe">Swipe down to open the notification shade</string>
     <string name="hide_app_icon_demo_panel_open">Quick Settings is open</string>
+    <string name="hide_app_icon_demo_icon_visible">The app icon is visible on the home screen</string>
     <string name="hide_app_icon_demo_icon_hidden">The app icon disappears from the home screen</string>
     <string name="hide_app_icon_demo_edit_caption">Tap Edit to manage tiles</string>
     <string name="hide_app_icon_demo_tap_more">Tap the three-dot menu</string>
@@ -198,8 +199,6 @@
     <string name="hide_app_icon_demo_edit">Edit</string>
     <string name="hide_app_icon_demo_done">Done</string>
     <string name="hide_app_icon_demo_add_tiles">Add tiles</string>
-    <string name="hide_app_icon_demo_available_tiles">Available tiles</string>
-    <string name="hide_app_icon_demo_added">Added</string>
     <string name="hide_app_icon_demo_time">9:41</string>
     <string name="hide_app_icon_demo_home_date">Tuesday, October 10</string>
     <string name="hide_app_icon_demo_phone">Phone</string>
