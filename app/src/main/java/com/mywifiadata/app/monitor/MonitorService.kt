@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.mywifiadata.app.MyWifiApplication
@@ -64,7 +65,15 @@ class MonitorService : Service() {
             return START_NOT_STICKY
         }
 
-        startAsForeground()
+        try {
+            startAsForeground()
+        } catch (exception: RuntimeException) {
+            Log.e(TAG, "Could not promote the monitoring service to foreground", exception)
+            repository.settingsStore.update { it.copy(trackingEnabled = false) }
+            MonitoringTileService.requestRefresh(this)
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
 
         if (loopJob?.isActive != true) {
             loopJob = scope.launch { monitorLoop() }
@@ -243,6 +252,7 @@ class MonitorService : Service() {
     }
 
     companion object {
+        private const val TAG = "MonitorService"
         const val ACTION_STOP = "com.mywifiadata.app.action.STOP_MONITOR"
 
         fun start(context: Context) {

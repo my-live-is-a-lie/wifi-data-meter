@@ -1,14 +1,19 @@
 package com.mywifiadata.app.monitor
 
+import android.app.Dialog
 import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Icon
 import android.os.Build
 import android.provider.Settings
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
+import android.util.Log
+import android.widget.Toast
 import com.mywifiadata.app.MyWifiApplication
 import com.mywifiadata.app.R
 import com.mywifiadata.app.core.AppLanguage
@@ -63,15 +68,57 @@ class MonitoringTileService : TileService() {
         }
 
         if (settings.trackingEnabled) {
-            repository.settingsStore.update { it.copy(trackingEnabled = false) }
-            MonitorService.stop(this)
+            stopMonitoring()
+        } else if (Build.VERSION.SDK_INT == Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            // Android 14 may reject direct foreground-service starts from a tile callback.
+            // Showing a temporary dialog makes this user action eligible to start the service.
+            if (isLocked) {
+                unlockAndRun { startMonitoringThroughDialog() }
+            } else {
+                startMonitoringThroughDialog()
+            }
         } else {
-            repository.settingsStore.update { it.copy(trackingEnabled = true) }
-            val started = runCatching { MonitorService.start(this) }.isSuccess
-            if (!started) {
-                repository.settingsStore.update { it.copy(trackingEnabled = false) }
+            startMonitoring()
+        }
+    }
+
+    private fun startMonitoringThroughDialog() {
+        val dialog = Dialog(this).apply {
+            window?.apply {
+                setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+                setDimAmount(0f)
+            }
+            setOnShowListener {
+                startMonitoring()
+                dismiss()
             }
         }
+        runCatching { showDialog(dialog) }
+            .onFailure { exception ->
+                Log.w(TAG, "Temporary tile dialog failed; trying the direct start", exception)
+                startMonitoring()
+            }
+    }
+
+    private fun startMonitoring() {
+        val started = runCatching {
+            repository.settingsStore.update { it.copy(trackingEnabled = true) }
+            MonitorService.start(this)
+        }.onFailure { exception ->
+            Log.e(TAG, "Could not start monitoring from Quick Settings", exception)
+            repository.settingsStore.update { it.copy(trackingEnabled = false) }
+            Toast.makeText(this, R.string.qs_tile_start_failed, Toast.LENGTH_LONG).show()
+        }.isSuccess
+
+        if (!started) {
+            MonitoringTileService.requestRefresh(this)
+        }
+        updateTileState()
+    }
+
+    private fun stopMonitoring() {
+        repository.settingsStore.update { it.copy(trackingEnabled = false) }
+        MonitorService.stop(this)
         updateTileState()
     }
 
@@ -119,6 +166,7 @@ class MonitoringTileService : TileService() {
     }
 
     companion object {
+        private const val TAG = "MonitoringTileService"
         private const val USAGE_ACCESS_REQUEST_CODE = 5401
 
         /** يطلب من النظام إعادة قراءة حالة البلاطة بعد تغييرها من واجهة التطبيق. */
