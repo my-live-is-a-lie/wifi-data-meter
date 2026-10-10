@@ -4,8 +4,40 @@
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24"
-    android:tint="#FFFFFF">
+    android:tint="#FFFFFFFF">
+    <!-- Three clean Wi-Fi bands, matching the app mark and staying inside the tile bounds. -->
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M12,21l-3,-3c1.66,-1.66 4.34,-1.66 6,0l-3,3zM5,13l-2,-2C8.87,4.14 15.14,4.14 21,11l-2,2C15.24,9.24 8.76,9.24 5,13zM1,9l-2,-2C7.08,0.93 16.93,0.93 25,7l-2,2C18.03,4.03 9.97,4.03 1,9z" />
+        android:fillColor="#00000000"
+        android:pathData="M3.7,6.4 C8.3,2.3 15.7,2.3 20.3,6.4"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="2" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M6.4,8.8 C9.5,5.9 14.5,5.9 17.6,8.8"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="2" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M9.1,10.9 C10.8,9.3 13.2,9.3 14.9,10.9"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="2" />
+    <!-- The dot and rising bars turn the Wi-Fi mark into a compact data-monitor logo. -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,12.3a0.9,0.9 0,1 0,0 1.8a0.9,0.9 0,1 0,0 -1.8z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M7.9,18.4h0.7c0.6,0 1,0.4 1,1v2.5c0,0.6 -0.4,1 -1,1h-0.7c-0.6,0 -1,-0.4 -1,-1v-2.5c0,-0.6 0.4,-1 1,-1z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M11.7,16.4h0.7c0.6,0 1,0.4 1,1v4.5c0,0.6 -0.4,1 -1,1h-0.7c-0.6,0 -1,-0.4 -1,-1v-4.5c0,-0.6 0.4,-1 1,-1z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M15.5,14.8h0.7c0.6,0 1,0.4 1,1v6.1c0,0.6 -0.4,1 -1,1h-0.7c-0.6,0 -1,-0.4 -1,-1v-6.1c0,-0.6 0.4,-1 1,-1z" />
 </vector>
