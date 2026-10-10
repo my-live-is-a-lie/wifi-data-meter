@@ -148,8 +148,6 @@
     <string name="settings_section_data">Permissions</string>
     <string name="settings_section_appearance">Appearance</string>
     <string name="settings_accent_color">Accent color</string>
-    <string name="settings_accent_color_desc">A manual choice turns off system colors.</string>
-    <string name="settings_accent_color_current">Using: %1$s</string>
     <string name="settings_accent_color_system_active">System colors</string>
     <string name="accent_color_default">Default</string>
     <string name="accent_color_indigo">Indigo</string>
