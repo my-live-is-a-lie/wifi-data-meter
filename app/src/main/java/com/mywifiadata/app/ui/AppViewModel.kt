@@ -12,6 +12,7 @@ import com.mywifiadata.app.core.TimeRange
 import com.mywifiadata.app.core.TimeRanges
 import com.mywifiadata.app.core.UsagePeriod
 import com.mywifiadata.app.data.UsageRepository
+import com.mywifiadata.app.data.model.AccentColor
 import com.mywifiadata.app.data.model.AppSettings
 import com.mywifiadata.app.data.model.AppUsage
 import com.mywifiadata.app.data.model.AppsFilter
@@ -532,7 +533,19 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
     }
 
     fun setDynamicColorEnabled(enabled: Boolean) {
-        repository.settingsStore.update { it.copy(dynamicColorEnabled = enabled) }
+        repository.settingsStore.update {
+            it.copy(
+                dynamicColorEnabled = enabled,
+                // عند الرجوع إلى ألوان النظام نعيد الخيار الافتراضي بدل إبقاء لون يدوي غير فعّال.
+                accentColor = if (enabled) AccentColor.DEFAULT else it.accentColor,
+            )
+        }
+    }
+
+    fun setAccentColor(color: AccentColor) {
+        repository.settingsStore.update {
+            it.copy(accentColor = color, dynamicColorEnabled = false)
+        }
     }
 
     fun setThemeMode(mode: ThemeMode) {

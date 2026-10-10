@@ -326,6 +326,7 @@ fun MainScreen(
                     onThresholdChange = { viewModel.setAlertThreshold(it) },
                     onIntervalChange = { viewModel.setSampleInterval(it) },
                     onDynamicColorChange = { viewModel.setDynamicColorEnabled(it) },
+                    onAccentColorChange = { viewModel.setAccentColor(it) },
                     onTrackingChange = { toggleTracking(it) },
                     onThemeModeChange = { viewModel.setThemeMode(it) },
                     onOpenUsageAccess = { SystemActions.openUsageAccessSettings(context) },

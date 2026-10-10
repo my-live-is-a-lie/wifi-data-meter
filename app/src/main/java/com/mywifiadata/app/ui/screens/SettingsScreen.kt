@@ -22,6 +22,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -68,8 +70,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -79,6 +85,7 @@ import com.mywifiadata.app.R
 import com.mywifiadata.app.core.Format
 import com.mywifiadata.app.core.SamplingIntervalUnit
 import com.mywifiadata.app.core.SamplingIntervals
+import com.mywifiadata.app.data.model.AccentColor
 import com.mywifiadata.app.data.model.ThemeMode
 import com.mywifiadata.app.ui.UiState
 import com.mywifiadata.app.ui.components.ExpressiveCard
@@ -86,6 +93,7 @@ import com.mywifiadata.app.ui.components.InfoRow
 import com.mywifiadata.app.ui.components.SectionHeader
 import com.mywifiadata.app.ui.components.SettingSwitchRow
 import com.mywifiadata.app.ui.theme.AppButtonShape
+import com.mywifiadata.app.ui.theme.swatchColor
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.collect
@@ -103,6 +111,7 @@ fun SettingsScreen(
     onThresholdChange: (Int) -> Unit,
     onIntervalChange: (Int) -> Unit,
     onDynamicColorChange: (Boolean) -> Unit,
+    onAccentColorChange: (AccentColor) -> Unit,
     onTrackingChange: (Boolean) -> Unit,
     onThemeModeChange: (ThemeMode) -> Unit,
     onOpenUsageAccess: () -> Unit,
@@ -223,6 +232,11 @@ fun SettingsScreen(
                     ThemeModeSelector(
                         themeMode = settings.themeMode,
                         onThemeModeChange = onThemeModeChange,
+                    )
+                    AccentColorSelector(
+                        accentColor = settings.accentColor,
+                        dynamicColorEnabled = settings.dynamicColorEnabled,
+                        onAccentColorChange = onAccentColorChange,
                     )
                     SettingSwitchRow(
                         icon = Icons.Rounded.Palette,
@@ -585,6 +599,128 @@ private fun ThemeModeSelector(
             }
         }
     }
+}
+
+@Composable
+private fun AccentColorSelector(
+    accentColor: AccentColor,
+    dynamicColorEnabled: Boolean,
+    onAccentColorChange: (AccentColor) -> Unit,
+) {
+    val options = remember { AccentColor.entries.toList() }
+    val currentColorLabel = if (dynamicColorEnabled) {
+        stringResource(R.string.settings_accent_color_system_active)
+    } else {
+        stringResource(accentColor.labelResource())
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.settings_accent_color),
+            style = MaterialTheme.typography.bodyMediumEmphasized,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            text = stringResource(R.string.settings_accent_color_desc),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        Text(
+            text = stringResource(R.string.settings_accent_color_current, currentColorLabel),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        options.chunked(4).forEach { rowOptions ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                rowOptions.forEach { option ->
+                    val label = stringResource(option.labelResource())
+                    AccentColorSwatch(
+                        color = option.swatchColor(),
+                        label = label,
+                        selected = !dynamicColorEnabled && accentColor == option,
+                        onClick = { onAccentColorChange(option) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                repeat(4 - rowOptions.size) {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AccentColorSwatch(
+    color: Color,
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .height(48.dp)
+            .selectable(
+                selected = selected,
+                onClick = onClick,
+                role = Role.RadioButton,
+            )
+            .semantics { contentDescription = label },
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(color)
+                .border(
+                    width = if (selected) 2.dp else 1.dp,
+                    color = if (selected) {
+                        MaterialTheme.colorScheme.onSurface
+                    } else {
+                        MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
+                    },
+                    shape = CircleShape,
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (selected) {
+                Icon(
+                    imageVector = Icons.Rounded.Check,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
+    }
+}
+
+private fun AccentColor.labelResource(): Int = when (this) {
+    AccentColor.DEFAULT -> R.string.accent_color_default
+    AccentColor.INDIGO -> R.string.accent_color_indigo
+    AccentColor.BLUE -> R.string.accent_color_blue
+    AccentColor.CYAN -> R.string.accent_color_cyan
+    AccentColor.TEAL -> R.string.accent_color_teal
+    AccentColor.GREEN -> R.string.accent_color_green
+    AccentColor.AMBER -> R.string.accent_color_amber
+    AccentColor.ORANGE -> R.string.accent_color_orange
+    AccentColor.RED -> R.string.accent_color_red
+    AccentColor.PINK -> R.string.accent_color_pink
+    AccentColor.PURPLE -> R.string.accent_color_purple
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

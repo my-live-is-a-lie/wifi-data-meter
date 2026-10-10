@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+import com.mywifiadata.app.data.model.AccentColor
 
 /** ألوان دلالية إضافية: التنزيل والرفع. */
 val LocalDownloadColor = staticCompositionLocalOf { Color(0xFF3F51D8) }
@@ -32,6 +33,7 @@ val LocalSpeedButtonContentColor = staticCompositionLocalOf { Color(0xFF101C3A) 
  *
  * - يختار مخطط الألوان الديناميكي من خلفية الشاشة عند توفره (أندرويد 12+) إن كان مُفعّلًا.
  * - يستخدم [expressiveLightColorScheme] في الوضع الفاتح و [darkColorScheme] في الوضع الداكن.
+ * - يطبّق [accentColor] على أدوار اللون الأساسي عند اختيار لون يدوي.
  * - عند تفعيل [amoled] في الوضع الداكن تصبح الخلفيات سوداء بالكامل (وضع «مظلم»).
  * - يمرّر [MotionScheme.expressive] لحركات أكثر حيوية.
  */
@@ -40,6 +42,7 @@ fun AppTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = true,
     amoled: Boolean = false,
+    accentColor: AccentColor = AccentColor.DEFAULT,
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
@@ -53,9 +56,11 @@ fun AppTheme(
         else -> expressiveLightColorScheme()
     }
 
+    val accentedScheme = baseScheme.withAccentColor(accentColor, darkTheme)
+
     // وضع «مظلم» (AMOLED): أسود بالكامل للخلفيات مع تدرّجات شبه سوداء للتباين.
     val colorScheme: ColorScheme = if (amoled && darkTheme) {
-        baseScheme.copy(
+        accentedScheme.copy(
             background = Color.Black,
             surface = Color.Black,
             surfaceDim = Color.Black,
@@ -67,7 +72,7 @@ fun AppTheme(
             surfaceContainerHighest = Color(0xFF161616),
         )
     } else {
-        baseScheme
+        accentedScheme
     }
 
     val downloadColor = if (darkTheme) Color(0xFFB7C4FF) else Color(0xFF2A3EB1)
