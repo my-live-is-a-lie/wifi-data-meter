@@ -1017,35 +1017,38 @@ private fun HideAppIconGuideIllustration() {
                 }
             }
 
-            AnimatedVisibility(
-                visible = overflowMenuOpen,
+            AnimatedContent(
+                targetState = overflowMenuOpen,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .absoluteOffset(x = if (isRtl) 9.dp else (-9).dp, y = 52.dp),
-                enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { -it / 4 },
-                exit = fadeOut(tween(140)) + slideOutVertically(tween(140)) { -it / 4 },
-            ) {
-                Row(
-                    modifier = Modifier
-                        .onGloballyPositioned {
-                            menuEditCoordinates = it
-                            updateGuideTargetPoints()
-                        }
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(MaterialTheme.colorScheme.surface)
-                        .border(
-                            width = 1.dp,
-                            color = MaterialTheme.colorScheme.outlineVariant,
-                            shape = RoundedCornerShape(10.dp),
+                label = "quick-settings-overflow-menu",
+            ) { menuVisible ->
+                if (menuVisible) {
+                    Row(
+                        modifier = Modifier
+                            .onGloballyPositioned {
+                                menuEditCoordinates = it
+                                updateGuideTargetPoints()
+                            }
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(MaterialTheme.colorScheme.surface)
+                            .border(
+                                width = 1.dp,
+                                color = MaterialTheme.colorScheme.outlineVariant,
+                                shape = RoundedCornerShape(10.dp),
+                            )
+                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.hide_app_icon_demo_edit),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
-                        .padding(horizontal = 14.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = stringResource(R.string.hide_app_icon_demo_edit),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
+                    }
+                } else {
+                    Spacer(modifier = Modifier.size(1.dp).graphicsLayer { alpha = 0f })
                 }
             }
 
