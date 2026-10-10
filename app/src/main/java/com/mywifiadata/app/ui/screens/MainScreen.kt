@@ -2,10 +2,12 @@ package com.mywifiadata.app.ui.screens
 
 import android.Manifest
 import android.app.PendingIntent
+import android.app.StatusBarManager
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.drawable.Icon as AndroidIcon
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.compose.BackHandler
@@ -59,6 +61,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mywifiadata.app.R
 import com.mywifiadata.app.core.SystemActions
+import com.mywifiadata.app.monitor.MonitoringTileService
 import com.mywifiadata.app.ui.AppViewModel
 import com.mywifiadata.app.ui.theme.AppButtonShape
 import com.mywifiadata.app.widget.UsageWidgetProvider
@@ -92,6 +95,11 @@ fun MainScreen(
     val wifiDeniedMessage = stringResource(R.string.wifi_permission_denied)
     val widgetPinRequestedMessage = stringResource(R.string.widget_pin_requested)
     val widgetPinUnsupportedMessage = stringResource(R.string.widget_pin_unsupported)
+    val quickSettingsTileAddedMessage = stringResource(R.string.qs_tile_added)
+    val quickSettingsTileAlreadyAddedMessage = stringResource(R.string.qs_tile_already_added)
+    val quickSettingsTileAddCancelledMessage = stringResource(R.string.qs_tile_add_cancelled)
+    val quickSettingsTileManualAddMessage = stringResource(R.string.qs_tile_manual_add)
+    val quickSettingsTileDisabledMessage = stringResource(R.string.qs_tile_disabled)
 
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
@@ -162,6 +170,52 @@ fun MainScreen(
             viewModel.startTracking()
         } else {
             viewModel.stopTracking()
+        }
+    }
+
+    fun configureQuickSettingsTile(enabled: Boolean) {
+        viewModel.setQuickSettingsTileEnabled(enabled)
+        if (!enabled) {
+            scope.launch { snackbarHostState.showSnackbar(quickSettingsTileDisabledMessage) }
+            return
+        }
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            scope.launch { snackbarHostState.showSnackbar(quickSettingsTileManualAddMessage) }
+            return
+        }
+
+        val statusBarManager = context.getSystemService(StatusBarManager::class.java)
+        if (statusBarManager == null) {
+            scope.launch { snackbarHostState.showSnackbar(quickSettingsTileManualAddMessage) }
+            return
+        }
+
+        runCatching {
+            statusBarManager.requestAddTileService(
+                ComponentName(context, MonitoringTileService::class.java),
+                context.getString(R.string.qs_tile_label),
+                AndroidIcon.createWithResource(context, R.drawable.ic_stat_usage),
+                ContextCompat.getMainExecutor(context),
+            ) { result ->
+                when (result) {
+                    StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ADDED -> {
+                        scope.launch { snackbarHostState.showSnackbar(quickSettingsTileAddedMessage) }
+                    }
+
+                    StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED -> {
+                        scope.launch { snackbarHostState.showSnackbar(quickSettingsTileAlreadyAddedMessage) }
+                    }
+
+                    else -> {
+                        viewModel.setQuickSettingsTileEnabled(false)
+                        scope.launch { snackbarHostState.showSnackbar(quickSettingsTileAddCancelledMessage) }
+                    }
+                }
+            }
+        }.onFailure {
+            viewModel.setQuickSettingsTileEnabled(false)
+            scope.launch { snackbarHostState.showSnackbar(quickSettingsTileAddCancelledMessage) }
         }
     }
 
@@ -327,6 +381,7 @@ fun MainScreen(
                     onIntervalChange = { viewModel.setSampleInterval(it) },
                     onDynamicColorChange = { viewModel.setDynamicColorEnabled(it) },
                     onAccentColorChange = { viewModel.setAccentColor(it) },
+                    onQuickSettingsTileEnabledChange = { configureQuickSettingsTile(it) },
                     onTrackingChange = { toggleTracking(it) },
                     onThemeModeChange = { viewModel.setThemeMode(it) },
                     onOpenUsageAccess = { SystemActions.openUsageAccessSettings(context) },

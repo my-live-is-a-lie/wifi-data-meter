@@ -183,6 +183,18 @@
     <string name="settings_usage_access_granted">ممنوحة</string>
     <string name="settings_usage_access_missing">غير ممنوحة — اضغط للمنح</string>
     <string name="settings_section_more">المزيد</string>
+    <string name="settings_quick_settings_tile">زر مراقبة الشبكة في الإعدادات السريعة</string>
+    <string name="settings_quick_settings_tile_desc">إضافة زر لتشغيل المراقبة من لوحة الإعدادات السريعة. قد يطلب النظام موافقتك أو يتطلب إضافته يدويًا. إيقاف هذا الخيار يعطّل الزر داخل التطبيق ولا يحذفه؛ أزِله يدويًا من اللوحة.</string>
+    <string name="qs_tile_label">مراقبة الشبكة</string>
+    <string name="qs_tile_state_running">المراقبة تعمل</string>
+    <string name="qs_tile_state_stopped">المراقبة متوقفة</string>
+    <string name="qs_tile_state_disabled">فعّل الزر من إعدادات التطبيق</string>
+    <string name="qs_tile_state_permission_needed">صلاحية الوصول إلى الاستخدام مطلوبة</string>
+    <string name="qs_tile_added">تمت إضافة زر مراقبة الشبكة إلى الإعدادات السريعة.</string>
+    <string name="qs_tile_already_added">زر مراقبة الشبكة موجود بالفعل.</string>
+    <string name="qs_tile_add_cancelled">لم تتم إضافة الزر. يمكنك إعادة المحاولة من الإعدادات.</string>
+    <string name="qs_tile_manual_add">افتح لوحة الإعدادات السريعة، واضغط «تعديل»، ثم أضف «مراقبة الشبكة».</string>
+    <string name="qs_tile_disabled">أُوقفت وظيفة الزر. إن كان مضافًا، أزِله يدويًا من تعديل الإعدادات السريعة.</string>
     <string name="settings_more_expand">عرض إعدادات إضافية</string>
     <string name="settings_more_collapse">إخفاء إعدادات إضافية</string>
 

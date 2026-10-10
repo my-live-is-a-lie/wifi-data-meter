@@ -170,6 +170,18 @@
     <string name="settings_usage_access_granted">Granted</string>
     <string name="settings_usage_access_missing">Not granted — tap to grant</string>
     <string name="settings_section_more">More</string>
+    <string name="settings_quick_settings_tile">Network monitoring Quick Settings tile</string>
+    <string name="settings_quick_settings_tile_desc">Add a tile to toggle monitoring from Quick Settings. The system may ask for confirmation, or require manual adding. Turning this option off disables the tile in the app but does not remove it; remove it manually from Quick Settings.</string>
+    <string name="qs_tile_label">Network monitoring</string>
+    <string name="qs_tile_state_running">Monitoring is on</string>
+    <string name="qs_tile_state_stopped">Monitoring is off</string>
+    <string name="qs_tile_state_disabled">Enable the tile in app settings</string>
+    <string name="qs_tile_state_permission_needed">Usage access permission required</string>
+    <string name="qs_tile_added">Network monitoring was added to Quick Settings.</string>
+    <string name="qs_tile_already_added">The network monitoring tile is already added.</string>
+    <string name="qs_tile_add_cancelled">The tile was not added. You can try again from Settings.</string>
+    <string name="qs_tile_manual_add">Open Quick Settings, tap Edit, then add “Network monitoring”.</string>
+    <string name="qs_tile_disabled">The tile is disabled. If it is still shown, remove it from Quick Settings Edit.</string>
     <string name="settings_more_expand">Show additional settings</string>
     <string name="settings_more_collapse">Hide additional settings</string>
 

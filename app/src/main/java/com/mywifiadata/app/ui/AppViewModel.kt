@@ -24,6 +24,7 @@ import com.mywifiadata.app.data.model.TrafficTotals
 import com.mywifiadata.app.data.model.UsageSlice
 import com.mywifiadata.app.data.model.WifiStatus
 import com.mywifiadata.app.monitor.MonitorService
+import com.mywifiadata.app.monitor.MonitoringTileService
 import com.mywifiadata.app.widget.UsageWidgetProvider
 import com.mywifiadata.app.widget.UsageWidgetUpdater
 import kotlinx.coroutines.delay
@@ -472,11 +473,18 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
     fun startTracking() {
         repository.settingsStore.update { it.copy(trackingEnabled = true) }
         MonitorService.start(repository.context)
+        MonitoringTileService.requestRefresh(repository.context)
     }
 
     fun stopTracking() {
         repository.settingsStore.update { it.copy(trackingEnabled = false) }
         MonitorService.stop(repository.context)
+        MonitoringTileService.requestRefresh(repository.context)
+    }
+
+    fun setQuickSettingsTileEnabled(enabled: Boolean) {
+        repository.settingsStore.update { it.copy(quickSettingsTileEnabled = enabled) }
+        MonitoringTileService.requestRefresh(repository.context)
     }
 
     fun resetSession() {

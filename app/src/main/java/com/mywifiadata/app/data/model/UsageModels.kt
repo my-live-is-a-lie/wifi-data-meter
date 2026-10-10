@@ -142,6 +142,7 @@ data class AppSettings(
     val sampleIntervalIndex: Int = SamplingIntervals.DEFAULT_INDEX,
     val dynamicColorEnabled: Boolean = true,
     val accentColor: AccentColor = AccentColor.DEFAULT,
+    val quickSettingsTileEnabled: Boolean = false,
     val trackingEnabled: Boolean = false,
     /** فهرس تصميم بطاقة استهلاك الباقة المختار على لوحة المعلومات. */
     val usageCardStyleIndex: Int = 0,
