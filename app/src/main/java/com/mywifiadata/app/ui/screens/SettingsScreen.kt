@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -98,6 +99,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -693,6 +695,15 @@ private fun HideAppIconGuideIllustration() {
             AnimatedContent(
                 targetState = isAppScreenVisible,
                 modifier = Modifier.fillMaxSize(),
+                transitionSpec = {
+                    if (targetState) {
+                        (fadeIn(tween(520)) + slideInVertically(tween(520)) { it / 6 }) togetherWith
+                            fadeOut(tween(240))
+                    } else {
+                        (fadeIn(tween(360)) + slideInVertically(tween(360)) { -it / 8 }) togetherWith
+                            fadeOut(tween(180))
+                    }
+                },
                 label = "home-to-app-screen",
             ) { appIsVisible ->
                 if (appIsVisible) HideAppIconDemoAppScreen() else HideAppIconDemoHomeScreen()
@@ -1058,6 +1069,7 @@ private fun HideAppIconGuideIllustration() {
             ).toFloat()
             Box(
                 modifier = Modifier
+                    .align(AbsoluteAlignment.TopLeft)
                     .absoluteOffset(
                         x = maxWidth * pointerPosition.x - pointerSize / 2,
                         y = maxHeight * pointerPosition.y - pointerSize / 2,
@@ -1071,15 +1083,11 @@ private fun HideAppIconGuideIllustration() {
                         modifier = Modifier
                             .offset(y = 10.dp)
                             .size((8f + 26f * tapRippleProgress).dp)
-                            .background(Color.White.copy(alpha = 0.36f * tapAlpha), CircleShape)
+                            .shadow(7.dp, CircleShape)
+                            .background(Color.White.copy(alpha = 0.32f * tapAlpha), CircleShape)
                             .border(
-                                width = 2.dp,
-                                color = Color.Black.copy(alpha = 0.24f * tapAlpha),
-                                shape = CircleShape,
-                            )
-                            .border(
-                                width = 1.dp,
-                                color = Color.White.copy(alpha = tapAlpha),
+                                width = 1.75.dp,
+                                color = Color.White.copy(alpha = 0.88f * tapAlpha),
                                 shape = CircleShape,
                             ),
                     )
@@ -1088,38 +1096,31 @@ private fun HideAppIconGuideIllustration() {
                     Box(
                         modifier = Modifier
                             .offset(y = 10.dp)
-                            .size((10f + longPressPulse * 7f).dp)
-                            .background(Color.White.copy(alpha = 0.92f), CircleShape)
-                            .border(1.dp, Color.Black.copy(alpha = 0.28f), CircleShape),
-                    )
-                    Box(
-                        modifier = Modifier
-                            .offset(y = 10.dp)
-                            .size((20f + longPressPulse * 14f).dp)
-                            .background(Color.White.copy(alpha = 0.12f), CircleShape)
-                            .border(2.dp, Color.Black.copy(alpha = 0.24f), CircleShape)
-                            .border(1.25.dp, Color.White.copy(alpha = 0.98f), CircleShape),
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .size(pointerSize)
-                        .shadow(6.dp, CircleShape)
-                        .background(Color.White, CircleShape)
-                        .border(
-                            width = 1.dp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f),
-                            shape = CircleShape,
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.TouchApp,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(21.dp),
+                            .size((16f + longPressPulse * 14f).dp)
+                            .shadow(8.dp, CircleShape)
+                            .background(
+                                Color.White.copy(alpha = 0.14f + 0.24f * longPressPulse),
+                                CircleShape,
+                            )
+                            .border(
+                                width = 1.75.dp,
+                                color = Color.White.copy(alpha = 0.52f + 0.40f * longPressPulse),
+                                shape = CircleShape,
+                            ),
                     )
                 }
+                Icon(
+                    imageVector = Icons.Rounded.TouchApp,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(27.dp),
+                )
+                Icon(
+                    imageVector = Icons.Rounded.TouchApp,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp),
+                )
             }
         }
 
