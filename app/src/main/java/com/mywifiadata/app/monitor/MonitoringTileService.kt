@@ -83,7 +83,6 @@ class MonitoringTileService : TileService() {
     }
 
     private fun startMonitoringThroughDialog() {
-        var startRequested = false
         val dialog = object : Dialog(this) {
             init {
                 window?.apply {
@@ -91,7 +90,6 @@ class MonitoringTileService : TileService() {
                     setDimAmount(0f)
                 }
                 setOnShowListener {
-                    startRequested = true
                     startMonitoring()
                     dismiss()
                 }
@@ -106,16 +104,10 @@ class MonitoringTileService : TileService() {
             }
         }
 
-        val result = runCatching { showDialog(dialog) }
-        if (!startRequested) {
-            result.exceptionOrNull()?.let {
-                Log.w(TAG, "Temporary tile dialog failed; trying the direct start", it)
-            }
+        val failure = runCatching { showDialog(dialog) }.exceptionOrNull()
+        if (failure !is TemporaryTileDialogShownException) {
+            failure?.let { Log.w(TAG, "Temporary tile dialog failed; trying the direct start", it) }
             startMonitoring()
-        } else {
-            result.exceptionOrNull()
-                ?.takeUnless { it is TemporaryTileDialogShownException }
-                ?.let { Log.w(TAG, "Quick Settings remained open after showing the tile dialog", it) }
         }
     }
 
