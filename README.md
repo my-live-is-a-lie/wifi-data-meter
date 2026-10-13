@@ -187,6 +187,8 @@ app/src/main/java/com/mywifiadata/app/
 ├── data/                         # SettingsStore، NetworkStatsReader، WifiNetworkReader، UsageRepository
 ├── data/model/                   # نماذج البيانات (TrafficTotals، WifiStatus، AppUsage …)
 ├── monitor/                      # MonitorService (خدمة أمامية) و Notifier
+│                                 # و MonitoringTileService (بلاطة الإعدادات السريعة)
+│                                 # و TileIconFrames / TileIconPainter (تحريك أيقونة البلاطة)
 └── ui/
     ├── AppViewModel.kt           # حالة الواجهة والمنطق العرضي
     ├── theme/                    # AppTheme، Shapes، Typography
@@ -194,7 +196,8 @@ app/src/main/java/com/mywifiadata/app/
     │                             # TodayTotalRow، SpeedTestPanel، AppUsageRow …
     ├── screens/                  # Main / Dashboard / Apps / History / Settings
     └── PreviewData.kt            # معاينات Android Studio
-app/src/test/java/…               # اختبارات الوحدة (Format، TimeRanges، النماذج، SpeedTestWatchdog)
+app/src/test/java/…               # اختبارات الوحدة (Format، TimeRanges، النماذج، SpeedTestWatchdog،
+                                  # وإطارات أيقونة البلاطة)
 ```
 
 ---
