@@ -465,6 +465,7 @@ fun MainScreen(
                     onDynamicColorChange = { viewModel.setDynamicColorEnabled(it) },
                     onAccentColorChange = { viewModel.setAccentColor(it) },
                     onQuickSettingsTileEnabledChange = { configureQuickSettingsTile(it) },
+                    onHideStatusBarIconChange = { viewModel.setHideStatusBarIcon(it) },
                     onAppIconHiddenChange = { viewModel.setAppIconHidden(it) },
                     onTrackingChange = { toggleTracking(it) },
                     onThemeModeChange = { viewModel.setThemeMode(it) },

@@ -87,9 +87,9 @@ internal object QuotaStatusBarIcon {
     private const val START_ANGLE = -90f
     private const val FULL_SWEEP = 360f
 
-    // قياسات الخط بوحدة dp في مساحة 24dp؛ الثلاثة أرقام تبقى داخل الحلقة أيضًا.
-    private const val ONE_DIGIT_SIZE = 10f
-    private const val TWO_DIGIT_SIZE = 9.5f
-    private const val THREE_DIGIT_SIZE = 7.5f
-    private const val FOUR_DIGIT_SIZE = 6f
+    // كُبّرت الأرقام قليلًا لتحسين قراءتها في شريط الحالة مع إبقائها داخل الحلقة.
+    private const val ONE_DIGIT_SIZE = 12f
+    private const val TWO_DIGIT_SIZE = 11f
+    private const val THREE_DIGIT_SIZE = 8.5f
+    private const val FOUR_DIGIT_SIZE = 7f
 }

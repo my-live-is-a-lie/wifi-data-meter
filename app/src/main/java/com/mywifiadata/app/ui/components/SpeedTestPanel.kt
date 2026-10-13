@@ -293,10 +293,7 @@ private fun speedTestStatusText(state: SpeedTestState): String? = when (state) {
 
     is SpeedTestState.Done -> {
         val whenText = "${Format.shortDate(state.timestampMillis)} ${Format.clock(state.timestampMillis)}"
-        stringResource(
-            if (state.usedFastCom) R.string.speed_test_last_at else R.string.speed_test_last_at_fallback,
-            whenText,
-        )
+        "${stringResource(R.string.speed_test_last_at)}\n$whenText"
     }
 
     is SpeedTestState.Failed -> stringResource(

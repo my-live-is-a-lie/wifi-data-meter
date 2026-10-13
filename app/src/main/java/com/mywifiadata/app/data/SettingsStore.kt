@@ -82,6 +82,7 @@ class SettingsStore(context: Context) {
             prefs.getString(AppLanguage.PREFERENCE_KEY, AppLanguage.SYSTEM),
         ),
         trackingEnabled = prefs.getBoolean(KEY_TRACKING, false),
+        hideStatusBarIcon = prefs.getBoolean(KEY_HIDE_STATUS_BAR_ICON, false),
         usageCardStyleIndex = prefs.getInt(KEY_USAGE_CARD_STYLE, 0).coerceAtLeast(0),
         historyLineChartEnabled = prefs.getBoolean(KEY_HISTORY_LINE_CHART, false),
         appsLineChartEnabled = prefs.getBoolean(KEY_APPS_LINE_CHART, false),
@@ -149,6 +150,7 @@ class SettingsStore(context: Context) {
             .putBoolean(KEY_APP_ICON_HIDDEN, settings.appIconHidden)
             .putString(AppLanguage.PREFERENCE_KEY, AppLanguage.normalize(settings.appLanguage))
             .putBoolean(KEY_TRACKING, settings.trackingEnabled)
+            .putBoolean(KEY_HIDE_STATUS_BAR_ICON, settings.hideStatusBarIcon)
             .putInt(KEY_USAGE_CARD_STYLE, settings.usageCardStyleIndex)
             .putBoolean(KEY_HISTORY_LINE_CHART, settings.historyLineChartEnabled)
             .putBoolean(KEY_APPS_LINE_CHART, settings.appsLineChartEnabled)
@@ -182,6 +184,7 @@ class SettingsStore(context: Context) {
         private const val KEY_QUICK_SETTINGS_TILE_ADDED = "quick_settings_tile_added"
         private const val KEY_APP_ICON_HIDDEN = "app_icon_hidden"
         private const val KEY_TRACKING = "tracking_enabled"
+        private const val KEY_HIDE_STATUS_BAR_ICON = "hide_status_bar_icon"
         private const val KEY_USAGE_CARD_STYLE = "usage_card_style"
         private const val KEY_HISTORY_LINE_CHART = "history_line_chart_enabled"
         private const val KEY_APPS_LINE_CHART = "apps_line_chart_enabled"

@@ -151,6 +151,8 @@ data class AppSettings(
     /** `system`, `ar`, or `en`. */
     val appLanguage: String = AppLanguage.SYSTEM,
     val trackingEnabled: Boolean = false,
+    /** إخفاء أيقونة إشعار المراقبة من شريط الحالة مع إبقاء إشعار الخدمة. */
+    val hideStatusBarIcon: Boolean = false,
     /** فهرس تصميم بطاقة استهلاك الباقة المختار على لوحة المعلومات. */
     val usageCardStyleIndex: Int = 0,
     /** نمط مخطط السجل محفوظ بشكل مستقل عن نمط مخططات التطبيقات. */

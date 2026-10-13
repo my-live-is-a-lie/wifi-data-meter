@@ -567,6 +567,10 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         repository.settingsStore.update { it.copy(notificationsEnabled = enabled) }
     }
 
+    fun setHideStatusBarIcon(hidden: Boolean) {
+        repository.settingsStore.update { it.copy(hideStatusBarIcon = hidden) }
+    }
+
     fun setAlertThreshold(percent: Int) {
         repository.settingsStore.update { it.copy(alertThresholdPercent = percent.coerceIn(10, 100)) }
     }

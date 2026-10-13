@@ -105,6 +105,7 @@ class MonitorService : Service() {
         val notification = notifier.buildOngoingNotification(
             title = getString(R.string.app_name),
             text = getString(R.string.tracking_running),
+            hideStatusBarIcon = repository.settingsStore.current.hideStatusBarIcon,
         )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             ServiceCompat.startForeground(
@@ -133,7 +134,9 @@ class MonitorService : Service() {
             // تغيّر الإعداد أو إيقاف المراقبة يوقظ الحلقة فورًا بدل انتظار مدة القياس القديمة.
             withTimeoutOrNull(intervalMillis) {
                 repository.settingsStore.settings.first {
-                    !it.trackingEnabled || it.sampleIntervalIndex != intervalIndex
+                    !it.trackingEnabled ||
+                        it.sampleIntervalIndex != intervalIndex ||
+                        it.hideStatusBarIcon != settings.hideStatusBarIcon
                 }
             }
         }
@@ -145,6 +148,7 @@ class MonitorService : Service() {
                 notifier.buildOngoingNotification(
                     title = getString(R.string.app_name),
                     text = getString(R.string.permission_needed_title),
+                    hideStatusBarIcon = settings.hideStatusBarIcon,
                 ),
             )
             return
@@ -177,6 +181,7 @@ class MonitorService : Service() {
                 text = text,
                 quotaUsedBytes = cycle.totalBytes,
                 quotaBytes = settings.quotaBytes,
+                hideStatusBarIcon = settings.hideStatusBarIcon,
             ),
         )
 
