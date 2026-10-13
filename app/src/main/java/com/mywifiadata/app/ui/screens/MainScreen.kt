@@ -209,7 +209,7 @@ fun MainScreen(
             statusBarManager.requestAddTileService(
                 ComponentName(context, MonitoringTileService::class.java),
                 context.getString(R.string.qs_tile_label),
-                AndroidIcon.createWithResource(context, R.drawable.ic_tile_network_monitor),
+                AndroidIcon.createWithResource(context, R.drawable.ic_network_monitor),
                 ContextCompat.getMainExecutor(context),
             ) { result ->
                 when (result) {

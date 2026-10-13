@@ -55,7 +55,7 @@ class Notifier(private val context: Context) {
         )
 
         return NotificationCompat.Builder(context, CHANNEL_MONITOR)
-            .setSmallIcon(R.drawable.ic_stat_usage)
+            .setSmallIcon(R.drawable.ic_network_monitor)
             .setContentTitle(title)
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
