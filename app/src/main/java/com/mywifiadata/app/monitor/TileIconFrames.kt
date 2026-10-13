@@ -13,7 +13,7 @@ package com.mywifiadata.app.monitor
  * (العليا ثم السفلية ثم النقطة).
  *
  * الأبعاد بوحدات dp داخل مربع 24dp، وهي مطابقة تمامًا لأبعاد الأيقونة المتجهة الثابتة
- * `res/drawable/ic_tile_network_monitor.xml` حتى لا يحدث أي قفز عند انتهاء الحركة.
+ * `res/drawable/ic_network_monitor.xml` حتى لا يحدث أي قفز عند انتهاء الحركة.
  */
 internal object TileIconFrames {
 

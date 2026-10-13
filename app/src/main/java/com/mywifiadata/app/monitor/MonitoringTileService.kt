@@ -225,7 +225,7 @@ class MonitoringTileService : TileService() {
         }
 
         tile.label = getString(R.string.qs_tile_label)
-        tile.icon = Icon.createWithResource(this, R.drawable.ic_tile_network_monitor)
+        tile.icon = Icon.createWithResource(this, R.drawable.ic_network_monitor)
         tile.state = when {
             !settings.quickSettingsTileEnabled -> Tile.STATE_UNAVAILABLE
             settings.trackingEnabled -> Tile.STATE_ACTIVE
