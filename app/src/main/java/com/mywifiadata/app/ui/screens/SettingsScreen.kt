@@ -160,6 +160,7 @@ fun SettingsScreen(
     onDynamicColorChange: (Boolean) -> Unit,
     onAccentColorChange: (AccentColor) -> Unit,
     onQuickSettingsTileEnabledChange: (Boolean) -> Unit,
+    onHideStatusBarIconChange: (Boolean) -> Unit,
     onAppIconHiddenChange: (Boolean) -> Boolean,
     onTrackingChange: (Boolean) -> Unit,
     onThemeModeChange: (ThemeMode) -> Unit,
@@ -408,6 +409,13 @@ fun SettingsScreen(
                                 subtitle = stringResource(R.string.settings_quick_settings_tile_desc),
                                 checked = settings.quickSettingsTileEnabled,
                                 onCheckedChange = onQuickSettingsTileEnabledChange,
+                            )
+                            SettingSwitchRow(
+                                icon = Icons.Rounded.VisibilityOff,
+                                title = stringResource(R.string.settings_hide_status_bar_icon),
+                                subtitle = stringResource(R.string.settings_hide_status_bar_icon_desc),
+                                checked = settings.hideStatusBarIcon,
+                                onCheckedChange = onHideStatusBarIconChange,
                             )
                             SettingSwitchRow(
                                 icon = Icons.Rounded.VisibilityOff,
@@ -1880,12 +1888,7 @@ private fun IntervalSelector(intervalIndex: Int, onIntervalChange: (Int) -> Unit
                     .fillMaxWidth()
                     .height(INTERVAL_WHEEL_ITEM_HEIGHT)
                     .clip(selectionShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f))
-                    .border(
-                        width = 1.dp,
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.30f),
-                        shape = selectionShape,
-                    ),
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
             )
 
             LazyColumn(
@@ -1929,9 +1932,11 @@ private fun IntervalSelector(intervalIndex: Int, onIntervalChange: (Int) -> Unit
                         Text(
                             text = "${option.amountLabel} $unitLabel",
                             style = if (distanceFromCenter == 0) {
-                                MaterialTheme.typography.titleMedium.copy(fontSize = 15.sp)
+                                MaterialTheme.typography.titleMedium.copy(fontSize = 15.sp * 0.90f)
                             } else {
-                                MaterialTheme.typography.titleSmall
+                                MaterialTheme.typography.titleSmall.copy(
+                                    fontSize = MaterialTheme.typography.titleSmall.fontSize * 0.85f,
+                                )
                             },
                             color = if (distanceFromCenter == 0) {
                                 MaterialTheme.colorScheme.onSurface

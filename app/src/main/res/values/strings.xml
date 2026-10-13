@@ -68,8 +68,7 @@
     <string name="speed_test_running_download">جارٍ قياس سرعة التنزيل…</string>
     <string name="speed_test_running_upload">جارٍ قياس سرعة الرفع…</string>
     <string name="speed_test_finished">اكتمل الاختبار</string>
-    <string name="speed_test_last_at">آخر اختبار عبر fast.com: %1$s</string>
-    <string name="speed_test_last_at_fallback">آخر اختبار عبر خوادم بديلة: %1$s</string>
+    <string name="speed_test_last_at">آخر اختبار:</string>
     <string name="speed_test_details">تفاصيل المصادر: %1$s</string>
     <string name="speed_test_never">لم يُجرَ اختبار بعد</string>
     <string name="speed_test_start">بدء اختبار السرعة</string>
@@ -198,6 +197,8 @@
     <string name="settings_section_more">المزيد</string>
     <string name="settings_quick_settings_tile">زر مراقبة الشبكة في الإعدادات السريعة</string>
     <string name="settings_quick_settings_tile_desc">إضافة زر لتشغيل المراقبة من لوحة الإعدادات السريعة. قد يطلب النظام موافقتك أو يتطلب إضافته يدويًا. إيقاف هذا الخيار يعطّل الزر داخل التطبيق ولا يحذفه؛ أزِله يدويًا من اللوحة.</string>
+    <string name="settings_hide_status_bar_icon">إخفاء أيقونة المراقبة من شريط الحالة</string>
+    <string name="settings_hide_status_bar_icon_desc">يخفي الأيقونة بجانب الساعة فقط؛ يظل إشعار الخدمة ظاهرًا في ستارة الإشعارات.</string>
     <string name="settings_hide_app_icon">إخفاء أيقونة التطبيق</string>
     <string name="settings_hide_app_icon_desc">يتطلب تفعيل خيار بلاطة الإعدادات السريعة وإضافتها فعليًا. بعد الإخفاء، اضغط مطولًا على بلاطة «مراقبة الشبكة» لفتح التطبيق مجددًا. إزالة البلاطة تعيد إظهار الأيقونة تلقائيًا.</string>
     <string name="hide_app_icon_dialog_title">إخفاء أيقونة التطبيق؟</string>

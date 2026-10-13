@@ -56,8 +56,7 @@
     <string name="speed_test_running_download">Measuring download speed…</string>
     <string name="speed_test_running_upload">Measuring upload speed…</string>
     <string name="speed_test_finished">Test finished</string>
-    <string name="speed_test_last_at">Last test via fast.com: %1$s</string>
-    <string name="speed_test_last_at_fallback">Last test via fallback servers: %1$s</string>
+    <string name="speed_test_last_at">Last test:</string>
     <string name="speed_test_details">Source details: %1$s</string>
     <string name="speed_test_never">No test yet</string>
     <string name="speed_test_start">Start speed test</string>
@@ -185,6 +184,8 @@
     <string name="settings_section_more">More</string>
     <string name="settings_quick_settings_tile">Network monitoring Quick Settings tile</string>
     <string name="settings_quick_settings_tile_desc">Add a tile to toggle monitoring from Quick Settings. The system may ask for confirmation, or require manual adding. Turning this option off disables the tile in the app but does not remove it; remove it manually from Quick Settings.</string>
+    <string name="settings_hide_status_bar_icon">Hide monitoring icon from status bar</string>
+    <string name="settings_hide_status_bar_icon_desc">Hides only the icon next to the clock; the service notification remains in the notification shade.</string>
     <string name="settings_hide_app_icon">Hide app icon</string>
     <string name="settings_hide_app_icon_desc">Requires enabling the Quick Settings tile option and adding the tile. After hiding the icon, long-press “Network monitoring” in Quick Settings to reopen the app. Removing the tile automatically restores the app icon.</string>
     <string name="hide_app_icon_dialog_title">Hide the app icon?</string>
