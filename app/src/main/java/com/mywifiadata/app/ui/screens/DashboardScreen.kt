@@ -213,7 +213,7 @@ fun DashboardScreen(
             }
         }
 
-        item {
+        item(key = "dashboard-today-card") {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -227,7 +227,8 @@ fun DashboardScreen(
             }
         }
 
-        item {
+        // يبقى قسم الجلسة بعد بطاقة اليوم؛ وعند توسيع سجل السرعة ينتقل إلى أسفلها تلقائيًا.
+        item(key = "dashboard-session-card") {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1000,6 +1001,8 @@ private fun TodayCard(
             Spacer(modifier = Modifier.height(12.dp))
             SpeedTestPanel(
                 state = state.speedTest,
+                history = state.speedTestHistory,
+                nowMillis = state.now,
                 onStart = onStart,
                 onStop = onStop,
             )

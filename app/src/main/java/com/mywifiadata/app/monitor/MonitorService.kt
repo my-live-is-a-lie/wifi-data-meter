@@ -43,9 +43,6 @@ class MonitorService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var loopJob: Job? = null
 
-    private var previousCycleBytes: Long = -1L
-    private var previousSampleMillis: Long = 0L
-
     private lateinit var repository: UsageRepository
     private lateinit var notifier: Notifier
 
@@ -165,37 +162,18 @@ class MonitorService : Service() {
             quota = settings.quotaBytes,
         )
 
-        val speed = estimateSpeed(cycle.totalBytes, now)
-
+        // لا نعرض سرعة لحظية في الإشعار: قياسها من إجمالي الدورة غير دقيق ومشتّت،
+        // والسرعة الفعلية متاحة داخل التطبيق ولوحة اختبار السرعة.
         val title = getString(R.string.notification_monitor_title, Format.bytes(today.totalBytes))
         val text = if (settings.quotaBytes > 0L) {
             val remaining = (settings.quotaBytes - cycle.totalBytes).coerceAtLeast(0L)
-            getString(
-                R.string.notification_monitor_text,
-                Format.speed(speed),
-                Format.bytes(remaining),
-            )
+            getString(R.string.notification_monitor_text, Format.bytes(remaining))
         } else {
-            getString(
-                R.string.notification_monitor_text_no_quota,
-                Format.speed(speed),
-                Format.bytes(session.totalBytes),
-            )
+            getString(R.string.notification_monitor_text_no_quota, Format.bytes(session.totalBytes))
         }
         notifier.updateOngoing(notifier.buildOngoingNotification(title, text))
 
         checkQuotaAlerts(settings, cycle.totalBytes, now)
-    }
-
-    private fun estimateSpeed(currentBytes: Long, now: Long): Double {
-        val previousBytes = previousCycleBytes
-        val previousMillis = previousSampleMillis
-        previousCycleBytes = currentBytes
-        previousSampleMillis = now
-        if (previousBytes < 0L || previousMillis <= 0L || now <= previousMillis) return 0.0
-        val delta = currentBytes - previousBytes
-        if (delta <= 0L) return 0.0
-        return delta.toDouble() / ((now - previousMillis) / 1000.0)
     }
 
     private fun checkQuotaAlerts(settings: AppSettings, cycleBytes: Long, now: Long) {

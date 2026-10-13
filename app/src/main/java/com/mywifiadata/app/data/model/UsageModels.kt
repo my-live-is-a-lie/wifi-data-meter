@@ -162,6 +162,8 @@ data class AppSettings(
     val sessionBaseline: TrafficTotals = TrafficTotals.Empty,
     val alertCycleStartMillis: Long = 0L,
     val alertLevelReached: Int = 0,
-    /** آخر نتيجة اختبار سرعة (fast.com) محفوظة محليًا. */
+    /** أحدث نتائج اختبارات السرعة محفوظة محليًا (الأحدث أولًا). */
+    val speedTestHistory: List<SpeedTestRecord> = emptyList(),
+    /** آخر نتيجة اختبار سرعة محفوظة؛ تبقى منفصلة لتوافق التخزين القديم وملخص البطاقة. */
     val lastSpeedTest: SpeedTestRecord? = null,
 )
