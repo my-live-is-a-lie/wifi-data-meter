@@ -992,7 +992,7 @@ private fun HideAppIconGuideIllustration() {
                                         },
                                 ) { tint ->
                                     Icon(
-                                        painter = painterResource(R.drawable.ic_stat_usage),
+                                        painter = painterResource(R.drawable.ic_tile_network_monitor),
                                         contentDescription = null,
                                         tint = tint,
                                         modifier = Modifier.fillMaxSize(),
@@ -1103,7 +1103,7 @@ private fun HideAppIconGuideIllustration() {
                                             },
                                     ) { tint ->
                                         Icon(
-                                            painter = painterResource(R.drawable.ic_stat_usage),
+                                            painter = painterResource(R.drawable.ic_tile_network_monitor),
                                             contentDescription = null,
                                             tint = tint,
                                             modifier = Modifier.fillMaxSize(),

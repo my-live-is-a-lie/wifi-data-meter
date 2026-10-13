@@ -9,6 +9,8 @@ import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Icon
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
@@ -27,6 +29,12 @@ class MonitoringTileService : TileService() {
     }
 
     private val repository by lazy { (application as MyWifiApplication).repository }
+
+    /** يشغّل إطارات تحريك الأيقونة على الخيط الرئيسي أثناء فتح لوحة الإعدادات السريعة. */
+    private val tileAnimationHandler = Handler(Looper.getMainLooper())
+
+    /** الحركة الجارية حاليًا (إن وُجدت). */
+    private var tileAnimation: TileIconAnimation? = null
 
     override fun onTileAdded() {
         super.onTileAdded()
@@ -52,6 +60,17 @@ class MonitoringTileService : TileService() {
     override fun onStartListening() {
         super.onStartListening()
         updateTileState()
+    }
+
+    override fun onStopListening() {
+        // انتهى ظهور البلاطة: أوقف الحركة وأعد الأيقونة الثابتة إن كانت الحركة في منتصفها.
+        if (stopTileIconAnimation()) updateTileState()
+        super.onStopListening()
+    }
+
+    override fun onDestroy() {
+        stopTileIconAnimation()
+        super.onDestroy()
     }
 
     override fun onClick() {
@@ -125,12 +144,74 @@ class MonitoringTileService : TileService() {
             MonitoringTileService.requestRefresh(this)
         }
         updateTileState()
+        if (started) playTileIconAnimation(activating = true)
     }
 
     private fun stopMonitoring() {
         repository.settingsStore.update { it.copy(trackingEnabled = false) }
         MonitorService.stop(this)
         updateTileState()
+        playTileIconAnimation(activating = false)
+    }
+
+    // ——————————————————————————— تحريك أيقونة البلاطة ———————————————————————————
+
+    /**
+     * يشغّل حركة الأيقونة: الدائرة تتقلص للداخل ثم تعود إلى مكانها، وشرطات الواي فاي
+     * تُرسَم من الشرطة السفلية إلى العليا عند التشغيل، وبالعكس عند الإيقاف.
+     */
+    private fun playTileIconAnimation(activating: Boolean) {
+        stopTileIconAnimation()
+        val animation = TileIconAnimation(activating)
+        tileAnimation = animation
+        tileAnimationHandler.post(animation)
+    }
+
+    /** يوقف أي حركة جارية، ويعيد true إن كانت هناك حركة تعمل فعلًا. */
+    private fun stopTileIconAnimation(): Boolean {
+        val wasRunning = tileAnimation != null
+        tileAnimation?.let { tileAnimationHandler.removeCallbacks(it) }
+        tileAnimation = null
+        return wasRunning
+    }
+
+    /**
+     * يحدّث أيقونة البلاطة بإطار تلو الآخر: النظام لا يشغّل حركة الأيقونة بنفسه،
+     * لذا نرسل كل إطار كصورة مستقلة بينما لوحة الإعدادات السريعة مفتوحة.
+     */
+    private inner class TileIconAnimation(private val activating: Boolean) : Runnable {
+
+        private val frameCount = if (activating) {
+            TileIconFrames.ACTIVATION_FRAMES
+        } else {
+            TileIconFrames.DEACTIVATION_FRAMES
+        }
+        private var index = 0
+
+        override fun run() {
+            val tile = qsTile
+            if (tile == null) {
+                tileAnimation = null
+                return
+            }
+            val progress = if (frameCount > 1) index.toFloat() / (frameCount - 1) else 1f
+            val frame = if (activating) {
+                TileIconFrames.activation(progress)
+            } else {
+                TileIconFrames.deactivation(progress)
+            }
+            tile.icon = frame.toIcon(this@MonitoringTileService)
+            tile.updateTile()
+
+            index += 1
+            if (index < frameCount) {
+                tileAnimationHandler.postDelayed(this, TileIconFrames.FRAME_DELAY_MS)
+            } else {
+                // انتهت الحركة: أعد الأيقونة المتجهة الثابتة (أحدّ من الصورة النقطية).
+                tileAnimation = null
+                updateTileState()
+            }
+        }
     }
 
     private fun updateTileState() {
@@ -144,7 +225,7 @@ class MonitoringTileService : TileService() {
         }
 
         tile.label = getString(R.string.qs_tile_label)
-        tile.icon = Icon.createWithResource(this, R.drawable.ic_stat_usage)
+        tile.icon = Icon.createWithResource(this, R.drawable.ic_tile_network_monitor)
         tile.state = when {
             !settings.quickSettingsTileEnabled -> Tile.STATE_UNAVAILABLE
             settings.trackingEnabled -> Tile.STATE_ACTIVE
