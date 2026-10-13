@@ -171,7 +171,14 @@ class MonitorService : Service() {
         } else {
             getString(R.string.notification_monitor_text_no_quota, Format.bytes(session.totalBytes))
         }
-        notifier.updateOngoing(notifier.buildOngoingNotification(title, text))
+        notifier.updateOngoing(
+            notifier.buildOngoingNotification(
+                title = title,
+                text = text,
+                quotaUsedBytes = cycle.totalBytes,
+                quotaBytes = settings.quotaBytes,
+            ),
+        )
 
         checkQuotaAlerts(settings, cycle.totalBytes, now)
     }

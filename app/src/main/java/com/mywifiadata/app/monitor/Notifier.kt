@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.graphics.drawable.IconCompat
 import com.mywifiadata.app.MainActivity
 import com.mywifiadata.app.R
 
@@ -38,8 +39,13 @@ class Notifier(private val context: Context) {
         notificationManager.createNotificationChannels(listOf(monitorChannel, alertsChannel))
     }
 
-    /** الإشعار الدائم الذي يعرض حالة المراقبة. */
-    fun buildOngoingNotification(title: String, text: String): Notification {
+    /** الإشعار الدائم الذي يعرض حالة المراقبة ونسبة استهلاك الباقة في أيقونة شريط الحالة. */
+    fun buildOngoingNotification(
+        title: String,
+        text: String,
+        quotaUsedBytes: Long? = null,
+        quotaBytes: Long = 0L,
+    ): Notification {
         val contentIntent = PendingIntent.getActivity(
             context,
             0,
@@ -54,8 +60,21 @@ class Notifier(private val context: Context) {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
 
-        return NotificationCompat.Builder(context, CHANNEL_MONITOR)
-            .setSmallIcon(R.drawable.ic_network_monitor)
+        val quotaIcon = quotaUsedBytes?.let { usedBytes ->
+            QuotaStatusBarIcon.create(
+                usedBytes = usedBytes,
+                quotaBytes = quotaBytes,
+                locale = context.resources.configuration.locales[0],
+            )
+        }
+        val builder = NotificationCompat.Builder(context, CHANNEL_MONITOR)
+        if (quotaIcon != null) {
+            builder.setSmallIcon(quotaIcon)
+        } else {
+            builder.setSmallIcon(R.drawable.ic_network_monitor)
+        }
+
+        return builder
             .setContentTitle(title)
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
