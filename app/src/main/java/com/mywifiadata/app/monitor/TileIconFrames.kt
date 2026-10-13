@@ -17,14 +17,17 @@ package com.mywifiadata.app.monitor
  */
 internal object TileIconFrames {
 
-    /** عدد إطارات حركة التشغيل (16 إطارًا × 45ms ≈ 675ms). */
-    const val ACTIVATION_FRAMES = 16
+    /** عدد إطارات حركة التشغيل (14 إطارًا × 30ms ≈ 390ms). */
+    const val ACTIVATION_FRAMES = 14
 
-    /** عدد إطارات حركة الإيقاف — أقصر (11 إطارًا × 45ms ≈ 450ms). */
-    const val DEACTIVATION_FRAMES = 11
+    /** عدد إطارات حركة الإيقاف — أقصر (10 إطارات × 30ms ≈ 270ms). */
+    const val DEACTIVATION_FRAMES = 10
 
-    /** المهلة بين إطارين. */
-    const val FRAME_DELAY_MS = 45L
+    /**
+     * المهلة بين إطارين: 30ms ≈ 33 إطارًا في الثانية.
+     * أقل من ذلك يرهق النظام بطلبات تحديث متلاحقة للبلاطة بلا فرق يُذكر.
+     */
+    const val FRAME_DELAY_MS = 30L
 
     // ——————————————————————————— الأبعاد (dp داخل مربع 24dp) ———————————————————————————
 
@@ -87,9 +90,9 @@ internal object TileIconFrames {
             circleScale = circle,
             glyphScale = 1f - GLYPH_FOLLOW * (1f - circle),
             // التشغيل: النقطة ثم الشرطة السفلية ثم العليا — الإيقاف: بالعكس.
-            dotScale = reveal(t, if (activating) 0f else 0.60f, if (activating) 0.22f else 0.95f),
-            innerArc = reveal(t, if (activating) 0.14f else 0.30f, if (activating) 0.55f else 0.72f),
-            outerArc = reveal(t, if (activating) 0.36f else 0.04f, if (activating) 0.88f else 0.44f),
+            dotScale = reveal(t, if (activating) 0f else 0.58f, if (activating) 0.18f else 0.94f),
+            innerArc = reveal(t, if (activating) 0.12f else 0.28f, if (activating) 0.48f else 0.70f),
+            outerArc = reveal(t, if (activating) 0.32f else 0.03f, if (activating) 0.86f else 0.42f),
         )
     }
 

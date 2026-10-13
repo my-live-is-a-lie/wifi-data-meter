@@ -71,6 +71,15 @@ class TileIconFramesTest {
     }
 
     @Test
+    fun `animations are short enough to feel responsive`() {
+        val activationMs = (TileIconFrames.ACTIVATION_FRAMES - 1) * TileIconFrames.FRAME_DELAY_MS
+        val deactivationMs = (TileIconFrames.DEACTIVATION_FRAMES - 1) * TileIconFrames.FRAME_DELAY_MS
+        assertTrue("حركة التشغيل أقل من نصف ثانية ($activationMs)", activationMs <= 500L)
+        assertTrue("حركة الإيقاف أقصر ($deactivationMs)", deactivationMs <= 350L)
+        assertTrue("إطار واحد على الأقل كل 24ms", TileIconFrames.FRAME_DELAY_MS >= 24L)
+    }
+
+    @Test
     fun `both animations end with the complete icon`() {
         assertFrameEquals(TileIconFrames.resting, TileIconFrames.activation(1f))
         assertFrameEquals(TileIconFrames.resting, TileIconFrames.deactivation(1f))
