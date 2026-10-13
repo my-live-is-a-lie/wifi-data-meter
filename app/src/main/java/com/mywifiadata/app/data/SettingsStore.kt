@@ -52,9 +52,12 @@ class SettingsStore(context: Context) {
         it.copy(sessionBaseline = baseline, sessionStartMillis = startMillis)
     }
 
-    /** يحفظ آخر نتيجة اختبار سرعة لتظهر بعد إعادة تشغيل التطبيق. */
-    fun saveSpeedTest(record: SpeedTestRecord) = update {
-        it.copy(lastSpeedTest = record)
+    /** يحفظ نتيجة الاختبار الأخيرة ويضيفها إلى سجل آخر عشرة اختبارات. */
+    fun saveSpeedTest(record: SpeedTestRecord) = update { settings ->
+        settings.copy(
+            lastSpeedTest = record,
+            speedTestHistory = SpeedTestHistory.prepend(settings.speedTestHistory, record),
+        )
     }
 
     private fun read(): AppSettings = AppSettings(
@@ -92,6 +95,7 @@ class SettingsStore(context: Context) {
         ),
         alertCycleStartMillis = prefs.getLong(KEY_ALERT_CYCLE, 0L),
         alertLevelReached = prefs.getInt(KEY_ALERT_LEVEL, 0),
+        speedTestHistory = readSpeedTestHistory(),
         lastSpeedTest = readSpeedTest(),
     )
 
@@ -106,6 +110,23 @@ class SettingsStore(context: Context) {
             usedFastCom = prefs.getBoolean(KEY_SPEED_FAST, true),
             uploadMeasured = prefs.getBoolean(KEY_SPEED_UPLOAD_OK, true),
         )
+    }
+
+    /** يقرأ السجل الجديد، أو يرحّل آخر نتيجة القديمة إلى أول عنصر عند التحديث. */
+    private fun readSpeedTestHistory(): List<SpeedTestRecord> {
+        val last = readSpeedTest()
+        val encoded = prefs.getString(KEY_SPEED_HISTORY, null)
+        val history = encoded
+            ?.takeIf(String::isNotBlank)
+            ?.let(SpeedTestHistory::decode)
+            .orEmpty()
+
+        if (history.isEmpty()) return listOfNotNull(last)
+        return if (last != null && history.none { it == last }) {
+            SpeedTestHistory.prepend(history, last)
+        } else {
+            history
+        }
     }
 
     private fun write(settings: AppSettings) {
@@ -142,6 +163,7 @@ class SettingsStore(context: Context) {
             .putLong(KEY_SPEED_TIME, settings.lastSpeedTest?.timestampMillis ?: 0L)
             .putBoolean(KEY_SPEED_FAST, settings.lastSpeedTest?.usedFastCom ?: true)
             .putBoolean(KEY_SPEED_UPLOAD_OK, settings.lastSpeedTest?.uploadMeasured ?: true)
+            .putString(KEY_SPEED_HISTORY, SpeedTestHistory.encode(settings.speedTestHistory))
             .apply()
     }
 
@@ -174,5 +196,6 @@ class SettingsStore(context: Context) {
         private const val KEY_SPEED_TIME = "speed_test_time"
         private const val KEY_SPEED_FAST = "speed_test_source_fast"
         private const val KEY_SPEED_UPLOAD_OK = "speed_test_upload_ok"
+        private const val KEY_SPEED_HISTORY = "speed_test_history"
     }
 }

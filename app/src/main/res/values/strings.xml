@@ -71,9 +71,18 @@
     <string name="speed_test_last_at">آخر اختبار عبر fast.com: %1$s</string>
     <string name="speed_test_last_at_fallback">آخر اختبار عبر خوادم بديلة: %1$s</string>
     <string name="speed_test_details">تفاصيل المصادر: %1$s</string>
-    <string name="speed_test_never">لم يُجرَ اختبار بعد — اضغط زر التشغيل لقياس سرعة الإنترنت.</string>
+    <string name="speed_test_never">لم يُجرَ اختبار بعد</string>
     <string name="speed_test_start">بدء اختبار السرعة</string>
     <string name="speed_test_stop">إيقاف الاختبار وإغلاق التحميل</string>
+    <string name="speed_test_history_expand">عرض سجل اختبارات السرعة</string>
+    <string name="speed_test_history_collapse">إخفاء سجل اختبارات السرعة</string>
+    <string name="speed_test_history_empty">لا توجد اختبارات سابقة بعد</string>
+    <string name="speed_test_age_now">الآن</string>
+    <string name="speed_test_age_minutes">%1$sد</string>
+    <string name="speed_test_age_hours">%1$sس</string>
+    <string name="speed_test_age_days">%1$sي</string>
+    <string name="speed_test_age_months">%1$sش</string>
+    <string name="speed_test_age_years">%1$sسنة</string>
 
     <!-- البطاقة الرئيسية (الحلقة) -->
     <string name="quota_ring_title">استهلاك دورة الفاتورة</string>
@@ -245,8 +254,8 @@
     <string name="channel_alerts_name">تنبيهات الباقة</string>
     <string name="channel_alerts_desc">تنبيهات عند اقتراب استهلاك الباقة الشهرية من نهايتها.</string>
     <string name="notification_monitor_title">%1$s اليوم</string>
-    <string name="notification_monitor_text">السرعة الحالية: %1$s • المتبقي: %2$s</string>
-    <string name="notification_monitor_text_no_quota">السرعة الحالية: %1$s • إجمالي الجلسة: %2$s</string>
+    <string name="notification_monitor_text">المتبقي: %1$s</string>
+    <string name="notification_monitor_text_no_quota">إجمالي الجلسة: %1$s</string>
     <string name="notification_alert_threshold_title">اقتربت من حد الباقة</string>
     <string name="notification_alert_threshold_text">استهلكت %1$s%% من باقة %2$s على شبكة الواي فاي.</string>
     <string name="notification_alert_exceeded_title">تجاوزت الباقة الشهرية</string>
