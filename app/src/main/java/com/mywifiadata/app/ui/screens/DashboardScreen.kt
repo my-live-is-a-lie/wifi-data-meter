@@ -106,6 +106,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.mywifiadata.app.R
@@ -247,6 +248,9 @@ fun DashboardScreen(
                             layout.copy(hiddenCards = toggleId(layout.hiddenCards, cardId)),
                         )
                     },
+                    dragOverlay = cardId == DashboardLayoutIds.USAGE_CARD ||
+                        cardId == DashboardLayoutIds.WIFI_CARD ||
+                        cardId == DashboardLayoutIds.SESSION_CARD,
                     modifier = frameModifier,
                 ) {
                     when (cardId) {
@@ -335,19 +339,24 @@ private fun DashboardEditToolbar(
             textAlign = instructionAlignment,
         )
         Spacer(modifier = Modifier.width(8.dp))
-        FilledTonalButton(
-            onClick = onSave,
-            shape = AppButtonShape,
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        Row(
+            modifier = Modifier.absoluteOffset(x = (-8).dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(text = stringResource(R.string.action_save))
-        }
-        TextButton(
-            onClick = onCancel,
-            shape = AppButtonShape,
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-        ) {
-            Text(text = stringResource(R.string.action_cancel))
+            FilledTonalButton(
+                onClick = onSave,
+                shape = AppButtonShape,
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            ) {
+                Text(text = stringResource(R.string.action_save))
+            }
+            TextButton(
+                onClick = onCancel,
+                shape = AppButtonShape,
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+            ) {
+                Text(text = stringResource(R.string.action_cancel))
+            }
         }
     }
 }
@@ -364,6 +373,8 @@ private fun EditableDashboardItem(
     positions: SnapshotStateMap<String, Rect>,
     onMove: (String, String) -> Unit,
     onToggleVisibility: () -> Unit,
+    dragOverlay: Boolean = false,
+    badgeHorizontalOffset: Dp = 0.dp,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
@@ -449,7 +460,7 @@ private fun EditableDashboardItem(
     Box(
         modifier = modifier
             .then(positionModifier)
-            .then(dragModifier),
+            .then(if (isEditing && !dragOverlay) dragModifier else Modifier),
     ) {
         Box(
             modifier = Modifier
@@ -459,11 +470,18 @@ private fun EditableDashboardItem(
             content()
         }
 
+        if (isEditing && dragOverlay) {
+            // Place the drag detector above nested buttons/surfaces that otherwise consume long presses.
+            Box(
+                modifier = Modifier.matchParentSize().then(dragModifier),
+            )
+        }
+
         if (isEditing) {
             Box(
                 modifier = Modifier
                     .align(badgeAlignment)
-                    .absoluteOffset(x = (-10).dp, y = (-10).dp)
+                    .absoluteOffset(x = badgeHorizontalOffset - 10.dp, y = (-10).dp)
                     .size(28.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.primaryContainer)
@@ -1069,6 +1087,11 @@ private fun QuickActions(
     } else {
         layout.quickActionOrder.filterNot(layout.hiddenQuickActions::contains)
     }
+    val leftmostActionId = if (LocalLayoutDirection.current == LayoutDirection.Rtl) {
+        actionIds.lastOrNull()
+    } else {
+        actionIds.firstOrNull()
+    }
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -1091,6 +1114,8 @@ private fun QuickActions(
                         layout.copy(hiddenQuickActions = toggleId(layout.hiddenQuickActions, actionId)),
                     )
                 },
+                dragOverlay = true,
+                badgeHorizontalOffset = if (actionId == leftmostActionId) 32.dp else 0.dp,
                 modifier = Modifier.weight(1f).heightIn(min = 84.dp),
             ) {
                 when (actionId) {
@@ -1354,6 +1379,7 @@ private fun TodayCard(
                             ),
                         )
                     },
+                    dragOverlay = sectionId == DashboardLayoutIds.TODAY_SPEED_TEST,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     when (sectionId) {
@@ -1403,6 +1429,11 @@ private fun TrafficTilesRow(
     } else {
         layout.trafficTileOrder.filterNot(layout.hiddenTrafficTiles::contains)
     }
+    val leftmostTileId = if (LocalLayoutDirection.current == LayoutDirection.Rtl) {
+        tileIds.lastOrNull()
+    } else {
+        tileIds.firstOrNull()
+    }
 
     if (tileIds.isNotEmpty()) {
         Row(
@@ -1426,6 +1457,8 @@ private fun TrafficTilesRow(
                             layout.copy(hiddenTrafficTiles = toggleId(layout.hiddenTrafficTiles, tileId)),
                         )
                     },
+                    dragOverlay = true,
+                    badgeHorizontalOffset = if (tileId == leftmostTileId) 32.dp else 0.dp,
                     modifier = Modifier.weight(1f),
                 ) {
                     when (tileId) {

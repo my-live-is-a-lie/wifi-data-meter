@@ -254,7 +254,7 @@
     <string name="cd_more_options">More options</string>
     <string name="cd_refresh">Refresh</string>
     <string name="cd_edit_dashboard">Edit home screen</string>
-    <string name="dashboard_edit_instructions">Long-press and drag to reorder. Side-by-side items stay within their card, and rows move vertically together. Use −/＋ to hide or show.</string>
+    <string name="dashboard_edit_instructions">Long-press an item and move it to change its position.\nTap the button to hide or show the item.</string>
     <string name="dashboard_hide_item">Hide item</string>
     <string name="dashboard_show_item">Show item</string>
     <string name="cd_settings">Settings</string>
