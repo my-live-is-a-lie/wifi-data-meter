@@ -19,6 +19,7 @@ import com.mywifiadata.app.data.model.AppSettings
 import com.mywifiadata.app.data.model.AppUsage
 import com.mywifiadata.app.data.model.AppsFilter
 import com.mywifiadata.app.data.model.DayUsage
+import com.mywifiadata.app.data.model.DashboardLayout
 import com.mywifiadata.app.data.model.SpeedSample
 import com.mywifiadata.app.data.model.SpeedTestRecord
 import com.mywifiadata.app.data.model.ThemeMode
@@ -85,6 +86,7 @@ data class UiState(
     val session: TrafficTotals = TrafficTotals.Empty,
     val samples: List<SpeedSample> = emptyList(),
     val speedTest: SpeedTestState = SpeedTestState.Idle,
+    val speedTestHistory: List<SpeedTestRecord> = emptyList(),
     val daily: List<DayUsage> = emptyList(),
     /**
      * أعلى يوم استهلاكًا خلال آخر 30 يومًا — مرجع ثابت للمقارنة مهما كانت
@@ -92,6 +94,9 @@ data class UiState(
      */
     val monthPeak: DayUsage? = null,
     val apps: List<AppUsage> = emptyList(),
+    /** تطبيقات اليوم للاستخدام في تفصيل الرفع/التنزيل/الإجمالي داخل لوحة اليوم. */
+    val todayApps: List<AppUsage> = emptyList(),
+    val isTodayAppsLoading: Boolean = false,
     // تطبيقات الفترة كاملة (لا تتأثر باختيار شريحة) لبطاقة «الفترة».
     val periodApps: List<AppUsage> = emptyList(),
     val isAppsLoading: Boolean = false,
@@ -182,6 +187,7 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         UiState(
             settings = initialSettings,
             speedTest = initialSettings.lastSpeedTest.toSpeedTestState(),
+            speedTestHistory = initialSettings.speedTestHistory,
         ),
     )
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
@@ -189,6 +195,9 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
     private var lastTotals: TrafficTotals = TrafficTotals.Empty
     private var lastSampleMillis: Long = 0L
     private var appsLoadedAt: Long = 0L
+    private var todayAppsLoadedAt: Long = 0L
+    private var todayAppsLoadedRangeStartMillis: Long = 0L
+    private var todayAppsJob: Job? = null
     private var dailyLoadedAt: Long = 0L
     private var dailyLoadedDays: Int = 0
     private var monthPeakLoadedAt: Long = 0L
@@ -196,7 +205,9 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
     init {
         viewModelScope.launch {
             repository.settingsStore.settings.collect { settings ->
-                _uiState.update { it.copy(settings = settings) }
+                _uiState.update {
+                    it.copy(settings = settings, speedTestHistory = settings.speedTestHistory)
+                }
             }
         }
         viewModelScope.launch { refreshLoop() }
@@ -238,6 +249,7 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
                 isLoading = false,
                 hasUsageAccess = hasAccess,
                 settings = settings,
+                speedTestHistory = settings.speedTestHistory,
                 wifi = wifi,
                 today = today,
                 cycle = cycle,
@@ -464,6 +476,36 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         }
     }
 
+    /** تحميل استهلاك تطبيقات اليوم عند فتح أحد تفاصيل بطاقة «اليوم». */
+    fun loadTodayApps() {
+        if (!_uiState.value.hasUsageAccess || todayAppsJob?.isActive == true) return
+
+        val now = System.currentTimeMillis()
+        val range = TimeRanges.forPeriod(UsagePeriod.TODAY, now)
+        if (
+            range.startMillis == todayAppsLoadedRangeStartMillis &&
+            now - todayAppsLoadedAt <= TODAY_APPS_TTL_MILLIS
+        ) {
+            return
+        }
+
+        todayAppsJob = viewModelScope.launch {
+            _uiState.update { it.copy(isTodayAppsLoading = true) }
+            val loadedAt = System.currentTimeMillis()
+            val todayRange = TimeRanges.forPeriod(UsagePeriod.TODAY, loadedAt)
+            val apps = try {
+                repository.perAppUsage(todayRange)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                emptyList()
+            }
+            todayAppsLoadedAt = loadedAt
+            todayAppsLoadedRangeStartMillis = todayRange.startMillis
+            _uiState.update { it.copy(todayApps = apps, isTodayAppsLoading = false) }
+        }
+    }
+
     fun refreshNow() {
         _uiState.update { it.copy(isRefreshing = true) }
         viewModelScope.launch {
@@ -545,6 +587,10 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         }
     }
 
+    fun setDashboardLayout(layout: DashboardLayout) {
+        repository.settingsStore.update { it.copy(dashboardLayout = layout.normalized()) }
+    }
+
     fun setHistoryLineChartEnabled(enabled: Boolean) {
         repository.settingsStore.update { it.copy(historyLineChartEnabled = enabled) }
     }
@@ -560,6 +606,10 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
 
     fun setNotificationsEnabled(enabled: Boolean) {
         repository.settingsStore.update { it.copy(notificationsEnabled = enabled) }
+    }
+
+    fun setHideStatusBarIcon(hidden: Boolean) {
+        repository.settingsStore.update { it.copy(hideStatusBarIcon = hidden) }
     }
 
     fun setAlertThreshold(percent: Int) {
@@ -593,6 +643,10 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
     }
 
     fun clearData() {
+        todayAppsJob?.cancel()
+        todayAppsJob = null
+        todayAppsLoadedAt = 0L
+        todayAppsLoadedRangeStartMillis = 0L
         LauncherIconVisibility.setVisible(repository.context, visible = true)
         stopTracking()
         repository.settingsStore.clearAll()
@@ -652,7 +706,12 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
                     uploadMeasured = result.uploadMeasured,
                 )
                 repository.settingsStore.saveSpeedTest(record)
-                _uiState.update { it.copy(speedTest = record.toSpeedTestState()) }
+                _uiState.update {
+                    it.copy(
+                        speedTest = record.toSpeedTestState(),
+                        speedTestHistory = repository.settingsStore.current.speedTestHistory,
+                    )
+                }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: SpeedTestEngine.SpeedTestException) {
@@ -688,6 +747,7 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         // أعمال التحميل الثقيلة داخل refresh() محمية بمواعيد TTL منفصلة.
         private const val REFRESH_INTERVAL_MILLIS = 1_000L
         private const val APPS_TTL_MILLIS = 30_000L
+        private const val TODAY_APPS_TTL_MILLIS = 30_000L
         private const val DAILY_TTL_MILLIS = 60_000L
         private const val MONTH_PEAK_TTL_MILLIS = 120_000L
         private const val MONTH_DAYS = 30

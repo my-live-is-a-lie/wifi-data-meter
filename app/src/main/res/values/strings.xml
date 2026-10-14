@@ -68,12 +68,20 @@
     <string name="speed_test_running_download">جارٍ قياس سرعة التنزيل…</string>
     <string name="speed_test_running_upload">جارٍ قياس سرعة الرفع…</string>
     <string name="speed_test_finished">اكتمل الاختبار</string>
-    <string name="speed_test_last_at">آخر اختبار عبر fast.com: %1$s</string>
-    <string name="speed_test_last_at_fallback">آخر اختبار عبر خوادم بديلة: %1$s</string>
+    <string name="speed_test_last_at">آخر اختبار:</string>
     <string name="speed_test_details">تفاصيل المصادر: %1$s</string>
-    <string name="speed_test_never">لم يُجرَ اختبار بعد — اضغط زر التشغيل لقياس سرعة الإنترنت.</string>
+    <string name="speed_test_never">لم يُجرَ اختبار بعد</string>
     <string name="speed_test_start">بدء اختبار السرعة</string>
     <string name="speed_test_stop">إيقاف الاختبار وإغلاق التحميل</string>
+    <string name="speed_test_history_expand">عرض سجل اختبارات السرعة</string>
+    <string name="speed_test_history_collapse">إخفاء سجل اختبارات السرعة</string>
+    <string name="speed_test_history_empty">لا توجد اختبارات سابقة بعد</string>
+    <string name="speed_test_age_now">الآن</string>
+    <string name="speed_test_age_minutes">%1$sد</string>
+    <string name="speed_test_age_hours">%1$sس</string>
+    <string name="speed_test_age_days">%1$sي</string>
+    <string name="speed_test_age_months">%1$sش</string>
+    <string name="speed_test_age_years">%1$sسنة</string>
 
     <!-- البطاقة الرئيسية (الحلقة) -->
     <string name="quota_ring_title">استهلاك دورة الفاتورة</string>
@@ -113,6 +121,9 @@
     <string name="apps_screen_title">استهلاك التطبيقات</string>
     <string name="apps_empty_title">لا يوجد استهلاك مسجّل</string>
     <string name="apps_empty_body">لم تُسجّل أي بيانات لهذه الفترة حتى الآن. جرّب تصفح الإنترنت أو تحديث القائمة.</string>
+    <string name="dashboard_today_top_apps_title">أكثر 5 تطبيقات استهلاكًا لـ%1$s</string>
+    <string name="dashboard_today_apps_loading">جارٍ تحميل بيانات التطبيقات…</string>
+    <string name="dashboard_today_apps_empty">لا يوجد استهلاك مسجّل لهذه الفئة اليوم.</string>
     <string name="apps_loading">جارٍ حساب استهلاك التطبيقات…</string>
     <string name="apps_no_permission">فعّل صلاحية الاستخدام لعرض التفاصيل حسب التطبيق.</string>
     <string name="system_apps_label">تطبيقات النظام</string>
@@ -189,6 +200,8 @@
     <string name="settings_section_more">المزيد</string>
     <string name="settings_quick_settings_tile">زر مراقبة الشبكة في الإعدادات السريعة</string>
     <string name="settings_quick_settings_tile_desc">إضافة زر لتشغيل المراقبة من لوحة الإعدادات السريعة. قد يطلب النظام موافقتك أو يتطلب إضافته يدويًا. إيقاف هذا الخيار يعطّل الزر داخل التطبيق ولا يحذفه؛ أزِله يدويًا من اللوحة.</string>
+    <string name="settings_hide_status_bar_icon">إخفاء أيقونة المراقبة من شريط الحالة</string>
+    <string name="settings_hide_status_bar_icon_desc">يخفي الأيقونة بجانب الساعة فقط؛ يظل إشعار الخدمة ظاهرًا في ستارة الإشعارات.</string>
     <string name="settings_hide_app_icon">إخفاء أيقونة التطبيق</string>
     <string name="settings_hide_app_icon_desc">يتطلب تفعيل خيار بلاطة الإعدادات السريعة وإضافتها فعليًا. بعد الإخفاء، اضغط مطولًا على بلاطة «مراقبة الشبكة» لفتح التطبيق مجددًا. إزالة البلاطة تعيد إظهار الأيقونة تلقائيًا.</string>
     <string name="hide_app_icon_dialog_title">إخفاء أيقونة التطبيق؟</string>
@@ -245,8 +258,8 @@
     <string name="channel_alerts_name">تنبيهات الباقة</string>
     <string name="channel_alerts_desc">تنبيهات عند اقتراب استهلاك الباقة الشهرية من نهايتها.</string>
     <string name="notification_monitor_title">%1$s اليوم</string>
-    <string name="notification_monitor_text">السرعة الحالية: %1$s • المتبقي: %2$s</string>
-    <string name="notification_monitor_text_no_quota">السرعة الحالية: %1$s • إجمالي الجلسة: %2$s</string>
+    <string name="notification_monitor_text">المتبقي: %1$s</string>
+    <string name="notification_monitor_text_no_quota">إجمالي الجلسة: %1$s</string>
     <string name="notification_alert_threshold_title">اقتربت من حد الباقة</string>
     <string name="notification_alert_threshold_text">استهلكت %1$s%% من باقة %2$s على شبكة الواي فاي.</string>
     <string name="notification_alert_exceeded_title">تجاوزت الباقة الشهرية</string>
@@ -258,6 +271,11 @@
     <!-- نصوص مساعدة -->
     <string name="cd_more_options">خيارات أكثر</string>
     <string name="cd_refresh">تحديث</string>
+    <string name="cd_edit_dashboard">تعديل الصفحة الرئيسية</string>
+    <string name="dashboard_edit_instructions">اضغط مطولا علي العنصر و حركه لتغيير مكانه\nاضغط علي الزر لاخفاء و اظهار العنصر</string>
+    <string name="dashboard_hide_item">إخفاء العنصر</string>
+    <string name="dashboard_show_item">إظهار العنصر</string>
+    <string name="dashboard_reset_layout">إعادة ترتيب الصفحة إلى الوضع الافتراضي</string>
     <string name="cd_settings">الإعدادات</string>
     <string name="cd_toggle_tracking">تشغيل أو إيقاف المراقبة</string>
     <string name="cd_signal_bars">قوة الإشارة</string>
