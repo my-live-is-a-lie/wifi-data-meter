@@ -34,6 +34,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mywifiadata.app.R
+import com.mywifiadata.app.core.UsageNetwork
 import com.mywifiadata.app.core.Format
 import com.mywifiadata.app.data.model.TrafficTotals
 import com.mywifiadata.app.ui.AppDetailState
@@ -44,7 +45,7 @@ import com.mywifiadata.app.ui.theme.LocalDownloadColor
 import com.mywifiadata.app.ui.theme.LocalUploadColor
 
 /**
- * تفاصيل تطبيق واحد: استهلاكه على شبكة الواي فاي في اليوم وآخر ٧ أيام وآخر ٣٠ يومًا.
+ * تفاصيل تطبيق واحد: استهلاكه على الشبكة المختارة في اليوم وآخر ٧ أيام وآخر ٣٠ يومًا.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -90,7 +91,9 @@ fun AppDetailScreen(
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = stringResource(R.string.app_detail_hint),
+                    text = stringResource(
+                        if (detail.network == UsageNetwork.WIFI) R.string.apps_network_wifi else R.string.apps_network_mobile,
+                    ) + " · " + stringResource(R.string.app_detail_hint),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

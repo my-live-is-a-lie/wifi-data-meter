@@ -107,6 +107,16 @@
     <string name="permission_granted_title">Usage access granted</string>
     <string name="permission_granted_body">The app can now read your actual usage.</string>
 
+    <string name="apps_network_filter">Network</string>
+    <string name="apps_network_wifi">Wi-Fi</string>
+    <string name="apps_network_mobile">Mobile data</string>
+    <string name="apps_scope_all_time">All time</string>
+    <string name="apps_scope_current_cycle">Current plan</string>
+    <string name="apps_count_filter">Top apps</string>
+    <string name="apps_show_filters">Show app filters</string>
+    <string name="apps_hide_filters">Hide app filters</string>
+    <string name="apps_chart_period">Timeline — tap a slice to view its apps</string>
+    <string name="apps_selected_slice">Selected time slice</string>
     <string name="apps_screen_title">App usage</string>
     <string name="apps_empty_title">No usage recorded</string>
     <string name="apps_empty_body">No data for this period yet. Browse a bit and refresh.</string>

@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import com.mywifiadata.app.R
+import com.mywifiadata.app.core.UsageNetwork
 import com.mywifiadata.app.core.TimeRange
 import com.mywifiadata.app.core.TimeRanges
 import com.mywifiadata.app.data.model.AppUsage
@@ -29,8 +30,11 @@ class UsageRepository(
 
     fun wifiStatus(): WifiStatus = wifiReader.read()
 
-    suspend fun deviceTotals(range: TimeRange): TrafficTotals = withContext(Dispatchers.IO) {
-        statsReader.wifiDeviceTotals(range.startMillis, range.endMillis)
+    suspend fun deviceTotals(
+        range: TimeRange,
+        network: UsageNetwork = UsageNetwork.WIFI,
+    ): TrafficTotals = withContext(Dispatchers.IO) {
+        statsReader.deviceTotals(range.startMillis, range.endMillis, network)
     }
 
     suspend fun todayTotals(now: Long = System.currentTimeMillis()): TrafficTotals =
@@ -42,19 +46,26 @@ class UsageRepository(
     ): TrafficTotals = deviceTotals(TimeRanges.cycleRange(cycleStartDay, now))
 
     /** استهلاك التطبيقات مرتّبًا من الأكثر استهلاكًا. */
-    suspend fun perAppUsage(range: TimeRange): List<AppUsage> = withContext(Dispatchers.IO) {
+    suspend fun perAppUsage(
+        range: TimeRange,
+        network: UsageNetwork = UsageNetwork.WIFI,
+    ): List<AppUsage> = withContext(Dispatchers.IO) {
         if (!statsReader.hasUsageAccess()) return@withContext emptyList()
-        val perUid = statsReader.wifiPerUidTotals(range.startMillis, range.endMillis)
+        val perUid = statsReader.perUidTotals(range.startMillis, range.endMillis, network)
         perUid.entries
             .filter { it.value.totalBytes > 0L }
             .map { (uid, totals) -> resolveApp(uid, totals) }
             .sortedByDescending { it.totals.totalBytes }
     }
 
-    /** استهلاك تطبيق واحد (uid) على الواي فاي في فترة زمنية محددة. */
-    suspend fun appTotals(uid: Int, range: TimeRange): TrafficTotals = withContext(Dispatchers.IO) {
+    /** استهلاك تطبيق واحد (uid) على الشبكة المختارة في فترة زمنية محددة. */
+    suspend fun appTotals(
+        uid: Int,
+        range: TimeRange,
+        network: UsageNetwork = UsageNetwork.WIFI,
+    ): TrafficTotals = withContext(Dispatchers.IO) {
         if (!statsReader.hasUsageAccess()) return@withContext TrafficTotals.Empty
-        statsReader.wifiPerUidTotals(range.startMillis, range.endMillis)[uid] ?: TrafficTotals.Empty
+        statsReader.perUidTotals(range.startMillis, range.endMillis, network)[uid] ?: TrafficTotals.Empty
     }
 
     /** استهلاك الأيام الأخيرة (الأقدم أولاً). */

@@ -47,6 +47,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mywifiadata.app.R
+import com.mywifiadata.app.core.AppsUsageScope
+import com.mywifiadata.app.core.UsageNetwork
 import com.mywifiadata.app.core.Format
 import com.mywifiadata.app.core.TimeRange
 import com.mywifiadata.app.core.UsagePeriod
@@ -65,7 +67,7 @@ import com.mywifiadata.app.ui.theme.LocalDownloadColor
 import com.mywifiadata.app.ui.theme.LocalUploadColor
 
 /**
- * شاشة التطبيقات: ترتيب التطبيقات حسب استهلاك الواي فاي في الفترة المختارة،
+ * شاشة التطبيقات: ترتيب التطبيقات حسب استهلاك الشبكة والنطاق المختارين،
  * مع تفصيل زمني (ساعات اليوم / أيام الأسبوع / آخر 4 أسابيع) يمكن الضغط عليه
  * لعرض تطبيقات تلك الشريحة، وفلترة حسب نوع التطبيق.
  */
@@ -84,7 +86,7 @@ fun AppsScreen(
     contentPadding: PaddingValues = PaddingValues(16.dp),
 ) {
     val apps = state.visibleApps
-    val totalBytes = apps.sumOf { it.totals.totalBytes }.coerceAtLeast(1L)
+    val totalBytes = state.filteredApps.sumOf { it.totals.totalBytes }.coerceAtLeast(1L)
 
     // تسميات الشرائح: ساعة "14:00 – 15:00"، يوم "الأحد، 28 سبتمبر"، أسبوع "21 – 27 سبتمبر".
     val hourLabel: (UsageSlice) -> String = { slice ->
@@ -102,13 +104,6 @@ fun AppsScreen(
         contentPadding = contentPadding,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item {
-            PeriodSelector(
-                period = state.appsPeriod,
-                onPeriodChange = onPeriodChange,
-            )
-        }
-
         if (!state.hasUsageAccess) {
             item {
                 PermissionCard(
@@ -124,6 +119,16 @@ fun AppsScreen(
         } else {
             item {
                 SummaryCard(state = state)
+            }
+
+            item {
+                Text(
+                    text = stringResource(R.string.apps_chart_period),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                PeriodSelector(period = state.appsPeriod, onPeriodChange = onPeriodChange)
             }
 
             // التفصيل الزمني حسب الفترة: ساعات اليوم، أيام الأسبوع، أو أسابيع الشهر.
@@ -184,6 +189,22 @@ fun AppsScreen(
                 }
             }
 
+            // فلتر نوع التطبيقات: الكل (الافتراضي) أو المثبتة أو النظام — فوق قائمة التطبيقات.
+            item {
+                Column(modifier = Modifier.padding(horizontal = 4.dp)) {
+                    Text(
+                        text = stringResource(R.string.apps_filter_label),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    AppsFilterRow(
+                        filter = state.appsFilter,
+                        onFilterChange = onAppsFilterChange,
+                    )
+                }
+            }
+
             if (state.isAppsLoading && apps.isEmpty()) {
                 item {
                     Box(
@@ -209,26 +230,11 @@ fun AppsScreen(
                     }
                 }
             } else {
-                // فلتر نوع التطبيقات: الكل (الافتراضي) أو المثبتة أو النظام — فوق قائمة التطبيقات.
-                item {
-                    Column(modifier = Modifier.padding(horizontal = 4.dp)) {
-                        Text(
-                            text = stringResource(R.string.apps_filter_label),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        AppsFilterRow(
-                            filter = state.appsFilter,
-                            onFilterChange = onAppsFilterChange,
-                        )
-                    }
-                }
-
                 item {
                     SectionHeader(
                         title = stringResource(R.string.tab_apps),
-                        supportingText = stringResource(R.string.apps_count, apps.size),
+                        supportingText = stringResource(R.string.apps_count, apps.size) +
+                            if (state.appsSlice == null) "" else " · " + stringResource(R.string.apps_selected_slice),
                     )
                 }
 
@@ -399,8 +405,13 @@ private fun SummaryCard(state: UiState) {
     ExpressiveCard {
         Column(modifier = Modifier.fillMaxWidth()) {
             SectionHeader(
-                title = stringResource(R.string.label_period),
-                supportingText = stringResource(R.string.apps_count, periodApps.size),
+                title = stringResource(
+                    if (state.appsNetwork == UsageNetwork.WIFI && state.appsScope == AppsUsageScope.CURRENT_CYCLE)
+                        R.string.apps_scope_current_cycle else R.string.apps_scope_all_time,
+                ),
+                supportingText = stringResource(
+                    if (state.appsNetwork == UsageNetwork.WIFI) R.string.apps_network_wifi else R.string.apps_network_mobile,
+                ) + " · " + stringResource(R.string.apps_count, periodApps.size),
             )
             Spacer(modifier = Modifier.height(14.dp))
             // التنزيل والرفع والإجمالي في صف أفقي واحد، وتحت كل واحد قيمةه.

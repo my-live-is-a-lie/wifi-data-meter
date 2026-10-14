@@ -16,6 +16,7 @@ import android.os.Bundle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,6 +31,7 @@ import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Language
+import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.AlertDialog
@@ -73,6 +75,7 @@ import com.mywifiadata.app.core.AppLanguage
 import com.mywifiadata.app.core.SystemActions
 import com.mywifiadata.app.data.model.DashboardLayout
 import com.mywifiadata.app.monitor.MonitoringTileService
+import com.mywifiadata.app.ui.components.AppsUsageFilterBar
 import com.mywifiadata.app.ui.AppViewModel
 import com.mywifiadata.app.ui.theme.AppButtonShape
 import com.mywifiadata.app.widget.UsageWidgetProvider
@@ -101,6 +104,7 @@ fun MainScreen(
 
     var selectedTabIndex by rememberSaveable { mutableIntStateOf(0) }
     var languageMenuExpanded by rememberSaveable { mutableStateOf(false) }
+    var appsFiltersExpanded by rememberSaveable { mutableStateOf(false) }
     var isDashboardEditing by remember { mutableStateOf(false) }
     var dashboardLayoutDraft by remember { mutableStateOf(state.settings.dashboardLayout.normalized()) }
 
@@ -406,6 +410,17 @@ fun MainScreen(
                                     )
                                 }
                             }
+                        } else if (currentTab == AppTab.APPS && state.appDetail == null) {
+                            IconButton(onClick = { appsFiltersExpanded = !appsFiltersExpanded }) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Menu,
+                                    contentDescription = stringResource(
+                                        if (appsFiltersExpanded) R.string.apps_hide_filters else R.string.apps_show_filters,
+                                    ),
+                                    tint = if (appsFiltersExpanded) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         } else {
                             IconButton(onClick = { viewModel.refreshNow() }) {
                                 Icon(
@@ -473,16 +488,29 @@ fun MainScreen(
                             onBack = { viewModel.closeAppDetail() },
                         )
                     } else {
-                        AppsScreen(
-                            state = state,
-                            onPeriodChange = { viewModel.setAppsPeriod(it) },
-                            onAppsFilterChange = { viewModel.setAppsFilter(it) },
-                            onAppsWeekChange = { viewModel.selectAppsWeek(it) },
-                            onAppsSliceChange = { viewModel.selectAppsSlice(it) },
-                            onChartTypeChange = { viewModel.setAppsLineChartEnabled(it) },
-                            onOpenUsageAccess = { SystemActions.openUsageAccessSettings(context) },
-                            onAppClick = { viewModel.openAppDetail(it) },
-                        )
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            AnimatedVisibility(visible = appsFiltersExpanded) {
+                                AppsUsageFilterBar(
+                                    network = state.appsNetwork,
+                                    scope = state.appsScope,
+                                    countLimit = state.appsCountLimit,
+                                    onNetworkChange = viewModel::setAppsNetwork,
+                                    onScopeChange = viewModel::setAppsScope,
+                                    onCountLimitChange = viewModel::setAppsCountLimit,
+                                )
+                            }
+                            AppsScreen(
+                                state = state,
+                                modifier = Modifier.weight(1f),
+                                onPeriodChange = { viewModel.setAppsPeriod(it) },
+                                onAppsFilterChange = { viewModel.setAppsFilter(it) },
+                                onAppsWeekChange = { viewModel.selectAppsWeek(it) },
+                                onAppsSliceChange = { viewModel.selectAppsSlice(it) },
+                                onChartTypeChange = { viewModel.setAppsLineChartEnabled(it) },
+                                onOpenUsageAccess = { SystemActions.openUsageAccessSettings(context) },
+                                onAppClick = { viewModel.openAppDetail(it, state.appsNetwork) },
+                            )
+                        }
                     }
                 }
 
