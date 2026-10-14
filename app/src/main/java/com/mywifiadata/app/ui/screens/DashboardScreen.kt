@@ -120,6 +120,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.mywifiadata.app.R
@@ -616,6 +617,45 @@ private fun DashboardEditToolbar(
 
 private enum class DragAxis { HORIZONTAL, VERTICAL }
 
+/**
+ * Lets a visibility badge overhang a lazy row's top/left edge without being clipped,
+ * while keeping the row's measured size and the items' original positions unchanged.
+ */
+private fun Modifier.expandLazyViewportForVisibilityButton(
+    horizontalOverflow: Dp,
+    topOverflow: Dp,
+): Modifier = layout { measurable, constraints ->
+    val horizontalPx = horizontalOverflow.roundToPx()
+    val topPx = topOverflow.roundToPx()
+
+    fun expandBound(value: Int, overflow: Int): Int =
+        if (value == Constraints.Infinity) value else value + overflow
+
+    val placeable = measurable.measure(
+        constraints.copy(
+            maxWidth = expandBound(constraints.maxWidth, horizontalPx),
+            maxHeight = expandBound(constraints.maxHeight, topPx),
+        ),
+    )
+    val width = (placeable.width - horizontalPx).coerceIn(constraints.minWidth, constraints.maxWidth)
+    val height = (placeable.height - topPx).coerceIn(constraints.minHeight, constraints.maxHeight)
+
+    layout(width, height) {
+        placeable.place(-horizontalPx, -topPx)
+    }
+}
+
+private fun visibilityButtonContentPadding(
+    isEditing: Boolean,
+    layoutDirection: LayoutDirection,
+    horizontalOverflow: Dp,
+    topOverflow: Dp,
+): PaddingValues = when {
+    !isEditing -> PaddingValues(0.dp)
+    layoutDirection == LayoutDirection.Rtl -> PaddingValues(end = horizontalOverflow, top = topOverflow)
+    else -> PaddingValues(start = horizontalOverflow, top = topOverflow)
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun EditableDashboardItem(
@@ -627,6 +667,8 @@ private fun EditableDashboardItem(
     dragState: DashboardDragState,
     onMove: (String, String) -> Unit,
     onToggleVisibility: () -> Unit,
+    visibilityButtonOffsetX: Dp = (-8).dp,
+    visibilityButtonOffsetY: Dp = (-8).dp,
     dragPriority: Int = 0,
     showVisibilityButton: Boolean = true,
     dragEnabled: Boolean = true,
@@ -831,7 +873,7 @@ private fun EditableDashboardItem(
                 Box(
                     modifier = Modifier
                         .align(badgeAlignment)
-                        .absoluteOffset(x = (-16).dp, y = (-8).dp)
+                        .absoluteOffset(x = visibilityButtonOffsetX, y = visibilityButtonOffsetY)
                         .size(32.dp)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.primaryContainer)
@@ -1528,8 +1570,25 @@ private fun QuickActions(
             val itemSpacing = 10.dp
             val itemWidth = (maxWidth - itemSpacing * (actionIds.size - 1).toFloat()) /
                 actionIds.size.toFloat()
+            val badgeOverflowX = if (isEditing) 8.dp else 0.dp
+            val badgeOverflowY = if (isEditing) 8.dp else 0.dp
+            val rowLayoutDirection = LocalLayoutDirection.current
             LazyRow(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .then(
+                        if (isEditing) {
+                            Modifier.expandLazyViewportForVisibilityButton(badgeOverflowX, badgeOverflowY)
+                        } else {
+                            Modifier
+                        },
+                    )
+                    .fillMaxWidth(),
+                contentPadding = visibilityButtonContentPadding(
+                    isEditing = isEditing,
+                    layoutDirection = rowLayoutDirection,
+                    horizontalOverflow = badgeOverflowX,
+                    topOverflow = badgeOverflowY,
+                ),
                 userScrollEnabled = false,
                 horizontalArrangement = Arrangement.spacedBy(itemSpacing),
             ) {
@@ -1959,6 +2018,13 @@ private fun TodayCard(
                             )
                         },
                         showVisibilityButton = sectionId != DashboardLayoutIds.TODAY_TRAFFIC_ROW,
+                        visibilityButtonOffsetX = if (
+                            sectionId == DashboardLayoutIds.TODAY_TOTAL_ROW
+                        ) {
+                            (-16).dp
+                        } else {
+                            (-8).dp
+                        },
                         dragEnabled = true,
                         dragShield = sectionId == DashboardLayoutIds.TODAY_TOTAL_ROW,
                         modifier = placementModifier.fillMaxWidth(),
@@ -2317,6 +2383,9 @@ private fun TrafficTilesRow(
             val tileSpacing = 12.dp
             val tileWidth = (maxWidth - tileSpacing * (tileIds.size - 1).toFloat()) /
                 tileIds.size.toFloat()
+            val badgeOverflowX = if (isEditing) 16.dp else 0.dp
+            val badgeOverflowY = if (isEditing) 8.dp else 0.dp
+            val rowLayoutDirection = LocalLayoutDirection.current
 
             Column(modifier = Modifier.fillMaxWidth()) {
                 AnimatedVisibility(
@@ -2338,7 +2407,21 @@ private fun TrafficTilesRow(
                 }
 
                 LazyRow(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .then(
+                            if (isEditing) {
+                                Modifier.expandLazyViewportForVisibilityButton(badgeOverflowX, badgeOverflowY)
+                            } else {
+                                Modifier
+                            },
+                        )
+                        .fillMaxWidth(),
+                    contentPadding = visibilityButtonContentPadding(
+                        isEditing = isEditing,
+                        layoutDirection = rowLayoutDirection,
+                        horizontalOverflow = badgeOverflowX,
+                        topOverflow = badgeOverflowY,
+                    ),
                     userScrollEnabled = false,
                     horizontalArrangement = Arrangement.spacedBy(tileSpacing),
                 ) {
@@ -2369,6 +2452,7 @@ private fun TrafficTilesRow(
                                     layout.copy(hiddenTrafficTiles = toggleId(layout.hiddenTrafficTiles, tileId)),
                                 )
                             },
+                            visibilityButtonOffsetX = (-16).dp,
                             dragShield = true,
                             modifier = Modifier
                                 .width(tileWidth)
