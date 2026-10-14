@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Typeface
 import androidx.core.graphics.drawable.IconCompat
@@ -82,8 +83,9 @@ internal object QuotaStatusBarIcon {
         if (measuredTextWidth > maxTextWidth) {
             paint.textSize *= maxTextWidth / measuredTextWidth
         }
-        val metrics = paint.fontMetrics
-        val baseline = CENTER - (metrics.ascent + metrics.descent) / 2f
+        val textBounds = Rect()
+        paint.getTextBounds(text, 0, text.length, textBounds)
+        val baseline = CENTER - (textBounds.top + textBounds.bottom) / 2f
         canvas.drawText(text, CENTER, baseline, paint)
     }
 

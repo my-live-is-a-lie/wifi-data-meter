@@ -808,6 +808,7 @@ private fun EditableDashboardItem(
                 Box(
                     modifier = Modifier
                         .align(badgeAlignment)
+                        .absoluteOffset(x = (-16).dp, y = (-8).dp)
                         .size(32.dp)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.primaryContainer)
