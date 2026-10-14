@@ -390,7 +390,7 @@ fun DashboardScreen(
             userScrollEnabled = !isEditing || dragState.activeLongPressIds.isEmpty(),
             // تُترك مساحة أفقية للبطاقات العادية، بينما تمتد الواجهة المصغّرة حتى حافتي الشاشة.
             contentPadding = PaddingValues(
-                top = if (isEditing) 4.dp else contentPadding.calculateTopPadding(),
+                top = if (isEditing) 0.dp else contentPadding.calculateTopPadding(),
                 bottom = contentPadding.calculateBottomPadding(),
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -456,6 +456,7 @@ fun DashboardScreen(
                     showVisibilityButton = cardId !in DashboardLayoutIds.COMPOSITE_CARD_IDS,
                     dragShield = cardId == DashboardLayoutIds.USAGE_CARD ||
                         cardId == DashboardLayoutIds.WIFI_CARD ||
+                        cardId == DashboardLayoutIds.SPEED_TEST_CARD ||
                         cardId == DashboardLayoutIds.SESSION_CARD,
                     modifier = frameModifier,
                 ) {
@@ -500,8 +501,6 @@ fun DashboardScreen(
 
                         DashboardLayoutIds.TODAY_CARD -> TodayCard(
                             state = state,
-                            onStart = onStartSpeedTest,
-                            onStop = onStopSpeedTest,
                             isEditing = isEditing,
                             layout = layout,
                             cardBounds = cardBounds,
@@ -510,6 +509,14 @@ fun DashboardScreen(
                             trafficBounds = trafficTileBounds,
                             onLayoutChange = onDashboardLayoutChange,
                             dragState = dragState,
+                        )
+
+                        DashboardLayoutIds.SPEED_TEST_CARD -> SpeedTestPanel(
+                            state = state.speedTest,
+                            history = state.speedTestHistory,
+                            nowMillis = state.now,
+                            onStart = if (isEditing) ({}) else onStartSpeedTest,
+                            onStop = if (isEditing) ({}) else onStopSpeedTest,
                         )
 
                         DashboardLayoutIds.SESSION_CARD -> SessionCard(
@@ -558,7 +565,7 @@ private fun DashboardEditToolbar(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
+            .padding(bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -801,8 +808,7 @@ private fun EditableDashboardItem(
                 Box(
                     modifier = Modifier
                         .align(badgeAlignment)
-                        .padding(4.dp)
-                        .size(28.dp)
+                        .size(32.dp)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.primaryContainer)
                         .clickable(onClick = onToggleVisibility),
@@ -1755,8 +1761,6 @@ private fun NotConnectedCard(isOnline: Boolean) {
 @Composable
 private fun TodayCard(
     state: UiState,
-    onStart: () -> Unit,
-    onStop: () -> Unit,
     isEditing: Boolean,
     layout: DashboardLayout,
     cardBounds: SnapshotStateMap<String, Rect>,
@@ -1806,31 +1810,42 @@ private fun TodayCard(
                             )
                         },
                         onEdgeMoveTarget = { previousCenter, nextCenter ->
+                            // Crossing the Today card's own edge moves the group, while interior drags reorder sections.
                             val direction = when {
                                 nextCenter < previousCenter -> -1
                                 nextCenter > previousCenter -> 1
                                 else -> 0
                             }
                             val sectionIndex = layout.todaySectionOrder.indexOf(sectionId)
-                            val mayMoveCard = (direction < 0 && sectionIndex == 0) ||
+                            val todayBounds = cardBounds[DashboardLayoutIds.TODAY_CARD]
+                            val sectionBoundsForMove = sectionBounds[sectionId]
+                            val sectionHalfHeight = (sectionBoundsForMove?.height ?: 0f) / 2f
+                            val crossedCardEdge = todayBounds != null && sectionBoundsForMove != null &&
+                                when (direction) {
+                                    -1 -> previousCenter - sectionHalfHeight >= todayBounds.top &&
+                                        nextCenter - sectionHalfHeight < todayBounds.top
+
+                                    1 -> previousCenter + sectionHalfHeight <= todayBounds.bottom &&
+                                        nextCenter + sectionHalfHeight > todayBounds.bottom
+
+                                    else -> false
+                                }
+                            val isBoundarySection = (direction < 0 && sectionIndex == 0) ||
                                 (direction > 0 && sectionIndex == layout.todaySectionOrder.lastIndex)
-                            if (!isEditing || !mayMoveCard) {
+                            val neighborIndex = when {
+                                direction < 0 -> layout.cardOrder.indexOf(DashboardLayoutIds.TODAY_CARD) - 1
+                                direction > 0 -> layout.cardOrder.indexOf(DashboardLayoutIds.TODAY_CARD) + 1
+                                else -> -1
+                            }
+                            val neighborCardId = layout.cardOrder.getOrNull(neighborIndex)
+                            val neighborBounds = neighborCardId?.let { cardBounds[it] }
+                            if (
+                                !isEditing || !isBoundarySection || !crossedCardEdge ||
+                                neighborCardId == null || neighborBounds == null || neighborBounds.height <= 0f
+                            ) {
                                 null
                             } else {
-                                cardBounds.entries
-                                    .asSequence()
-                                .filter { (targetCardId, bounds) ->
-                                    val targetCenter = bounds.center.y
-                                    val crossed = if (direction < 0) {
-                                        previousCenter >= targetCenter && nextCenter <= targetCenter
-                                    } else {
-                                        previousCenter <= targetCenter && nextCenter >= targetCenter
-                                    }
-                                    targetCardId != DashboardLayoutIds.TODAY_CARD &&
-                                        bounds.width > 0f && bounds.height > 0f && crossed
-                                }
-                                    .minByOrNull { (_, bounds) -> abs(nextCenter - bounds.center.y) }
-                                    ?.key
+                                neighborCardId
                             }
                         },
                         onEdgeMove = { targetCardId ->
@@ -1853,8 +1868,7 @@ private fun TodayCard(
                         },
                         showVisibilityButton = sectionId != DashboardLayoutIds.TODAY_TRAFFIC_ROW,
                         dragEnabled = true,
-                        dragShield = sectionId == DashboardLayoutIds.TODAY_TOTAL_ROW ||
-                            sectionId == DashboardLayoutIds.TODAY_SPEED_TEST,
+                        dragShield = sectionId == DashboardLayoutIds.TODAY_TOTAL_ROW,
                         modifier = placementModifier.fillMaxWidth(),
                     ) {
                         when (sectionId) {
@@ -1871,14 +1885,6 @@ private fun TodayCard(
                                 bytes = state.today.totalBytes,
                                 label = stringResource(R.string.label_total),
                                 secondaryBytes = state.cycle.totalBytes,
-                            )
-
-                            DashboardLayoutIds.TODAY_SPEED_TEST -> SpeedTestPanel(
-                                state = state.speedTest,
-                                history = state.speedTestHistory,
-                                nowMillis = state.now,
-                                onStart = if (isEditing) ({}) else onStart,
-                                onStop = if (isEditing) ({}) else onStop,
                             )
                         }
                     }

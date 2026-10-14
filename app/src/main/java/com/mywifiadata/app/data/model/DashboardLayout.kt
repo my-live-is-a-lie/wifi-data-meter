@@ -14,21 +14,46 @@ data class DashboardLayout(
     val trafficTileOrder: List<String> = DashboardLayoutIds.TRAFFIC_TILE_ORDER,
     val hiddenTrafficTiles: Set<String> = emptySet(),
 ) {
-    /** Removes invalid/duplicate ids and appends any supported item missing from a saved layout. */
-    fun normalized(): DashboardLayout = copy(
-        cardOrder = normalizeOrder(cardOrder, DashboardLayoutIds.CARD_ORDER),
-        hiddenCards = normalizeHidden(hiddenCards, DashboardLayoutIds.CARD_ORDER)
-            .filterNot { it in DashboardLayoutIds.COMPOSITE_CARD_IDS }
-            .toSet(),
-        quickActionOrder = normalizeOrder(quickActionOrder, DashboardLayoutIds.QUICK_ACTION_ORDER),
-        hiddenQuickActions = normalizeHidden(hiddenQuickActions, DashboardLayoutIds.QUICK_ACTION_ORDER),
-        todaySectionOrder = normalizeOrder(todaySectionOrder, DashboardLayoutIds.TODAY_SECTION_ORDER),
-        hiddenTodaySections = normalizeHidden(hiddenTodaySections, DashboardLayoutIds.TODAY_SECTION_ORDER)
-            .filterNot { it in DashboardLayoutIds.COMPOSITE_TODAY_SECTION_IDS }
-            .toSet(),
-        trafficTileOrder = normalizeOrder(trafficTileOrder, DashboardLayoutIds.TRAFFIC_TILE_ORDER),
-        hiddenTrafficTiles = normalizeHidden(hiddenTrafficTiles, DashboardLayoutIds.TRAFFIC_TILE_ORDER),
-    )
+    /** Removes invalid/duplicate ids and migrates the former nested speed-test section to its own card. */
+    fun normalized(): DashboardLayout {
+        val hasLegacySpeedTestSection = DashboardLayoutIds.TODAY_SPEED_TEST in todaySectionOrder
+        val hidesLegacySpeedTest = DashboardLayoutIds.TODAY_SPEED_TEST in hiddenTodaySections
+        val cardOrderWithSpeedTest = if (
+            DashboardLayoutIds.SPEED_TEST_CARD !in cardOrder &&
+            (hasLegacySpeedTestSection || hidesLegacySpeedTest)
+        ) {
+            cardOrder.toMutableList().apply {
+                val todayIndex = indexOf(DashboardLayoutIds.TODAY_CARD)
+                add(if (todayIndex >= 0) todayIndex + 1 else size, DashboardLayoutIds.SPEED_TEST_CARD)
+            }
+        } else {
+            cardOrder
+        }
+        val hiddenCardsWithMigratedSpeedTest = if (hidesLegacySpeedTest) {
+            hiddenCards + DashboardLayoutIds.SPEED_TEST_CARD
+        } else {
+            hiddenCards
+        }
+
+        return copy(
+            cardOrder = normalizeOrder(cardOrderWithSpeedTest, DashboardLayoutIds.CARD_ORDER),
+            hiddenCards = normalizeHidden(hiddenCardsWithMigratedSpeedTest, DashboardLayoutIds.CARD_ORDER)
+                .filterNot { it in DashboardLayoutIds.COMPOSITE_CARD_IDS }
+                .toSet(),
+            quickActionOrder = normalizeOrder(quickActionOrder, DashboardLayoutIds.QUICK_ACTION_ORDER),
+            hiddenQuickActions = normalizeHidden(hiddenQuickActions, DashboardLayoutIds.QUICK_ACTION_ORDER),
+            todaySectionOrder = normalizeOrder(
+                todaySectionOrder.filterNot { it == DashboardLayoutIds.TODAY_SPEED_TEST },
+                DashboardLayoutIds.TODAY_SECTION_ORDER,
+            ),
+            hiddenTodaySections = normalizeHidden(
+                hiddenTodaySections - DashboardLayoutIds.TODAY_SPEED_TEST,
+                DashboardLayoutIds.TODAY_SECTION_ORDER,
+            ).filterNot { it in DashboardLayoutIds.COMPOSITE_TODAY_SECTION_IDS }.toSet(),
+            trafficTileOrder = normalizeOrder(trafficTileOrder, DashboardLayoutIds.TRAFFIC_TILE_ORDER),
+            hiddenTrafficTiles = normalizeHidden(hiddenTrafficTiles, DashboardLayoutIds.TRAFFIC_TILE_ORDER),
+        )
+    }
 
     /** Compact, versioned representation stored in SharedPreferences. */
     fun encode(): String {
@@ -97,6 +122,7 @@ object DashboardLayoutIds {
     const val QUICK_ACTIONS_CARD = "quick_actions_card"
     const val WIFI_CARD = "wifi_card"
     const val TODAY_CARD = "today_card"
+    const val SPEED_TEST_CARD = "speed_test_card"
     const val SESSION_CARD = "session_card"
 
     const val TRACKING_ACTION = "tracking_action"
@@ -105,6 +131,7 @@ object DashboardLayoutIds {
 
     const val TODAY_TRAFFIC_ROW = "today_traffic_row"
     const val TODAY_TOTAL_ROW = "today_total_row"
+    /** Legacy nested id retained only to migrate previously saved layouts. */
     const val TODAY_SPEED_TEST = "today_speed_test"
 
     const val DOWNLOAD_TILE = "download_tile"
@@ -115,6 +142,7 @@ object DashboardLayoutIds {
         QUICK_ACTIONS_CARD,
         WIFI_CARD,
         TODAY_CARD,
+        SPEED_TEST_CARD,
         SESSION_CARD,
     )
     val COMPOSITE_CARD_IDS = setOf(QUICK_ACTIONS_CARD, TODAY_CARD)
@@ -126,7 +154,6 @@ object DashboardLayoutIds {
     val TODAY_SECTION_ORDER = listOf(
         TODAY_TRAFFIC_ROW,
         TODAY_TOTAL_ROW,
-        TODAY_SPEED_TEST,
     )
     val COMPOSITE_TODAY_SECTION_IDS = setOf(TODAY_TRAFFIC_ROW)
     val TRAFFIC_TILE_ORDER = listOf(DOWNLOAD_TILE, UPLOAD_TILE)
