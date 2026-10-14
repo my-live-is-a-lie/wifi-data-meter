@@ -7,6 +7,7 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.os.Build
 import android.os.Process
+import com.mywifiadata.app.core.UsageNetwork
 import com.mywifiadata.app.data.model.TrafficTotals
 
 /**
@@ -48,12 +49,15 @@ class NetworkStatsReader(private val context: Context) {
     }
 
     /** إجمالي استهلاك الواي فاي للجهاز في فترة زمنية. */
-    fun wifiDeviceTotals(startMillis: Long, endMillis: Long): TrafficTotals {
+    fun wifiDeviceTotals(startMillis: Long, endMillis: Long): TrafficTotals =
+        deviceTotals(startMillis, endMillis, UsageNetwork.WIFI)
+
+    fun deviceTotals(startMillis: Long, endMillis: Long, network: UsageNetwork): TrafficTotals {
         val statsManager = manager ?: return TrafficTotals.Empty
         if (endMillis <= startMillis) return TrafficTotals.Empty
         return try {
             val bucket = statsManager.querySummaryForDevice(
-                ConnectivityManager.TYPE_WIFI,
+                if (network == UsageNetwork.WIFI) ConnectivityManager.TYPE_WIFI else ConnectivityManager.TYPE_MOBILE,
                 null,
                 startMillis,
                 endMillis,
@@ -66,8 +70,8 @@ class NetworkStatsReader(private val context: Context) {
         }
     }
 
-    /** استهلاك كل تطبيق (uid) على الواي فاي في فترة زمنية. */
-    fun wifiPerUidTotals(startMillis: Long, endMillis: Long): Map<Int, TrafficTotals> {
+    /** استهلاك كل تطبيق (uid) على الشبكة المختارة؛ null يجمع اشتراكات الهاتف المتاحة. */
+    fun perUidTotals(startMillis: Long, endMillis: Long, network: UsageNetwork): Map<Int, TrafficTotals> {
         val statsManager = manager ?: return emptyMap()
         if (endMillis <= startMillis) return emptyMap()
 
@@ -75,7 +79,7 @@ class NetworkStatsReader(private val context: Context) {
         var stats: NetworkStats? = null
         try {
             stats = statsManager.querySummary(
-                ConnectivityManager.TYPE_WIFI,
+                if (network == UsageNetwork.WIFI) ConnectivityManager.TYPE_WIFI else ConnectivityManager.TYPE_MOBILE,
                 null,
                 startMillis,
                 endMillis,
