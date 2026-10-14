@@ -6,8 +6,11 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Color
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.graphics.drawable.IconCompat
 import com.mywifiadata.app.MainActivity
 import com.mywifiadata.app.R
 
@@ -17,6 +20,12 @@ import com.mywifiadata.app.R
 class Notifier(private val context: Context) {
 
     private val manager = context.getSystemService(NotificationManager::class.java)
+    private val hiddenStatusBarIcon by lazy(LazyThreadSafetyMode.NONE) {
+        val bitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888).apply {
+            eraseColor(Color.TRANSPARENT)
+        }
+        IconCompat.createWithBitmap(bitmap)
+    }
 
     fun ensureChannels() {
         val notificationManager = manager ?: return
@@ -38,8 +47,14 @@ class Notifier(private val context: Context) {
         notificationManager.createNotificationChannels(listOf(monitorChannel, alertsChannel))
     }
 
-    /** الإشعار الدائم الذي يعرض حالة المراقبة. */
-    fun buildOngoingNotification(title: String, text: String): Notification {
+    /** يبقي إشعار الخدمة ظاهرًا، مع إمكانية إخفاء أيقونته من شريط الحالة. */
+    fun buildOngoingNotification(
+        title: String,
+        text: String,
+        quotaUsedBytes: Long? = null,
+        quotaBytes: Long = 0L,
+        hideStatusBarIcon: Boolean = false,
+    ): Notification {
         val contentIntent = PendingIntent.getActivity(
             context,
             0,
@@ -54,8 +69,25 @@ class Notifier(private val context: Context) {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
 
-        return NotificationCompat.Builder(context, CHANNEL_MONITOR)
-            .setSmallIcon(R.drawable.ic_stat_usage)
+        val quotaIcon = if (hideStatusBarIcon) {
+            null
+        } else {
+            quotaUsedBytes?.let { usedBytes ->
+                QuotaStatusBarIcon.create(
+                    usedBytes = usedBytes,
+                    quotaBytes = quotaBytes,
+                    locale = context.resources.configuration.locales[0],
+                )
+            }
+        }
+        val builder = NotificationCompat.Builder(context, CHANNEL_MONITOR)
+        when {
+            hideStatusBarIcon -> builder.setSmallIcon(hiddenStatusBarIcon)
+            quotaIcon != null -> builder.setSmallIcon(quotaIcon)
+            else -> builder.setSmallIcon(R.drawable.ic_network_monitor)
+        }
+
+        return builder
             .setContentTitle(title)
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
