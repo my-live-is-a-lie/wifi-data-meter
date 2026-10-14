@@ -24,16 +24,17 @@
   العشرية كما تكتبها شركات الاتصال، وتحتها التسمية مع سهم الاتجاه.
 - **صف الإجمالي**: إجمالي اليوم مع أيقونة دورية، وإلى جانبه «الإجمالي» لإجمالي دورة الفاتورة
   بالجيجابايت.
-- **لوحة اختبار السرعة**: زر تشغيل أزرق في البداية (يمينًا)، العنوان «اختبار السرعة»
-  وسطر «يستخدم موقع fast.com»، ثم نتائج التنزيل والرفع في الطرف الآخر. على الشاشات
-  الضيقة تُنقل النتائج إلى سطر ثانٍ تلقائيًا حتى لا يُقتطع أي نص.
+- **لوحة اختبار السرعة**: زر التشغيل والعنوان في الأعلى، ثم نتائج التنزيل والرفع
+  بجانب وقت آخر اختبار كما في التصميم المرجعي. السهم في منتصف أسفل البطاقة يفتح
+  سجلًّا يضم أحدث تسع نتائج سابقة، مع تاريخ ووقت كل اختبار والوقت المنقضي وسرعتي
+  التنزيل والرفع؛ وتبقى بطاقة الجلسة أسفلها عند توسيع السجل.
 
 **اختبار السرعة (fast.com):**
 
 - القياس يجري على خوادم fast.com الحقيقية (Netflix Open Connect) عبر عدة تدفقات متوازية،
   ومع حجب `api.fast.com` (رمز 403 في بعض الدول) ينتقل التطبيق تلقائيًا إلى خوادم Cloudflare.
-- **تُحفظ النتيجة محليًا** (تنزيل/رفع/الوقت/المصدر) فتبقى ظاهرة في اللوحة حتى بعد إغلاق
-  التطبيق وإعادة تشغيله، مع طابع وقت آخر اختبار.
+- **تُحفظ آخر عشر نتائج محليًا** (تنزيل/رفع/الوقت/المصدر) لتبقى متاحة بعد إغلاق
+  التطبيق وإعادة تشغيله؛ تظهر الأحدث في الملخص والتسع الأسبق في السجل القابل للتوسيع.
 - أثناء القياس تظهر المرحلة الجارية والسرعة اللحظية، وزر التشغيل يتحول إلى إيقاف.
 
 **رسائل الانقطاع والمهلة وإغلاق التحميل:**
@@ -48,7 +49,7 @@
 
 بالإضافة إلى:
 
-- **مراقبة في الخلفية** عبر خدمة أمامية (Foreground Service) بإشعار دائم يعرض استهلاك اليوم والسرعة والمتبقّي، مع زر إيقاف سريع من الإشعار.
+- **مراقبة في الخلفية** عبر خدمة أمامية بإشعار دائم يعرض استهلاك اليوم والمتبقّي؛ وأيقونته تعرض نسبة استهلاك الباقة داخل حلقة تقدم، أو علامة الواي فاي إن لم تُضبط باقة، مع زر إيقاف سريع.
 - **تنبيهات ذكية** عند بلوغ نسبة التحذير (افتراضيًا 80%) وعند تجاوز الباقة، تُعاد ضبطها تلقائيًا مع بداية دورة فاتورة جديدة.
 - **ألوان ديناميكية** (Android 12+) قابلة للإيقاف، وثيم فاتح/داكن، وواجهة عربية من اليمين إلى اليسار افتراضيًا.
 
@@ -187,6 +188,8 @@ app/src/main/java/com/mywifiadata/app/
 ├── data/                         # SettingsStore، NetworkStatsReader، WifiNetworkReader، UsageRepository
 ├── data/model/                   # نماذج البيانات (TrafficTotals، WifiStatus، AppUsage …)
 ├── monitor/                      # MonitorService (خدمة أمامية) و Notifier
+│                                 # و MonitoringTileService (بلاطة الإعدادات السريعة)
+│                                 # و TileIconFrames / TileIconPainter (تحريك أيقونة البلاطة)
 └── ui/
     ├── AppViewModel.kt           # حالة الواجهة والمنطق العرضي
     ├── theme/                    # AppTheme، Shapes، Typography
@@ -194,7 +197,8 @@ app/src/main/java/com/mywifiadata/app/
     │                             # TodayTotalRow، SpeedTestPanel، AppUsageRow …
     ├── screens/                  # Main / Dashboard / Apps / History / Settings
     └── PreviewData.kt            # معاينات Android Studio
-app/src/test/java/…               # اختبارات الوحدة (Format، TimeRanges، النماذج، SpeedTestWatchdog)
+app/src/test/java/…               # اختبارات الوحدة (Format، TimeRanges، النماذج، SpeedTestWatchdog،
+                                  # وإطارات أيقونة البلاطة)
 ```
 
 ---
@@ -222,9 +226,10 @@ built with **Kotlin + Jetpack Compose + Material 3 Expressive**.
 - History: 7‑ or 30‑day bar chart with per‑day details and that day's top apps.
 - Settings: quota + cycle start day, alert threshold, sampling interval, background tracking, dynamic color.
 - Background monitoring through a `dataSync` foreground service with an ongoing notification and threshold alerts.
-- A reference-matching “Today” card (blue download / purple upload tiles, total row, fast.com speed-test panel) and a
-  fast.com speed test that saves its last result on-device and aborts the transfer with a clear message when the
-  connection drops or no data arrives for too long (12 s stall window, 45 s overall cap).
+- A reference-matching “Today” card (blue download / purple upload tiles, total row, fast.com speed-test panel) with
+  a collapsible history of the nine preceding tests; the latest ten results are saved on-device. The speed test
+  also aborts its transfer with a clear message when the connection drops or no data arrives for too long (12 s
+  stall window, 45 s overall cap).
 
 Build with `./gradlew assembleDebug` (AGP 9.3.1 · Kotlin 2.4.10 · Gradle 9.5.0 · Compose BOM 2026.09.00 ·
 Material 3 1.5.0‑alpha29 · compileSdk 37 · minSdk 26). Grant **Usage Access** on first run to enable per‑app stats.

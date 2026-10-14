@@ -5,6 +5,7 @@ import com.mywifiadata.app.core.AppLanguage
 import com.mywifiadata.app.core.SamplingIntervals
 import com.mywifiadata.app.data.model.AccentColor
 import com.mywifiadata.app.data.model.AppSettings
+import com.mywifiadata.app.data.model.DashboardLayout
 import com.mywifiadata.app.data.model.SpeedTestRecord
 import com.mywifiadata.app.data.model.ThemeMode
 import com.mywifiadata.app.data.model.TrafficTotals
@@ -52,9 +53,12 @@ class SettingsStore(context: Context) {
         it.copy(sessionBaseline = baseline, sessionStartMillis = startMillis)
     }
 
-    /** يحفظ آخر نتيجة اختبار سرعة لتظهر بعد إعادة تشغيل التطبيق. */
-    fun saveSpeedTest(record: SpeedTestRecord) = update {
-        it.copy(lastSpeedTest = record)
+    /** يحفظ نتيجة الاختبار الأخيرة ويضيفها إلى سجل آخر عشرة اختبارات. */
+    fun saveSpeedTest(record: SpeedTestRecord) = update { settings ->
+        settings.copy(
+            lastSpeedTest = record,
+            speedTestHistory = SpeedTestHistory.prepend(settings.speedTestHistory, record),
+        )
     }
 
     private fun read(): AppSettings = AppSettings(
@@ -79,7 +83,9 @@ class SettingsStore(context: Context) {
             prefs.getString(AppLanguage.PREFERENCE_KEY, AppLanguage.SYSTEM),
         ),
         trackingEnabled = prefs.getBoolean(KEY_TRACKING, false),
+        hideStatusBarIcon = prefs.getBoolean(KEY_HIDE_STATUS_BAR_ICON, false),
         usageCardStyleIndex = prefs.getInt(KEY_USAGE_CARD_STYLE, 0).coerceAtLeast(0),
+        dashboardLayout = DashboardLayout.decode(prefs.getString(KEY_DASHBOARD_LAYOUT, null)),
         historyLineChartEnabled = prefs.getBoolean(KEY_HISTORY_LINE_CHART, false),
         appsLineChartEnabled = prefs.getBoolean(KEY_APPS_LINE_CHART, false),
         themeMode = prefs.getString(KEY_THEME_MODE, null)
@@ -92,6 +98,7 @@ class SettingsStore(context: Context) {
         ),
         alertCycleStartMillis = prefs.getLong(KEY_ALERT_CYCLE, 0L),
         alertLevelReached = prefs.getInt(KEY_ALERT_LEVEL, 0),
+        speedTestHistory = readSpeedTestHistory(),
         lastSpeedTest = readSpeedTest(),
     )
 
@@ -106,6 +113,23 @@ class SettingsStore(context: Context) {
             usedFastCom = prefs.getBoolean(KEY_SPEED_FAST, true),
             uploadMeasured = prefs.getBoolean(KEY_SPEED_UPLOAD_OK, true),
         )
+    }
+
+    /** يقرأ السجل الجديد، أو يرحّل آخر نتيجة القديمة إلى أول عنصر عند التحديث. */
+    private fun readSpeedTestHistory(): List<SpeedTestRecord> {
+        val last = readSpeedTest()
+        val encoded = prefs.getString(KEY_SPEED_HISTORY, null)
+        val history = encoded
+            ?.takeIf(String::isNotBlank)
+            ?.let(SpeedTestHistory::decode)
+            .orEmpty()
+
+        if (history.isEmpty()) return listOfNotNull(last)
+        return if (last != null && history.none { it == last }) {
+            SpeedTestHistory.prepend(history, last)
+        } else {
+            history
+        }
     }
 
     private fun write(settings: AppSettings) {
@@ -128,7 +152,9 @@ class SettingsStore(context: Context) {
             .putBoolean(KEY_APP_ICON_HIDDEN, settings.appIconHidden)
             .putString(AppLanguage.PREFERENCE_KEY, AppLanguage.normalize(settings.appLanguage))
             .putBoolean(KEY_TRACKING, settings.trackingEnabled)
+            .putBoolean(KEY_HIDE_STATUS_BAR_ICON, settings.hideStatusBarIcon)
             .putInt(KEY_USAGE_CARD_STYLE, settings.usageCardStyleIndex)
+            .putString(KEY_DASHBOARD_LAYOUT, settings.dashboardLayout.encode())
             .putBoolean(KEY_HISTORY_LINE_CHART, settings.historyLineChartEnabled)
             .putBoolean(KEY_APPS_LINE_CHART, settings.appsLineChartEnabled)
             .putString(KEY_THEME_MODE, settings.themeMode.name)
@@ -142,6 +168,7 @@ class SettingsStore(context: Context) {
             .putLong(KEY_SPEED_TIME, settings.lastSpeedTest?.timestampMillis ?: 0L)
             .putBoolean(KEY_SPEED_FAST, settings.lastSpeedTest?.usedFastCom ?: true)
             .putBoolean(KEY_SPEED_UPLOAD_OK, settings.lastSpeedTest?.uploadMeasured ?: true)
+            .putString(KEY_SPEED_HISTORY, SpeedTestHistory.encode(settings.speedTestHistory))
             .apply()
     }
 
@@ -160,7 +187,9 @@ class SettingsStore(context: Context) {
         private const val KEY_QUICK_SETTINGS_TILE_ADDED = "quick_settings_tile_added"
         private const val KEY_APP_ICON_HIDDEN = "app_icon_hidden"
         private const val KEY_TRACKING = "tracking_enabled"
+        private const val KEY_HIDE_STATUS_BAR_ICON = "hide_status_bar_icon"
         private const val KEY_USAGE_CARD_STYLE = "usage_card_style"
+        private const val KEY_DASHBOARD_LAYOUT = "dashboard_layout"
         private const val KEY_HISTORY_LINE_CHART = "history_line_chart_enabled"
         private const val KEY_APPS_LINE_CHART = "apps_line_chart_enabled"
         private const val KEY_SESSION_START = "session_start"
@@ -174,5 +203,6 @@ class SettingsStore(context: Context) {
         private const val KEY_SPEED_TIME = "speed_test_time"
         private const val KEY_SPEED_FAST = "speed_test_source_fast"
         private const val KEY_SPEED_UPLOAD_OK = "speed_test_upload_ok"
+        private const val KEY_SPEED_HISTORY = "speed_test_history"
     }
 }

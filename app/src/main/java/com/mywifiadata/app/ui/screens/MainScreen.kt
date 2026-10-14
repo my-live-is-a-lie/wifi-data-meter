@@ -21,9 +21,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Info
@@ -69,6 +71,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mywifiadata.app.R
 import com.mywifiadata.app.core.AppLanguage
 import com.mywifiadata.app.core.SystemActions
+import com.mywifiadata.app.data.model.DashboardLayout
 import com.mywifiadata.app.monitor.MonitoringTileService
 import com.mywifiadata.app.ui.AppViewModel
 import com.mywifiadata.app.ui.theme.AppButtonShape
@@ -94,9 +97,12 @@ fun MainScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+    val dashboardListState = rememberLazyListState()
 
     var selectedTabIndex by rememberSaveable { mutableIntStateOf(0) }
     var languageMenuExpanded by rememberSaveable { mutableStateOf(false) }
+    var isDashboardEditing by remember { mutableStateOf(false) }
+    var dashboardLayoutDraft by remember { mutableStateOf(state.settings.dashboardLayout.normalized()) }
 
     val permissionMessage = stringResource(R.string.permission_needed_title)
     val openSettingsLabel = stringResource(R.string.action_open_usage_access)
@@ -182,6 +188,21 @@ fun MainScreen(
         }
     }
 
+    fun beginDashboardEditing() {
+        dashboardLayoutDraft = state.settings.dashboardLayout.normalized()
+        isDashboardEditing = true
+    }
+
+    fun cancelDashboardEditing() {
+        dashboardLayoutDraft = state.settings.dashboardLayout.normalized()
+        isDashboardEditing = false
+    }
+
+    fun saveDashboardEditing() {
+        viewModel.setDashboardLayout(dashboardLayoutDraft.normalized())
+        isDashboardEditing = false
+    }
+
     fun configureQuickSettingsTile(enabled: Boolean) {
         viewModel.setQuickSettingsTileEnabled(enabled)
         if (!enabled) {
@@ -209,7 +230,7 @@ fun MainScreen(
             statusBarManager.requestAddTileService(
                 ComponentName(context, MonitoringTileService::class.java),
                 context.getString(R.string.qs_tile_label),
-                AndroidIcon.createWithResource(context, R.drawable.ic_stat_usage),
+                AndroidIcon.createWithResource(context, R.drawable.ic_network_monitor),
                 ContextCompat.getMainExecutor(context),
             ) { result ->
                 when (result) {
@@ -279,8 +300,10 @@ fun MainScreen(
         }
     }
 
-    // زر الرجوع يغلق تفاصيل التطبيق قبل الخروج من الشاشة
-    BackHandler(enabled = state.appDetail != null) { viewModel.closeAppDetail() }
+    // زر الرجوع يلغي تخصيص الصفحة أولًا، ثم يغلق تفاصيل التطبيق إن وُجدت.
+    BackHandler(enabled = isDashboardEditing || state.appDetail != null) {
+        if (isDashboardEditing) cancelDashboardEditing() else viewModel.closeAppDetail()
+    }
 
     // تأكيد تصفير الجلسة قبل تنفيذه (يغطي زر الأزرار السريعة وزر بطاقة الجلسة معًا)
     var showResetDialog by rememberSaveable { mutableStateOf(false) }
@@ -314,82 +337,98 @@ fun MainScreen(
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
-            TopAppBar(
-                title = { Text(text = stringResource(currentTab.labelRes)) },
-                actions = {
-                    if (currentTab == AppTab.SETTINGS) {
-                        Box {
-                            IconButton(onClick = { languageMenuExpanded = true }) {
+            if (currentTab != AppTab.DASHBOARD || !isDashboardEditing) {
+                TopAppBar(
+                    title = { Text(text = stringResource(currentTab.labelRes)) },
+                    actions = {
+                        if (currentTab == AppTab.SETTINGS) {
+                            Box {
+                                IconButton(onClick = { languageMenuExpanded = true }) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Language,
+                                        contentDescription = stringResource(R.string.cd_change_language),
+                                    )
+                                }
+                                DropdownMenu(
+                                    expanded = languageMenuExpanded,
+                                    onDismissRequest = { languageMenuExpanded = false },
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text(text = stringResource(R.string.language_system)) },
+                                        onClick = { selectAppLanguage(AppLanguage.SYSTEM) },
+                                        trailingIcon = if (state.settings.appLanguage == AppLanguage.SYSTEM) {
+                                            {
+                                                Icon(
+                                                    imageVector = Icons.Rounded.Check,
+                                                    contentDescription = null,
+                                                )
+                                            }
+                                        } else {
+                                            null
+                                        },
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text(text = stringResource(R.string.language_arabic)) },
+                                        onClick = { selectAppLanguage(AppLanguage.ARABIC) },
+                                        trailingIcon = if (state.settings.appLanguage == AppLanguage.ARABIC) {
+                                            {
+                                                Icon(
+                                                    imageVector = Icons.Rounded.Check,
+                                                    contentDescription = null,
+                                                )
+                                            }
+                                        } else {
+                                            null
+                                        },
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text(text = stringResource(R.string.language_english)) },
+                                        onClick = { selectAppLanguage(AppLanguage.ENGLISH) },
+                                        trailingIcon = if (state.settings.appLanguage == AppLanguage.ENGLISH) {
+                                            {
+                                                Icon(
+                                                    imageVector = Icons.Rounded.Check,
+                                                    contentDescription = null,
+                                                )
+                                            }
+                                        } else {
+                                            null
+                                        },
+                                    )
+                                }
+                            }
+                        } else if (currentTab == AppTab.DASHBOARD) {
+                            if (!isDashboardEditing) {
+                                IconButton(onClick = { beginDashboardEditing() }) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Edit,
+                                        contentDescription = stringResource(R.string.cd_edit_dashboard),
+                                    )
+                                }
+                            }
+                        } else {
+                            IconButton(onClick = { viewModel.refreshNow() }) {
                                 Icon(
-                                    imageVector = Icons.Rounded.Language,
-                                    contentDescription = stringResource(R.string.cd_change_language),
-                                )
-                            }
-                            DropdownMenu(
-                                expanded = languageMenuExpanded,
-                                onDismissRequest = { languageMenuExpanded = false },
-                            ) {
-                                DropdownMenuItem(
-                                    text = { Text(text = stringResource(R.string.language_system)) },
-                                    onClick = { selectAppLanguage(AppLanguage.SYSTEM) },
-                                    trailingIcon = if (state.settings.appLanguage == AppLanguage.SYSTEM) {
-                                        {
-                                            Icon(
-                                                imageVector = Icons.Rounded.Check,
-                                                contentDescription = null,
-                                            )
-                                        }
-                                    } else {
-                                        null
-                                    },
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(text = stringResource(R.string.language_arabic)) },
-                                    onClick = { selectAppLanguage(AppLanguage.ARABIC) },
-                                    trailingIcon = if (state.settings.appLanguage == AppLanguage.ARABIC) {
-                                        {
-                                            Icon(
-                                                imageVector = Icons.Rounded.Check,
-                                                contentDescription = null,
-                                            )
-                                        }
-                                    } else {
-                                        null
-                                    },
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(text = stringResource(R.string.language_english)) },
-                                    onClick = { selectAppLanguage(AppLanguage.ENGLISH) },
-                                    trailingIcon = if (state.settings.appLanguage == AppLanguage.ENGLISH) {
-                                        {
-                                            Icon(
-                                                imageVector = Icons.Rounded.Check,
-                                                contentDescription = null,
-                                            )
-                                        }
-                                    } else {
-                                        null
-                                    },
+                                    imageVector = Icons.Rounded.Refresh,
+                                    contentDescription = stringResource(R.string.cd_refresh),
                                 )
                             }
                         }
-                    } else {
-                        IconButton(onClick = { viewModel.refreshNow() }) {
-                            Icon(
-                                imageVector = Icons.Rounded.Refresh,
-                                contentDescription = stringResource(R.string.cd_refresh),
-                            )
-                        }
-                    }
-                },
-            )
+                    },
+                )
+            }
         },
         bottomBar = {
             ShortNavigationBar {
                 tabs.forEachIndexed { index, tab ->
                     ShortNavigationBarItem(
                         selected = index == selectedTabIndex,
-                        onClick = { selectedTabIndex = index },
+                        onClick = {
+                            if (isDashboardEditing && index != AppTab.DASHBOARD.ordinal) {
+                                cancelDashboardEditing()
+                            }
+                            selectedTabIndex = index
+                        },
                         icon = {
                             Icon(
                                 imageVector = tab.icon,
@@ -404,13 +443,7 @@ fun MainScreen(
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
     ) { innerPadding ->
-        PullToRefreshBox(
-            isRefreshing = state.isRefreshing,
-            onRefresh = { viewModel.refreshNow() },
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-        ) {
+        val screenContent: @Composable () -> Unit = {
             when (currentTab) {
                 AppTab.DASHBOARD -> DashboardScreen(
                     state = state,
@@ -423,6 +456,13 @@ fun MainScreen(
                     onStopSpeedTest = { viewModel.stopSpeedTest() },
                     onAddUsageWidget = { styleIndex -> requestUsageWidgetPin(styleIndex) },
                     onUsageCardStyleChange = { styleIndex -> viewModel.setUsageCardStyle(styleIndex) },
+                    onLoadTodayApps = { viewModel.loadTodayApps() },
+                    dashboardListState = dashboardListState,
+                    isEditing = isDashboardEditing,
+                    dashboardLayout = dashboardLayoutDraft,
+                    onDashboardLayoutChange = { dashboardLayoutDraft = it.normalized() },
+                    onSaveDashboardLayout = { saveDashboardEditing() },
+                    onCancelDashboardLayout = { cancelDashboardEditing() },
                 )
 
                 AppTab.APPS -> {
@@ -465,6 +505,7 @@ fun MainScreen(
                     onDynamicColorChange = { viewModel.setDynamicColorEnabled(it) },
                     onAccentColorChange = { viewModel.setAccentColor(it) },
                     onQuickSettingsTileEnabledChange = { configureQuickSettingsTile(it) },
+                    onHideStatusBarIconChange = { viewModel.setHideStatusBarIcon(it) },
                     onAppIconHiddenChange = { viewModel.setAppIconHidden(it) },
                     onTrackingChange = { toggleTracking(it) },
                     onThemeModeChange = { viewModel.setThemeMode(it) },
@@ -472,6 +513,26 @@ fun MainScreen(
                     onOpenWifiSettings = { SystemActions.openWifiSettings(context) },
                     onClearData = { viewModel.clearData() },
                 )
+            }
+        }
+
+        if (isDashboardEditing && currentTab == AppTab.DASHBOARD) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+            ) {
+                screenContent()
+            }
+        } else {
+            PullToRefreshBox(
+                isRefreshing = state.isRefreshing,
+                onRefresh = { viewModel.refreshNow() },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+            ) {
+                screenContent()
             }
         }
     }
