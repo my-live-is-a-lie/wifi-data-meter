@@ -61,6 +61,7 @@ import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -94,6 +95,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -148,7 +150,9 @@ private class DashboardDragState {
 
     var draggedItemId by mutableStateOf<String?>(null)
         private set
-    var draggedOffset by mutableStateOf(Offset.Zero)
+    var draggedPointerRoot by mutableStateOf(Offset.Zero)
+        private set
+    var draggedAnchorOffset by mutableStateOf(Offset.Zero)
         private set
     var settlingItemId by mutableStateOf<String?>(null)
         private set
@@ -175,25 +179,29 @@ private class DashboardDragState {
         activeLongPressIds.remove(id)
     }
 
-    fun startDrag(id: String) {
+    fun startDrag(id: String, pointerRoot: Offset, itemBounds: Rect) {
         settlingItemId = null
         settlingStartOffset = Offset.Zero
         settlingOffset = Offset.Zero
         draggedItemId = id
-        draggedOffset = Offset.Zero
+        draggedPointerRoot = pointerRoot
+        draggedAnchorOffset = pointerRoot - Offset(itemBounds.left, itemBounds.top)
         edgeScrollDirection = 0
     }
 
-    fun draggedOffsetFor(id: String): Offset =
-        if (draggedItemId == id) draggedOffset else Offset.Zero
-
-    fun dragBy(id: String, axis: DragAxis, amount: Float) {
-        if (draggedItemId != id) return
-        draggedOffset += when (axis) {
-            DragAxis.HORIZONTAL -> Offset(amount, 0f)
-            DragAxis.VERTICAL -> Offset(0f, amount)
-        }
+    fun updateDraggedPointer(id: String, pointerRoot: Offset) {
+        if (draggedItemId == id) draggedPointerRoot = pointerRoot
     }
+
+    fun draggedOffsetFor(id: String, itemBounds: Rect): Offset =
+        if (draggedItemId == id) {
+            draggedPointerRoot - draggedAnchorOffset - Offset(itemBounds.left, itemBounds.top)
+        } else {
+            Offset.Zero
+        }
+
+    fun draggedAnchorFor(id: String): Offset =
+        if (draggedItemId == id) draggedAnchorOffset else Offset.Zero
 
     fun updateAutoScroll(pointerY: Float) {
         val bounds = viewportBounds
@@ -205,17 +213,11 @@ private class DashboardDragState {
         }
     }
 
-    fun compensateForAutoScroll(id: String, consumedScroll: Float) {
-        if (draggedItemId == id && consumedScroll != 0f) {
-            draggedOffset += Offset(0f, consumedScroll)
-        }
-    }
-
-    fun finishDrag(id: String) {
+    fun finishDrag(id: String, finalOffset: Offset) {
         if (draggedItemId != id) return
-        val finalOffset = draggedOffset
         draggedItemId = null
-        draggedOffset = Offset.Zero
+        draggedPointerRoot = Offset.Zero
+        draggedAnchorOffset = Offset.Zero
         edgeScrollDirection = 0
         if (finalOffset != Offset.Zero) {
             settlingItemId = id
@@ -240,7 +242,8 @@ private class DashboardDragState {
         endLongPress(id)
         if (draggedItemId == id) {
             draggedItemId = null
-            draggedOffset = Offset.Zero
+            draggedPointerRoot = Offset.Zero
+            draggedAnchorOffset = Offset.Zero
             edgeScrollDirection = 0
         }
         completeSettlement(id)
@@ -249,7 +252,8 @@ private class DashboardDragState {
     fun reset() {
         activeLongPressIds.clear()
         draggedItemId = null
-        draggedOffset = Offset.Zero
+        draggedPointerRoot = Offset.Zero
+        draggedAnchorOffset = Offset.Zero
         settlingItemId = null
         settlingStartOffset = Offset.Zero
         settlingOffset = Offset.Zero
@@ -294,6 +298,7 @@ fun DashboardScreen(
     val cardBounds = remember { mutableStateMapOf<String, Rect>() }
     val quickActionBounds = remember { mutableStateMapOf<String, Rect>() }
     val todaySectionBounds = remember { mutableStateMapOf<String, Rect>() }
+    val todayHeaderBounds = remember { mutableStateMapOf<String, Rect>() }
     val trafficTileBounds = remember { mutableStateMapOf<String, Rect>() }
     val dragState = remember { DashboardDragState() }
     val dashboardListState = rememberLazyListState()
@@ -338,8 +343,7 @@ fun DashboardScreen(
         val direction = dragState.edgeScrollDirection
         if (direction == 0) return@LaunchedEffect
         while (dragState.draggedItemId == draggedId && dragState.edgeScrollDirection == direction) {
-            val consumed = dashboardListState.scrollBy(direction * autoScrollStepPx)
-            dragState.compensateForAutoScroll(draggedId, consumed)
+            dashboardListState.scrollBy(direction * autoScrollStepPx)
             delay(16)
         }
     }
@@ -386,7 +390,7 @@ fun DashboardScreen(
             userScrollEnabled = !isEditing || dragState.activeLongPressIds.isEmpty(),
             // تُترك مساحة أفقية للبطاقات العادية، بينما تمتد الواجهة المصغّرة حتى حافتي الشاشة.
             contentPadding = PaddingValues(
-                top = contentPadding.calculateTopPadding(),
+                top = if (isEditing) 4.dp else contentPadding.calculateTopPadding(),
                 bottom = contentPadding.calculateBottomPadding(),
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -445,6 +449,10 @@ fun DashboardScreen(
                         )
                     },
                     dragState = dragState,
+                    canStartDragAt = { rootPosition ->
+                        cardId != DashboardLayoutIds.TODAY_CARD ||
+                            todayHeaderBounds[DashboardLayoutIds.TODAY_CARD]?.contains(rootPosition) == true
+                    },
                     showVisibilityButton = cardId !in DashboardLayoutIds.COMPOSITE_CARD_IDS,
                     dragShield = cardId == DashboardLayoutIds.USAGE_CARD ||
                         cardId == DashboardLayoutIds.WIFI_CARD ||
@@ -496,7 +504,9 @@ fun DashboardScreen(
                             onStop = onStopSpeedTest,
                             isEditing = isEditing,
                             layout = layout,
+                            cardBounds = cardBounds,
                             sectionBounds = todaySectionBounds,
+                            headerBounds = todayHeaderBounds,
                             trafficBounds = trafficTileBounds,
                             onLayoutChange = onDashboardLayoutChange,
                             dragState = dragState,
@@ -507,6 +517,26 @@ fun DashboardScreen(
                             onResetSession = onResetSession,
                             isEditing = isEditing,
                         )
+                    }
+                }
+            }
+
+            if (isEditing) {
+                item(key = "dashboard-reset-layout") {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = horizontalStartPadding, end = horizontalEndPadding),
+                    ) {
+                        FilledTonalButton(
+                            onClick = { onDashboardLayoutChange(DashboardLayout.Default) },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = AppButtonShape,
+                        ) {
+                            Icon(imageVector = Icons.Rounded.RestartAlt, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(text = stringResource(R.string.dashboard_reset_layout))
+                        }
                     }
                 }
             }
@@ -578,10 +608,16 @@ private fun EditableDashboardItem(
     showVisibilityButton: Boolean = true,
     dragEnabled: Boolean = true,
     dragShield: Boolean = false,
+    canStartDragAt: (Offset) -> Boolean = { true },
+    onEdgeMoveTarget: (previousCenter: Float, nextCenter: Float) -> String? = { _, _ -> null },
+    onEdgeMove: (String) -> Unit = {},
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
     val latestOnMove by rememberUpdatedState(onMove)
+    val latestCanStartDragAt by rememberUpdatedState(canStartDragAt)
+    val latestOnEdgeMoveTarget by rememberUpdatedState(onEdgeMoveTarget)
+    val latestOnEdgeMove by rememberUpdatedState(onEdgeMove)
     val layoutDirection = LocalLayoutDirection.current
     val badgeAlignment = if (layoutDirection == LayoutDirection.Rtl) {
         Alignment.TopEnd
@@ -591,8 +627,9 @@ private fun EditableDashboardItem(
     val isSelected = isEditing && dragState.selectedItemId == id
     val isBeingDragged = isEditing && dragState.draggedItemId == id
     val isSettling = isEditing && dragState.settlingItemId == id
+    val itemBounds = positions[id]
     val visualOffset = when {
-        isBeingDragged -> dragState.draggedOffset
+        isBeingDragged && itemBounds != null -> dragState.draggedOffsetFor(id, itemBounds)
         isSettling -> dragState.settlingOffset
         else -> Offset.Zero
     }
@@ -614,8 +651,8 @@ private fun EditableDashboardItem(
     val dragModifier = if (isEditing && dragEnabled) {
         Modifier.pointerInput(isEditing, id, dragAxis, dragPriority) {
             var previousTarget: String? = null
+            var previousEdgeTarget: String? = null
             var previousPointerRootPosition: Offset? = null
-            var useInitialOverSlop = false
 
             fun updateAutoScroll(change: PointerInputChange) {
                 if (dragAxis == DragAxis.VERTICAL) {
@@ -623,37 +660,56 @@ private fun EditableDashboardItem(
                 }
             }
 
+            fun finishDrag() {
+                val finalOffset = positions[id]?.let { dragState.draggedOffsetFor(id, it) } ?: Offset.Zero
+                dragState.finishDrag(id, finalOffset)
+            }
+
             fun handleDrag(change: PointerInputChange, amount: Float) {
                 change.consume()
-                val pointerRootPosition = coordinatesRef[0]?.localToRoot(change.position)
                 val previousRootPosition = previousPointerRootPosition
-                val pointerDelta = if (useInitialOverSlop || pointerRootPosition == null || previousRootPosition == null) {
-                    amount
+                val currentRootPosition = coordinatesRef[0]?.localToRoot(change.position)
+                val pointerDelta = if (currentRootPosition != null && previousRootPosition != null) {
+                    axisOffset(currentRootPosition - previousRootPosition, dragAxis)
                 } else {
-                    axisOffset(pointerRootPosition - previousRootPosition, dragAxis)
+                    amount
                 }
-                if (pointerRootPosition != null) previousPointerRootPosition = pointerRootPosition
-                useInitialOverSlop = false
+                val effectiveCurrentRootPosition = currentRootPosition
+                    ?: previousRootPosition?.plus(axisVector(dragAxis, pointerDelta))
+                if (effectiveCurrentRootPosition != null) {
+                    previousPointerRootPosition = effectiveCurrentRootPosition
+                    dragState.updateDraggedPointer(id, effectiveCurrentRootPosition)
+                }
 
                 val ownBounds = positions[id]
-                if (ownBounds == null) {
-                    dragState.dragBy(id, dragAxis, pointerDelta)
+                if (ownBounds == null || effectiveCurrentRootPosition == null) {
                     updateAutoScroll(change)
                     return
                 }
 
-                val previousCenter = axisCenter(ownBounds, dragAxis) +
-                    axisOffset(dragState.draggedOffsetFor(id), dragAxis)
-                val nextCenter = previousCenter + pointerDelta
+                val anchor = dragState.draggedAnchorFor(id)
+                val itemCenterOffset = axisExtent(ownBounds, dragAxis) / 2f - axisOffset(anchor, dragAxis)
+                val previousCenter = axisPosition(previousRootPosition ?: effectiveCurrentRootPosition, dragAxis) +
+                    itemCenterOffset
+                val nextCenter = axisPosition(effectiveCurrentRootPosition, dragAxis) + itemCenterOffset
+
+                val edgeTarget = latestOnEdgeMoveTarget(previousCenter, nextCenter)
+                if (edgeTarget != null && edgeTarget != previousEdgeTarget) {
+                    latestOnEdgeMove(edgeTarget)
+                    previousEdgeTarget = edgeTarget
+                } else if (edgeTarget == null) {
+                    previousEdgeTarget = null
+                }
+
                 val crossedTarget = positions.entries
                     .asSequence()
                     .filter { (targetId, bounds) ->
                         targetId != id && bounds.width > 0f && bounds.height > 0f &&
                             (
-                                if (amount > 0f) {
+                                if (pointerDelta > 0f) {
                                     previousCenter <= axisCenter(bounds, dragAxis) &&
                                         nextCenter >= axisCenter(bounds, dragAxis)
-                                } else if (amount < 0f) {
+                                } else if (pointerDelta < 0f) {
                                     previousCenter >= axisCenter(bounds, dragAxis) &&
                                         nextCenter <= axisCenter(bounds, dragAxis)
                                 } else {
@@ -663,32 +719,33 @@ private fun EditableDashboardItem(
                     }
                     .minByOrNull { (_, bounds) -> abs(nextCenter - axisCenter(bounds, dragAxis)) }
 
-                var placementCompensation = 0f
                 if (crossedTarget != null && crossedTarget.key != previousTarget) {
-                    placementCompensation = axisStart(ownBounds, dragAxis) -
-                        axisStart(crossedTarget.value, dragAxis)
                     latestOnMove(id, crossedTarget.key)
                     previousTarget = crossedTarget.key
                 } else if (crossedTarget == null) {
                     previousTarget = null
                 }
 
-                dragState.dragBy(id, dragAxis, pointerDelta + placementCompensation)
                 updateAutoScroll(change)
             }
 
             detectAxisDragGesturesAfterLongPress(
                 axis = dragAxis,
+                canStartDrag = { localPosition ->
+                    val rootPosition = coordinatesRef[0]?.localToRoot(localPosition) ?: localPosition
+                    latestCanStartDragAt(rootPosition)
+                },
                 onLongPress = { dragState.beginLongPress(id, dragPriority) },
-                onDragStart = { startPosition ->
+                onDragStart = { pressPosition ->
                     previousTarget = null
-                    previousPointerRootPosition = coordinatesRef[0]?.localToRoot(startPosition)
-                    useInitialOverSlop = true
-                    dragState.startDrag(id)
+                    previousEdgeTarget = null
+                    val pointerRootPosition = coordinatesRef[0]?.localToRoot(pressPosition) ?: pressPosition
+                    previousPointerRootPosition = pointerRootPosition
+                    dragState.startDrag(id, pointerRootPosition, positions[id] ?: Rect.Zero)
                 },
                 onDrag = ::handleDrag,
-                onDragEnd = { dragState.finishDrag(id) },
-                onDragCancel = { dragState.finishDrag(id) },
+                onDragEnd = ::finishDrag,
+                onDragCancel = ::finishDrag,
                 onLongPressEnd = { dragState.endLongPress(id) },
             )
         }
@@ -744,7 +801,7 @@ private fun EditableDashboardItem(
                 Box(
                     modifier = Modifier
                         .align(badgeAlignment)
-                        .absoluteOffset(x = (-10).dp, y = (-10).dp)
+                        .padding(4.dp)
                         .size(28.dp)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.primaryContainer)
@@ -765,9 +822,62 @@ private fun EditableDashboardItem(
     }
 }
 
+@Composable
+private fun rememberReorderPlacementModifier(id: String, enabled: Boolean): Modifier {
+    val animatedX = remember(id) { Animatable(0f) }
+    val animatedY = remember(id) { Animatable(0f) }
+    val scope = rememberCoroutineScope()
+    var previousPosition by remember(id) { mutableStateOf<Offset?>(null) }
+
+    return Modifier
+        .onGloballyPositioned { coordinates ->
+            val currentPosition = coordinates.positionInParent()
+            val previous = previousPosition
+            if (enabled && previous != null && previous != currentPosition) {
+                val displacement = previous - currentPosition
+                scope.launch {
+                    animatedX.snapTo(displacement.x)
+                    animatedY.snapTo(displacement.y)
+                    coroutineScope {
+                        launch {
+                            animatedX.animateTo(
+                                targetValue = 0f,
+                                animationSpec = spring(
+                                    dampingRatio = 0.86f,
+                                    stiffness = Spring.StiffnessMediumLow,
+                                ),
+                            )
+                        }
+                        launch {
+                            animatedY.animateTo(
+                                targetValue = 0f,
+                                animationSpec = spring(
+                                    dampingRatio = 0.86f,
+                                    stiffness = Spring.StiffnessMediumLow,
+                                ),
+                            )
+                        }
+                    }
+                }
+            }
+            previousPosition = currentPosition
+        }
+        .then(
+            if (enabled) {
+                Modifier.graphicsLayer {
+                    translationX = animatedX.value
+                    translationY = animatedY.value
+                }
+            } else {
+                Modifier
+            },
+        )
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 private suspend fun PointerInputScope.detectAxisDragGesturesAfterLongPress(
     axis: DragAxis,
+    canStartDrag: (Offset) -> Boolean = { true },
     onLongPress: () -> Unit,
     onDragStart: (Offset) -> Unit,
     onDrag: (PointerInputChange, Float) -> Unit,
@@ -777,6 +887,7 @@ private suspend fun PointerInputScope.detectAxisDragGesturesAfterLongPress(
 ) {
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false)
+        if (!canStartDrag(down.position)) return@awaitEachGesture
         var longPressRecognized = false
         var dragStarted = false
         var dragFinished = false
@@ -807,7 +918,7 @@ private suspend fun PointerInputScope.detectAxisDragGesturesAfterLongPress(
                     dragFinished = true
                 } else {
                     dragStarted = true
-                    onDragStart(drag.position)
+                    onDragStart(longPress.position)
                     onDrag(drag, overSlop)
                     val completed = when (axis) {
                         DragAxis.HORIZONTAL -> horizontalDrag(drag.id) { change ->
@@ -841,9 +952,19 @@ private fun axisOffset(offset: Offset, axis: DragAxis): Float = when (axis) {
     DragAxis.VERTICAL -> offset.y
 }
 
-private fun axisStart(rect: Rect, axis: DragAxis): Float = when (axis) {
-    DragAxis.HORIZONTAL -> rect.left
-    DragAxis.VERTICAL -> rect.top
+private fun axisPosition(offset: Offset, axis: DragAxis): Float = when (axis) {
+    DragAxis.HORIZONTAL -> offset.x
+    DragAxis.VERTICAL -> offset.y
+}
+
+private fun axisExtent(rect: Rect, axis: DragAxis): Float = when (axis) {
+    DragAxis.HORIZONTAL -> rect.width
+    DragAxis.VERTICAL -> rect.height
+}
+
+private fun axisVector(axis: DragAxis, amount: Float): Offset = when (axis) {
+    DragAxis.HORIZONTAL -> Offset(amount, 0f)
+    DragAxis.VERTICAL -> Offset(0f, amount)
 }
 
 private fun moveItem(order: List<String>, from: String, to: String): List<String> {
@@ -1638,7 +1759,9 @@ private fun TodayCard(
     onStop: () -> Unit,
     isEditing: Boolean,
     layout: DashboardLayout,
+    cardBounds: SnapshotStateMap<String, Rect>,
     sectionBounds: SnapshotStateMap<String, Rect>,
+    headerBounds: SnapshotStateMap<String, Rect>,
     trafficBounds: SnapshotStateMap<String, Rect>,
     onLayoutChange: (DashboardLayout) -> Unit,
     dragState: DashboardDragState,
@@ -1654,60 +1777,110 @@ private fun TodayCard(
         Column(modifier = Modifier.fillMaxWidth()) {
             SectionHeader(
                 title = stringResource(R.string.label_today),
+                modifier = Modifier.onGloballyPositioned { coordinates ->
+                    headerBounds[DashboardLayoutIds.TODAY_CARD] = coordinates.boundsInRoot()
+                },
                 supportingText = Format.fullDate(state.now),
             )
             if (sectionIds.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(14.dp))
             }
             sectionIds.forEachIndexed { index, sectionId ->
-                EditableDashboardItem(
-                    id = sectionId,
-                    isEditing = isEditing,
-                    isHidden = sectionId in layout.hiddenTodaySections,
-                    dragAxis = DragAxis.VERTICAL,
-                    positions = sectionBounds,
-                    dragState = dragState,
-                    onMove = { from, to ->
-                        onLayoutChange(
-                            layout.copy(todaySectionOrder = moveItem(layout.todaySectionOrder, from, to)),
-                        )
-                    },
-                    onToggleVisibility = {
-                        onLayoutChange(
-                            layout.copy(
-                                hiddenTodaySections = toggleId(layout.hiddenTodaySections, sectionId),
-                            ),
-                        )
-                    },
-                    showVisibilityButton = sectionId != DashboardLayoutIds.TODAY_TRAFFIC_ROW,
-                    dragEnabled = false,
-                    dragShield = sectionId == DashboardLayoutIds.TODAY_TOTAL_ROW ||
-                        sectionId == DashboardLayoutIds.TODAY_SPEED_TEST,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    when (sectionId) {
-                        DashboardLayoutIds.TODAY_TRAFFIC_ROW -> TrafficTilesRow(
-                            state = state,
-                            isEditing = isEditing,
-                            layout = layout,
-                            itemBounds = trafficBounds,
-                            onLayoutChange = onLayoutChange,
-                            dragState = dragState,
-                        )
+                key(sectionId) {
+                    val placementModifier = rememberReorderPlacementModifier(
+                        id = sectionId,
+                        enabled = isEditing && dragState.draggedItemId != sectionId &&
+                            dragState.settlingItemId != sectionId,
+                    )
+                    EditableDashboardItem(
+                        id = sectionId,
+                        isEditing = isEditing,
+                        isHidden = sectionId in layout.hiddenTodaySections,
+                        dragAxis = DragAxis.VERTICAL,
+                        positions = sectionBounds,
+                        dragState = dragState,
+                        dragPriority = 1,
+                        onMove = { from, to ->
+                            onLayoutChange(
+                                layout.copy(todaySectionOrder = moveItem(layout.todaySectionOrder, from, to)),
+                            )
+                        },
+                        onEdgeMoveTarget = { previousCenter, nextCenter ->
+                            val direction = when {
+                                nextCenter < previousCenter -> -1
+                                nextCenter > previousCenter -> 1
+                                else -> 0
+                            }
+                            val sectionIndex = layout.todaySectionOrder.indexOf(sectionId)
+                            val mayMoveCard = (direction < 0 && sectionIndex == 0) ||
+                                (direction > 0 && sectionIndex == layout.todaySectionOrder.lastIndex)
+                            if (!isEditing || !mayMoveCard) {
+                                null
+                            } else {
+                                cardBounds.entries
+                                    .asSequence()
+                                .filter { (targetCardId, bounds) ->
+                                    val targetCenter = bounds.center.y
+                                    val crossed = if (direction < 0) {
+                                        previousCenter >= targetCenter && nextCenter <= targetCenter
+                                    } else {
+                                        previousCenter <= targetCenter && nextCenter >= targetCenter
+                                    }
+                                    targetCardId != DashboardLayoutIds.TODAY_CARD &&
+                                        bounds.width > 0f && bounds.height > 0f && crossed
+                                }
+                                    .minByOrNull { (_, bounds) -> abs(nextCenter - bounds.center.y) }
+                                    ?.key
+                            }
+                        },
+                        onEdgeMove = { targetCardId ->
+                            onLayoutChange(
+                                layout.copy(
+                                    cardOrder = moveItem(
+                                        layout.cardOrder,
+                                        DashboardLayoutIds.TODAY_CARD,
+                                        targetCardId,
+                                    ),
+                                ),
+                            )
+                        },
+                        onToggleVisibility = {
+                            onLayoutChange(
+                                layout.copy(
+                                    hiddenTodaySections = toggleId(layout.hiddenTodaySections, sectionId),
+                                ),
+                            )
+                        },
+                        showVisibilityButton = sectionId != DashboardLayoutIds.TODAY_TRAFFIC_ROW,
+                        dragEnabled = true,
+                        dragShield = sectionId == DashboardLayoutIds.TODAY_TOTAL_ROW ||
+                            sectionId == DashboardLayoutIds.TODAY_SPEED_TEST,
+                        modifier = placementModifier.fillMaxWidth(),
+                    ) {
+                        when (sectionId) {
+                            DashboardLayoutIds.TODAY_TRAFFIC_ROW -> TrafficTilesRow(
+                                state = state,
+                                isEditing = isEditing,
+                                layout = layout,
+                                itemBounds = trafficBounds,
+                                onLayoutChange = onLayoutChange,
+                                dragState = dragState,
+                            )
 
-                        DashboardLayoutIds.TODAY_TOTAL_ROW -> TodayTotalRow(
-                            bytes = state.today.totalBytes,
-                            label = stringResource(R.string.label_total),
-                            secondaryBytes = state.cycle.totalBytes,
-                        )
+                            DashboardLayoutIds.TODAY_TOTAL_ROW -> TodayTotalRow(
+                                bytes = state.today.totalBytes,
+                                label = stringResource(R.string.label_total),
+                                secondaryBytes = state.cycle.totalBytes,
+                            )
 
-                        DashboardLayoutIds.TODAY_SPEED_TEST -> SpeedTestPanel(
-                            state = state.speedTest,
-                            history = state.speedTestHistory,
-                            nowMillis = state.now,
-                            onStart = if (isEditing) ({}) else onStart,
-                            onStop = if (isEditing) ({}) else onStop,
-                        )
+                            DashboardLayoutIds.TODAY_SPEED_TEST -> SpeedTestPanel(
+                                state = state.speedTest,
+                                history = state.speedTestHistory,
+                                nowMillis = state.now,
+                                onStart = if (isEditing) ({}) else onStart,
+                                onStop = if (isEditing) ({}) else onStop,
+                            )
+                        }
                     }
                 }
                 if (index < sectionIds.lastIndex) {
@@ -1759,7 +1932,7 @@ private fun TrafficTilesRow(
                         dragAxis = DragAxis.HORIZONTAL,
                         positions = itemBounds,
                         dragState = dragState,
-                        dragPriority = 1,
+                        dragPriority = 2,
                         onMove = { from, to ->
                             onLayoutChange(
                                 layout.copy(trafficTileOrder = moveItem(layout.trafficTileOrder, from, to)),
