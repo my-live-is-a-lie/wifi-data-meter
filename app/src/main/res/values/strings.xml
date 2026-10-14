@@ -272,6 +272,7 @@
     <string name="dashboard_edit_instructions">اضغط مطولا علي العنصر و حركه لتغيير مكانه\nاضغط علي الزر لاخفاء و اظهار العنصر</string>
     <string name="dashboard_hide_item">إخفاء العنصر</string>
     <string name="dashboard_show_item">إظهار العنصر</string>
+    <string name="dashboard_reset_layout">إعادة ترتيب الصفحة إلى الوضع الافتراضي</string>
     <string name="cd_settings">الإعدادات</string>
     <string name="cd_toggle_tracking">تشغيل أو إيقاف المراقبة</string>
     <string name="cd_signal_bars">قوة الإشارة</string>

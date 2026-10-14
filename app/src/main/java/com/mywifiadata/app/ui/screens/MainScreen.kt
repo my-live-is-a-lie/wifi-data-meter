@@ -335,88 +335,86 @@ fun MainScreen(
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
-            TopAppBar(
-                title = {
-                    if (currentTab != AppTab.DASHBOARD || !isDashboardEditing) {
-                        Text(text = stringResource(currentTab.labelRes))
-                    }
-                },
-                actions = {
-                    if (currentTab == AppTab.SETTINGS) {
-                        Box {
-                            IconButton(onClick = { languageMenuExpanded = true }) {
+            if (currentTab != AppTab.DASHBOARD || !isDashboardEditing) {
+                TopAppBar(
+                    title = { Text(text = stringResource(currentTab.labelRes)) },
+                    actions = {
+                        if (currentTab == AppTab.SETTINGS) {
+                            Box {
+                                IconButton(onClick = { languageMenuExpanded = true }) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Language,
+                                        contentDescription = stringResource(R.string.cd_change_language),
+                                    )
+                                }
+                                DropdownMenu(
+                                    expanded = languageMenuExpanded,
+                                    onDismissRequest = { languageMenuExpanded = false },
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text(text = stringResource(R.string.language_system)) },
+                                        onClick = { selectAppLanguage(AppLanguage.SYSTEM) },
+                                        trailingIcon = if (state.settings.appLanguage == AppLanguage.SYSTEM) {
+                                            {
+                                                Icon(
+                                                    imageVector = Icons.Rounded.Check,
+                                                    contentDescription = null,
+                                                )
+                                            }
+                                        } else {
+                                            null
+                                        },
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text(text = stringResource(R.string.language_arabic)) },
+                                        onClick = { selectAppLanguage(AppLanguage.ARABIC) },
+                                        trailingIcon = if (state.settings.appLanguage == AppLanguage.ARABIC) {
+                                            {
+                                                Icon(
+                                                    imageVector = Icons.Rounded.Check,
+                                                    contentDescription = null,
+                                                )
+                                            }
+                                        } else {
+                                            null
+                                        },
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text(text = stringResource(R.string.language_english)) },
+                                        onClick = { selectAppLanguage(AppLanguage.ENGLISH) },
+                                        trailingIcon = if (state.settings.appLanguage == AppLanguage.ENGLISH) {
+                                            {
+                                                Icon(
+                                                    imageVector = Icons.Rounded.Check,
+                                                    contentDescription = null,
+                                                )
+                                            }
+                                        } else {
+                                            null
+                                        },
+                                    )
+                                }
+                            }
+                        } else if (currentTab == AppTab.DASHBOARD) {
+                            if (!isDashboardEditing) {
+                                IconButton(onClick = { beginDashboardEditing() }) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Edit,
+                                        contentDescription = stringResource(R.string.cd_edit_dashboard),
+                                    )
+                                }
+                            }
+                        } else {
+                            IconButton(onClick = { viewModel.refreshNow() }) {
                                 Icon(
-                                    imageVector = Icons.Rounded.Language,
-                                    contentDescription = stringResource(R.string.cd_change_language),
-                                )
-                            }
-                            DropdownMenu(
-                                expanded = languageMenuExpanded,
-                                onDismissRequest = { languageMenuExpanded = false },
-                            ) {
-                                DropdownMenuItem(
-                                    text = { Text(text = stringResource(R.string.language_system)) },
-                                    onClick = { selectAppLanguage(AppLanguage.SYSTEM) },
-                                    trailingIcon = if (state.settings.appLanguage == AppLanguage.SYSTEM) {
-                                        {
-                                            Icon(
-                                                imageVector = Icons.Rounded.Check,
-                                                contentDescription = null,
-                                            )
-                                        }
-                                    } else {
-                                        null
-                                    },
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(text = stringResource(R.string.language_arabic)) },
-                                    onClick = { selectAppLanguage(AppLanguage.ARABIC) },
-                                    trailingIcon = if (state.settings.appLanguage == AppLanguage.ARABIC) {
-                                        {
-                                            Icon(
-                                                imageVector = Icons.Rounded.Check,
-                                                contentDescription = null,
-                                            )
-                                        }
-                                    } else {
-                                        null
-                                    },
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(text = stringResource(R.string.language_english)) },
-                                    onClick = { selectAppLanguage(AppLanguage.ENGLISH) },
-                                    trailingIcon = if (state.settings.appLanguage == AppLanguage.ENGLISH) {
-                                        {
-                                            Icon(
-                                                imageVector = Icons.Rounded.Check,
-                                                contentDescription = null,
-                                            )
-                                        }
-                                    } else {
-                                        null
-                                    },
+                                    imageVector = Icons.Rounded.Refresh,
+                                    contentDescription = stringResource(R.string.cd_refresh),
                                 )
                             }
                         }
-                    } else if (currentTab == AppTab.DASHBOARD) {
-                        if (!isDashboardEditing) {
-                            IconButton(onClick = { beginDashboardEditing() }) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Edit,
-                                    contentDescription = stringResource(R.string.cd_edit_dashboard),
-                                )
-                            }
-                        }
-                    } else {
-                        IconButton(onClick = { viewModel.refreshNow() }) {
-                            Icon(
-                                imageVector = Icons.Rounded.Refresh,
-                                contentDescription = stringResource(R.string.cd_refresh),
-                            )
-                        }
-                    }
-                },
-            )
+                    },
+                )
+            }
         },
         bottomBar = {
             ShortNavigationBar {
