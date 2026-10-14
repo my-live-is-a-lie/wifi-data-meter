@@ -42,7 +42,16 @@ class DashboardLayoutTest {
     fun `normalization removes unknown and duplicate ids and restores missing items`() {
         val layout = DashboardLayout(
             cardOrder = listOf("unknown", DashboardLayoutIds.WIFI_CARD, DashboardLayoutIds.WIFI_CARD),
-            hiddenCards = setOf("unknown", DashboardLayoutIds.TODAY_CARD),
+            hiddenCards = setOf(
+                "unknown",
+                DashboardLayoutIds.TODAY_CARD,
+                DashboardLayoutIds.QUICK_ACTIONS_CARD,
+                DashboardLayoutIds.WIFI_CARD,
+            ),
+            hiddenTodaySections = setOf(
+                DashboardLayoutIds.TODAY_TRAFFIC_ROW,
+                DashboardLayoutIds.TODAY_TOTAL_ROW,
+            ),
         ).normalized()
 
         assertEquals(
@@ -55,7 +64,11 @@ class DashboardLayoutTest {
             ),
             layout.cardOrder,
         )
-        assertEquals(setOf(DashboardLayoutIds.TODAY_CARD), layout.hiddenCards)
+        assertEquals(setOf(DashboardLayoutIds.WIFI_CARD), layout.hiddenCards)
+        assertEquals(
+            setOf(DashboardLayoutIds.TODAY_TOTAL_ROW),
+            layout.hiddenTodaySections,
+        )
     }
 
     @Test
