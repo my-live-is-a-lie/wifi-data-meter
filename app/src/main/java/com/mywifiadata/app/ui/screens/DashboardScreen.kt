@@ -1410,7 +1410,14 @@ private fun TrafficTilesRow(
 
 @Composable
 private fun SessionCard(state: UiState, onResetSession: () -> Unit, isEditing: Boolean) {
-    ExpressiveCard {
+    ExpressiveCard(
+        contentPadding = PaddingValues(
+            start = 20.dp,
+            top = 32.dp,
+            end = 20.dp,
+            bottom = 20.dp,
+        ),
+    ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             SectionHeader(
                 title = stringResource(R.string.label_session),
@@ -1428,7 +1435,7 @@ private fun SessionCard(state: UiState, onResetSession: () -> Unit, isEditing: B
                     }
                 },
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             InfoRow(
                 icon = Icons.Rounded.Timer,
                 label = stringResource(R.string.label_total),
