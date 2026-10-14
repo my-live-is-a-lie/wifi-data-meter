@@ -2,6 +2,7 @@ package com.mywifiadata.app.ui.screens
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -14,6 +15,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -428,7 +430,10 @@ fun DashboardScreen(
                 val frameModifier = Modifier
                     .fillMaxWidth()
                     .then(
-                        if (dragState.draggedItemId == cardId || dragState.settlingItemId == cardId) {
+                        if (
+                            !isEditing || dragState.draggedItemId == cardId ||
+                                dragState.settlingItemId == cardId
+                        ) {
                             Modifier
                         } else {
                             Modifier.animateItem()
@@ -1799,8 +1804,7 @@ private fun TodayCard(
     }
     var expandedMetric by rememberSaveable { mutableStateOf<TodayUsageMetric?>(null) }
     var expandsAbove by rememberSaveable { mutableStateOf(false) }
-    var pendingMetricAnchor by remember { mutableStateOf<Pair<TodayUsageMetric, Float>?>(null) }
-    var expandedMetricAnchor by remember { mutableStateOf<Pair<TodayUsageMetric, Float>?>(null) }
+    var metricAnchor by remember { mutableStateOf<Pair<TodayUsageMetric, Float>?>(null) }
     var isCompensatingMetricScroll by remember { mutableStateOf(false) }
     val estimatedAppsPanelHeightPx = with(LocalDensity.current) { TODAY_APPS_PANEL_ESTIMATED_HEIGHT.toPx() }
     val scope = rememberCoroutineScope()
@@ -1808,23 +1812,33 @@ private fun TodayCard(
     LaunchedEffect(isEditing) {
         if (isEditing) {
             expandedMetric = null
-            pendingMetricAnchor = null
-            expandedMetricAnchor = null
+            metricAnchor = null
         }
     }
 
-    LaunchedEffect(expandedMetric, expandsAbove, state.isTodayAppsLoading) {
-        val anchorMetric = expandedMetric
-        if (anchorMetric != null && expandsAbove && !state.isTodayAppsLoading) {
-            delay(250)
-            if (expandedMetric == anchorMetric && expandsAbove && !state.isTodayAppsLoading) {
-                expandedMetricAnchor = null
-            }
+    LaunchedEffect(expandedMetric, expandsAbove, state.isTodayAppsLoading, metricAnchor) {
+        val anchorMetric = metricAnchor?.first ?: return@LaunchedEffect
+        if (expandedMetric != null && state.isTodayAppsLoading) return@LaunchedEffect
+        delay(300)
+        if (
+            metricAnchor?.first == anchorMetric &&
+            !(expandedMetric != null && state.isTodayAppsLoading)
+        ) {
+            metricAnchor = null
         }
     }
 
-    fun compensateMetricScroll(scrollDelta: Float) {
+    fun updateMetricPosition(metric: TodayUsageMetric, bounds: Rect) {
+        if (listState.isScrollInProgress && !isCompensatingMetricScroll) {
+            metricAnchor = null
+            return
+        }
+
+        val anchor = metricAnchor ?: return
+        if (anchor.first != metric) return
+        val scrollDelta = bounds.top - anchor.second
         if (abs(scrollDelta) <= 1f) return
+
         scope.launch {
             isCompensatingMetricScroll = true
             try {
@@ -1835,52 +1849,21 @@ private fun TodayCard(
         }
     }
 
-    fun updateMetricPosition(metric: TodayUsageMetric, bounds: Rect) {
-        if (listState.isScrollInProgress && !isCompensatingMetricScroll) {
-            expandedMetricAnchor = null
-            pendingMetricAnchor = null
-            return
-        }
-
-        val expandedAnchor = expandedMetricAnchor
-        if (expandedAnchor?.first == metric && expandedMetric == metric && expandsAbove) {
-            val scrollDelta = bounds.top - expandedAnchor.second
-            compensateMetricScroll(scrollDelta)
-            if (!state.isTodayAppsLoading) expandedMetricAnchor = null
-            return
-        }
-
-        val pendingAnchor = pendingMetricAnchor ?: return
-        if (pendingAnchor.first != metric) return
-        pendingMetricAnchor = null
-        val scrollDelta = bounds.top - pendingAnchor.second
-        compensateMetricScroll(scrollDelta)
-    }
-
     fun toggleMetric(metric: TodayUsageMetric, metricBounds: Rect) {
+        metricAnchor = metric to metricBounds.top
         if (expandedMetric == metric) {
-            expandedMetricAnchor = null
-            pendingMetricAnchor = if (expandsAbove) metric to metricBounds.top else null
             expandedMetric = null
             return
         }
 
-        val previousExpandedMetric = expandedMetric
         val viewport = dragState.viewportBounds
         val availableAbove = (metricBounds.top - viewport.top).coerceAtLeast(0f)
         val availableBelow = (viewport.bottom - metricBounds.bottom).coerceAtLeast(0f)
-        val shouldExpandAbove = when {
+        expandsAbove = when {
             metricBounds.height <= 0f || viewport.height <= 0f -> false
             availableBelow >= estimatedAppsPanelHeightPx -> false
             availableAbove >= estimatedAppsPanelHeightPx -> true
             else -> availableAbove > availableBelow
-        }
-        expandsAbove = shouldExpandAbove
-        expandedMetricAnchor = if (shouldExpandAbove) metric to metricBounds.top else null
-        pendingMetricAnchor = if (!shouldExpandAbove && previousExpandedMetric != null) {
-            metric to metricBounds.top
-        } else {
-            null
         }
         expandedMetric = metric
         onLoadTodayApps()
@@ -2071,8 +2054,10 @@ private fun ExpandableTodayMetric(
     Column(modifier = modifier.fillMaxWidth()) {
         AnimatedVisibility(
             visible = isExpanded && expandsAbove,
-            enter = fadeIn(),
-            exit = fadeOut(),
+            enter = fadeIn(animationSpec = tween(120)) +
+                expandVertically(expandFrom = Alignment.Bottom, animationSpec = tween(220)),
+            exit = fadeOut(animationSpec = tween(100)) +
+                shrinkVertically(shrinkTowards = Alignment.Bottom, animationSpec = tween(180)),
         ) {
             Column {
                 TodayTopAppsPanel(
@@ -2089,8 +2074,10 @@ private fun ExpandableTodayMetric(
 
         AnimatedVisibility(
             visible = isExpanded && !expandsAbove,
-            enter = fadeIn(),
-            exit = fadeOut(),
+            enter = fadeIn(animationSpec = tween(120)) +
+                expandVertically(expandFrom = Alignment.Top, animationSpec = tween(220)),
+            exit = fadeOut(animationSpec = tween(100)) +
+                shrinkVertically(shrinkTowards = Alignment.Top, animationSpec = tween(180)),
         ) {
             Column {
                 Spacer(modifier = Modifier.height(8.dp))
@@ -2103,6 +2090,30 @@ private fun ExpandableTodayMetric(
             }
         }
     }
+}
+
+@Composable
+private fun ClickableTodayMetric(
+    metric: TodayUsageMetric,
+    isEditing: Boolean,
+    onMetricClick: (TodayUsageMetric, Rect) -> Unit,
+    onMetricBoundsChanged: (TodayUsageMetric, Rect) -> Unit,
+    content: @Composable (Modifier) -> Unit,
+) {
+    var metricBounds by remember(metric) { mutableStateOf(Rect.Zero) }
+    val metricModifier = Modifier
+        .fillMaxWidth()
+        .onGloballyPositioned { coordinates ->
+            val bounds = coordinates.boundsInRoot()
+            metricBounds = bounds
+            onMetricBoundsChanged(metric, bounds)
+        }
+        .then(
+            if (isEditing) Modifier else Modifier.clickable {
+                onMetricClick(metric, metricBounds)
+            },
+        )
+    content(metricModifier)
 }
 
 @Composable
@@ -2126,7 +2137,9 @@ private fun TodayTopAppsPanel(
     }
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(animationSpec = tween(180)),
         shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
     ) {
@@ -2291,88 +2304,126 @@ private fun TrafficTilesRow(
     } else {
         layout.trafficTileOrder.filterNot(layout.hiddenTrafficTiles::contains)
     }
+    val expandedTrafficMetric = expandedMetric?.takeIf {
+        it == TodayUsageMetric.DOWNLOAD || it == TodayUsageMetric.UPLOAD
+    }
+    var lastDisplayedTrafficMetric by remember { mutableStateOf(TodayUsageMetric.DOWNLOAD) }
+    LaunchedEffect(expandedTrafficMetric) {
+        if (expandedTrafficMetric != null) lastDisplayedTrafficMetric = expandedTrafficMetric
+    }
+
     if (tileIds.isNotEmpty()) {
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             val tileSpacing = 12.dp
             val tileWidth = (maxWidth - tileSpacing * (tileIds.size - 1).toFloat()) /
                 tileIds.size.toFloat()
-            LazyRow(
-                modifier = Modifier.fillMaxWidth(),
-                userScrollEnabled = false,
-                horizontalArrangement = Arrangement.spacedBy(tileSpacing),
-            ) {
-                items(items = tileIds, key = { it }) { tileId ->
-                    val placementModifier = if (
-                        dragState.draggedItemId == tileId || dragState.settlingItemId == tileId
-                    ) {
-                        Modifier
-                    } else {
-                        Modifier.animateItem()
-                    }
-                    EditableDashboardItem(
-                        id = tileId,
-                        isEditing = isEditing,
-                        isHidden = tileId in layout.hiddenTrafficTiles,
-                        dragAxis = DragAxis.HORIZONTAL,
-                        positions = itemBounds,
-                        dragState = dragState,
-                        dragPriority = 2,
-                        onMove = { from, to ->
-                            onLayoutChange(
-                                layout.copy(trafficTileOrder = moveItem(layout.trafficTileOrder, from, to)),
-                            )
-                        },
-                        onToggleVisibility = {
-                            onLayoutChange(
-                                layout.copy(hiddenTrafficTiles = toggleId(layout.hiddenTrafficTiles, tileId)),
-                            )
-                        },
-                        dragShield = true,
-                        modifier = Modifier
-                            .width(tileWidth)
-                            .then(placementModifier),
-                    ) {
-                        when (tileId) {
-                            DashboardLayoutIds.DOWNLOAD_TILE -> ExpandableTodayMetric(
-                                metric = TodayUsageMetric.DOWNLOAD,
-                                expandedMetric = expandedMetric,
-                                expandsAbove = expandsAbove,
-                                apps = state.todayApps,
-                                isAppsLoading = state.isTodayAppsLoading,
-                                hasUsageAccess = state.hasUsageAccess,
-                                isEditing = isEditing,
-                                onMetricClick = onMetricClick,
-                                onMetricBoundsChanged = onMetricBoundsChanged,
-                            ) { metricModifier ->
-                                TrafficTile(
-                                    label = stringResource(R.string.label_download),
-                                    bytes = state.today.rxBytes,
-                                    icon = Icons.Rounded.ArrowDownward,
-                                    accent = downloadColor,
-                                    modifier = metricModifier.fillMaxWidth(),
-                                )
-                            }
 
-                            DashboardLayoutIds.UPLOAD_TILE -> ExpandableTodayMetric(
-                                metric = TodayUsageMetric.UPLOAD,
-                                expandedMetric = expandedMetric,
-                                expandsAbove = expandsAbove,
-                                apps = state.todayApps,
-                                isAppsLoading = state.isTodayAppsLoading,
-                                hasUsageAccess = state.hasUsageAccess,
-                                isEditing = isEditing,
-                                onMetricClick = onMetricClick,
-                                onMetricBoundsChanged = onMetricBoundsChanged,
-                            ) { metricModifier ->
-                                TrafficTile(
-                                    label = stringResource(R.string.label_upload),
-                                    bytes = state.today.txBytes,
-                                    icon = Icons.Rounded.ArrowUpward,
-                                    accent = uploadColor,
-                                    modifier = metricModifier.fillMaxWidth(),
+            Column(modifier = Modifier.fillMaxWidth()) {
+                AnimatedVisibility(
+                    visible = !isEditing && expandedTrafficMetric != null && expandsAbove,
+                    enter = fadeIn(animationSpec = tween(120)) +
+                        expandVertically(expandFrom = Alignment.Bottom, animationSpec = tween(220)),
+                    exit = fadeOut(animationSpec = tween(100)) +
+                        shrinkVertically(shrinkTowards = Alignment.Bottom, animationSpec = tween(180)),
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        TodayTopAppsPanel(
+                            metric = expandedTrafficMetric ?: lastDisplayedTrafficMetric,
+                            apps = state.todayApps,
+                            isAppsLoading = state.isTodayAppsLoading,
+                            hasUsageAccess = state.hasUsageAccess,
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                }
+
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    userScrollEnabled = false,
+                    horizontalArrangement = Arrangement.spacedBy(tileSpacing),
+                ) {
+                    items(items = tileIds, key = { it }) { tileId ->
+                        val placementModifier = if (
+                            !isEditing || dragState.draggedItemId == tileId ||
+                                dragState.settlingItemId == tileId
+                        ) {
+                            Modifier
+                        } else {
+                            Modifier.animateItem()
+                        }
+                        EditableDashboardItem(
+                            id = tileId,
+                            isEditing = isEditing,
+                            isHidden = tileId in layout.hiddenTrafficTiles,
+                            dragAxis = DragAxis.HORIZONTAL,
+                            positions = itemBounds,
+                            dragState = dragState,
+                            dragPriority = 2,
+                            onMove = { from, to ->
+                                onLayoutChange(
+                                    layout.copy(trafficTileOrder = moveItem(layout.trafficTileOrder, from, to)),
                                 )
+                            },
+                            onToggleVisibility = {
+                                onLayoutChange(
+                                    layout.copy(hiddenTrafficTiles = toggleId(layout.hiddenTrafficTiles, tileId)),
+                                )
+                            },
+                            dragShield = true,
+                            modifier = Modifier
+                                .width(tileWidth)
+                                .then(placementModifier),
+                        ) {
+                            when (tileId) {
+                                DashboardLayoutIds.DOWNLOAD_TILE -> ClickableTodayMetric(
+                                    metric = TodayUsageMetric.DOWNLOAD,
+                                    isEditing = isEditing,
+                                    onMetricClick = onMetricClick,
+                                    onMetricBoundsChanged = onMetricBoundsChanged,
+                                ) { metricModifier ->
+                                    TrafficTile(
+                                        label = stringResource(R.string.label_download),
+                                        bytes = state.today.rxBytes,
+                                        icon = Icons.Rounded.ArrowDownward,
+                                        accent = downloadColor,
+                                        modifier = metricModifier.fillMaxWidth(),
+                                    )
+                                }
+
+                                DashboardLayoutIds.UPLOAD_TILE -> ClickableTodayMetric(
+                                    metric = TodayUsageMetric.UPLOAD,
+                                    isEditing = isEditing,
+                                    onMetricClick = onMetricClick,
+                                    onMetricBoundsChanged = onMetricBoundsChanged,
+                                ) { metricModifier ->
+                                    TrafficTile(
+                                        label = stringResource(R.string.label_upload),
+                                        bytes = state.today.txBytes,
+                                        icon = Icons.Rounded.ArrowUpward,
+                                        accent = uploadColor,
+                                        modifier = metricModifier.fillMaxWidth(),
+                                    )
+                                }
                             }
                         }
+                    }
+                }
+
+                AnimatedVisibility(
+                    visible = !isEditing && expandedTrafficMetric != null && !expandsAbove,
+                    enter = fadeIn(animationSpec = tween(120)) +
+                        expandVertically(expandFrom = Alignment.Top, animationSpec = tween(220)),
+                    exit = fadeOut(animationSpec = tween(100)) +
+                        shrinkVertically(shrinkTowards = Alignment.Top, animationSpec = tween(180)),
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        TodayTopAppsPanel(
+                            metric = expandedTrafficMetric ?: lastDisplayedTrafficMetric,
+                            apps = state.todayApps,
+                            isAppsLoading = state.isTodayAppsLoading,
+                            hasUsageAccess = state.hasUsageAccess,
+                        )
                     }
                 }
             }
@@ -2424,7 +2475,7 @@ private fun SessionCard(state: UiState, onResetSession: () -> Unit, isEditing: B
                     onClick = onResetSession,
                     enabled = !isEditing,
                     shape = AppButtonShape,
-                    modifier = Modifier.absoluteOffset(x = (-8).dp),
+                    modifier = Modifier.absoluteOffset(x = (-20).dp),
                 ) {
                     Text(text = stringResource(R.string.action_reset_session))
                 }
