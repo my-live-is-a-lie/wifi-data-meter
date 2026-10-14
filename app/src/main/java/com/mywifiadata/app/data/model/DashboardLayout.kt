@@ -17,11 +17,15 @@ data class DashboardLayout(
     /** Removes invalid/duplicate ids and appends any supported item missing from a saved layout. */
     fun normalized(): DashboardLayout = copy(
         cardOrder = normalizeOrder(cardOrder, DashboardLayoutIds.CARD_ORDER),
-        hiddenCards = normalizeHidden(hiddenCards, DashboardLayoutIds.CARD_ORDER),
+        hiddenCards = normalizeHidden(hiddenCards, DashboardLayoutIds.CARD_ORDER)
+            .filterNot { it in DashboardLayoutIds.COMPOSITE_CARD_IDS }
+            .toSet(),
         quickActionOrder = normalizeOrder(quickActionOrder, DashboardLayoutIds.QUICK_ACTION_ORDER),
         hiddenQuickActions = normalizeHidden(hiddenQuickActions, DashboardLayoutIds.QUICK_ACTION_ORDER),
         todaySectionOrder = normalizeOrder(todaySectionOrder, DashboardLayoutIds.TODAY_SECTION_ORDER),
-        hiddenTodaySections = normalizeHidden(hiddenTodaySections, DashboardLayoutIds.TODAY_SECTION_ORDER),
+        hiddenTodaySections = normalizeHidden(hiddenTodaySections, DashboardLayoutIds.TODAY_SECTION_ORDER)
+            .filterNot { it in DashboardLayoutIds.COMPOSITE_TODAY_SECTION_IDS }
+            .toSet(),
         trafficTileOrder = normalizeOrder(trafficTileOrder, DashboardLayoutIds.TRAFFIC_TILE_ORDER),
         hiddenTrafficTiles = normalizeHidden(hiddenTrafficTiles, DashboardLayoutIds.TRAFFIC_TILE_ORDER),
     )
@@ -113,6 +117,7 @@ object DashboardLayoutIds {
         TODAY_CARD,
         SESSION_CARD,
     )
+    val COMPOSITE_CARD_IDS = setOf(QUICK_ACTIONS_CARD, TODAY_CARD)
     val QUICK_ACTION_ORDER = listOf(
         TRACKING_ACTION,
         REFRESH_ACTION,
@@ -123,5 +128,6 @@ object DashboardLayoutIds {
         TODAY_TOTAL_ROW,
         TODAY_SPEED_TEST,
     )
+    val COMPOSITE_TODAY_SECTION_IDS = setOf(TODAY_TRAFFIC_ROW)
     val TRAFFIC_TILE_ORDER = listOf(DOWNLOAD_TILE, UPLOAD_TILE)
 }
