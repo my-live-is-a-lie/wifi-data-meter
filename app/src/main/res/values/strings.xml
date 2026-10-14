@@ -121,6 +121,9 @@
     <string name="apps_screen_title">استهلاك التطبيقات</string>
     <string name="apps_empty_title">لا يوجد استهلاك مسجّل</string>
     <string name="apps_empty_body">لم تُسجّل أي بيانات لهذه الفترة حتى الآن. جرّب تصفح الإنترنت أو تحديث القائمة.</string>
+    <string name="dashboard_today_top_apps_title">أكثر 5 تطبيقات استهلاكًا لـ%1$s</string>
+    <string name="dashboard_today_apps_loading">جارٍ تحميل بيانات التطبيقات…</string>
+    <string name="dashboard_today_apps_empty">لا يوجد استهلاك مسجّل لهذه الفئة اليوم.</string>
     <string name="apps_loading">جارٍ حساب استهلاك التطبيقات…</string>
     <string name="apps_no_permission">فعّل صلاحية الاستخدام لعرض التفاصيل حسب التطبيق.</string>
     <string name="system_apps_label">تطبيقات النظام</string>

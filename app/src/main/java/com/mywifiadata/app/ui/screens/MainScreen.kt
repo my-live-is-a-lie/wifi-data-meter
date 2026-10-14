@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.Check
@@ -96,6 +97,7 @@ fun MainScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+    val dashboardListState = rememberLazyListState()
 
     var selectedTabIndex by rememberSaveable { mutableIntStateOf(0) }
     var languageMenuExpanded by rememberSaveable { mutableStateOf(false) }
@@ -454,6 +456,8 @@ fun MainScreen(
                     onStopSpeedTest = { viewModel.stopSpeedTest() },
                     onAddUsageWidget = { styleIndex -> requestUsageWidgetPin(styleIndex) },
                     onUsageCardStyleChange = { styleIndex -> viewModel.setUsageCardStyle(styleIndex) },
+                    onLoadTodayApps = { viewModel.loadTodayApps() },
+                    dashboardListState = dashboardListState,
                     isEditing = isDashboardEditing,
                     dashboardLayout = dashboardLayoutDraft,
                     onDashboardLayoutChange = { dashboardLayoutDraft = it.normalized() },

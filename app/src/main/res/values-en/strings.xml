@@ -110,6 +110,9 @@
     <string name="apps_screen_title">App usage</string>
     <string name="apps_empty_title">No usage recorded</string>
     <string name="apps_empty_body">No data for this period yet. Browse a bit and refresh.</string>
+    <string name="dashboard_today_top_apps_title">Top 5 apps by %1$s</string>
+    <string name="dashboard_today_apps_loading">Loading app usage…</string>
+    <string name="dashboard_today_apps_empty">No usage recorded for this category today.</string>
     <string name="apps_loading">Calculating app usage…</string>
     <string name="apps_no_permission">Enable usage access to see the per‑app breakdown.</string>
     <string name="system_apps_label">System apps</string>
