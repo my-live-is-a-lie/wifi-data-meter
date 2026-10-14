@@ -2171,6 +2171,7 @@ private fun TodayTopAppsPanel(
                         Spacer(modifier = Modifier.height(6.dp))
                     }
                     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                        val isCompactLayout = maxWidth < 260.dp
                         Column(modifier = Modifier.fillMaxWidth()) {
                             topApps.forEachIndexed { index, app ->
                                 TodayTopAppItem(
@@ -2178,7 +2179,7 @@ private fun TodayTopAppsPanel(
                                     app = app,
                                     metric = metric,
                                     valueColor = valueColor,
-                                    compact = maxWidth < 260.dp,
+                                    compact = isCompactLayout,
                                 )
                             }
                         }
