@@ -19,6 +19,7 @@ import com.mywifiadata.app.data.model.AppSettings
 import com.mywifiadata.app.data.model.AppUsage
 import com.mywifiadata.app.data.model.AppsFilter
 import com.mywifiadata.app.data.model.DayUsage
+import com.mywifiadata.app.data.model.DashboardLayout
 import com.mywifiadata.app.data.model.SpeedSample
 import com.mywifiadata.app.data.model.SpeedTestRecord
 import com.mywifiadata.app.data.model.ThemeMode
@@ -85,6 +86,7 @@ data class UiState(
     val session: TrafficTotals = TrafficTotals.Empty,
     val samples: List<SpeedSample> = emptyList(),
     val speedTest: SpeedTestState = SpeedTestState.Idle,
+    val speedTestHistory: List<SpeedTestRecord> = emptyList(),
     val daily: List<DayUsage> = emptyList(),
     /**
      * أعلى يوم استهلاكًا خلال آخر 30 يومًا — مرجع ثابت للمقارنة مهما كانت
@@ -182,6 +184,7 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         UiState(
             settings = initialSettings,
             speedTest = initialSettings.lastSpeedTest.toSpeedTestState(),
+            speedTestHistory = initialSettings.speedTestHistory,
         ),
     )
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
@@ -196,7 +199,9 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
     init {
         viewModelScope.launch {
             repository.settingsStore.settings.collect { settings ->
-                _uiState.update { it.copy(settings = settings) }
+                _uiState.update {
+                    it.copy(settings = settings, speedTestHistory = settings.speedTestHistory)
+                }
             }
         }
         viewModelScope.launch { refreshLoop() }
@@ -238,6 +243,7 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
                 isLoading = false,
                 hasUsageAccess = hasAccess,
                 settings = settings,
+                speedTestHistory = settings.speedTestHistory,
                 wifi = wifi,
                 today = today,
                 cycle = cycle,
@@ -545,6 +551,10 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         }
     }
 
+    fun setDashboardLayout(layout: DashboardLayout) {
+        repository.settingsStore.update { it.copy(dashboardLayout = layout.normalized()) }
+    }
+
     fun setHistoryLineChartEnabled(enabled: Boolean) {
         repository.settingsStore.update { it.copy(historyLineChartEnabled = enabled) }
     }
@@ -560,6 +570,10 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
 
     fun setNotificationsEnabled(enabled: Boolean) {
         repository.settingsStore.update { it.copy(notificationsEnabled = enabled) }
+    }
+
+    fun setHideStatusBarIcon(hidden: Boolean) {
+        repository.settingsStore.update { it.copy(hideStatusBarIcon = hidden) }
     }
 
     fun setAlertThreshold(percent: Int) {
@@ -652,7 +666,12 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
                     uploadMeasured = result.uploadMeasured,
                 )
                 repository.settingsStore.saveSpeedTest(record)
-                _uiState.update { it.copy(speedTest = record.toSpeedTestState()) }
+                _uiState.update {
+                    it.copy(
+                        speedTest = record.toSpeedTestState(),
+                        speedTestHistory = repository.settingsStore.current.speedTestHistory,
+                    )
+                }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: SpeedTestEngine.SpeedTestException) {

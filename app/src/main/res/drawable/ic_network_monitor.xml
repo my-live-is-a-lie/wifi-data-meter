@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  أيقونة مراقبة الشبكة: دائرة بداخلها علامة الواي فاي بنفس شكل أيقونة التطبيق
+  (قوسان ونقطة) — تُستخدم لبلاطة الإعدادات السريعة ولإشعار المراقبة في شريط الحالة.
+  النظام يلوّن أيقونة البلاطة وأيقونة الإشعار الصغيرة بلون واحد حسب الحالة، لذا رُسمت
+  الأيقونة كصورة ظلية بيضاء بالكامل (النظام يستخدم قناة الشفافية فقط).
+  نفس الأبعاد منسوخة في TileIconFrames.kt لتطابق إطارات الحركة هذه الأيقونة تمامًا.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFFFF">
+    <!-- الدائرة -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M12,1.8A10.2,10.2 0 1,1 12,22.2A10.2,10.2 0 1,1 12,1.8"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.75" />
+    <!-- القوس الأعلى (الشرطة العليا) -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M6.25,10.58A7.5,7.5 0 0,1 17.75,10.58"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeWidth="2.1" />
+    <!-- القوس الأدنى (الشرطة السفلية) -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M8.86,12.76A4.1,4.1 0 0,1 15.14,12.76"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeWidth="2" />
+    <!-- نقطة البداية -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,13.75a1.65,1.65 0 1,1 0,3.3a1.65,1.65 0 1,1 0,-3.3" />
+</vector>

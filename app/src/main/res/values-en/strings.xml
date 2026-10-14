@@ -56,12 +56,20 @@
     <string name="speed_test_running_download">Measuring download speed…</string>
     <string name="speed_test_running_upload">Measuring upload speed…</string>
     <string name="speed_test_finished">Test finished</string>
-    <string name="speed_test_last_at">Last test via fast.com: %1$s</string>
-    <string name="speed_test_last_at_fallback">Last test via fallback servers: %1$s</string>
+    <string name="speed_test_last_at">Last test:</string>
     <string name="speed_test_details">Source details: %1$s</string>
-    <string name="speed_test_never">No test yet — tap the play button to measure your speed.</string>
+    <string name="speed_test_never">No test yet</string>
     <string name="speed_test_start">Start speed test</string>
     <string name="speed_test_stop">Stop the test and close the download</string>
+    <string name="speed_test_history_expand">Show speed test history</string>
+    <string name="speed_test_history_collapse">Hide speed test history</string>
+    <string name="speed_test_history_empty">No previous tests yet</string>
+    <string name="speed_test_age_now">now</string>
+    <string name="speed_test_age_minutes">%1$s m</string>
+    <string name="speed_test_age_hours">%1$s h</string>
+    <string name="speed_test_age_days">%1$s d</string>
+    <string name="speed_test_age_months">%1$s mo</string>
+    <string name="speed_test_age_years">%1$s y</string>
     <string name="label_period">Period</string>
     <string name="label_average">Daily average</string>
     <string name="label_peak">Busiest day</string>
@@ -176,6 +184,8 @@
     <string name="settings_section_more">More</string>
     <string name="settings_quick_settings_tile">Network monitoring Quick Settings tile</string>
     <string name="settings_quick_settings_tile_desc">Add a tile to toggle monitoring from Quick Settings. The system may ask for confirmation, or require manual adding. Turning this option off disables the tile in the app but does not remove it; remove it manually from Quick Settings.</string>
+    <string name="settings_hide_status_bar_icon">Hide monitoring icon from status bar</string>
+    <string name="settings_hide_status_bar_icon_desc">Hides only the icon next to the clock; the service notification remains in the notification shade.</string>
     <string name="settings_hide_app_icon">Hide app icon</string>
     <string name="settings_hide_app_icon_desc">Requires enabling the Quick Settings tile option and adding the tile. After hiding the icon, long-press “Network monitoring” in Quick Settings to reopen the app. Removing the tile automatically restores the app icon.</string>
     <string name="hide_app_icon_dialog_title">Hide the app icon?</string>
@@ -231,8 +241,8 @@
     <string name="channel_alerts_name">Plan alerts</string>
     <string name="channel_alerts_desc">Alerts when your monthly plan is nearly used up.</string>
     <string name="notification_monitor_title">%1$s today</string>
-    <string name="notification_monitor_text">Current speed: %1$s • Remaining: %2$s</string>
-    <string name="notification_monitor_text_no_quota">Current speed: %1$s • Session total: %2$s</string>
+    <string name="notification_monitor_text">Remaining: %1$s</string>
+    <string name="notification_monitor_text_no_quota">Session total: %1$s</string>
     <string name="notification_alert_threshold_title">Approaching your plan limit</string>
     <string name="notification_alert_threshold_text">You used %1$s%% of your %2$s Wi‑Fi plan.</string>
     <string name="notification_alert_exceeded_title">Monthly plan exceeded</string>
@@ -243,6 +253,10 @@
 
     <string name="cd_more_options">More options</string>
     <string name="cd_refresh">Refresh</string>
+    <string name="cd_edit_dashboard">Edit home screen</string>
+    <string name="dashboard_edit_instructions">Long-press and drag to reorder. Side-by-side items stay within their card, and rows move vertically together. Use −/＋ to hide or show.</string>
+    <string name="dashboard_hide_item">Hide item</string>
+    <string name="dashboard_show_item">Show item</string>
     <string name="cd_settings">Settings</string>
     <string name="cd_toggle_tracking">Toggle monitoring</string>
     <string name="cd_signal_bars">Signal strength</string>
