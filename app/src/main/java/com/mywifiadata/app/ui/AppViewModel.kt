@@ -302,6 +302,7 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         if (hasAccess && (force || now - appsLoadedAt > APPS_TTL_MILLIS)) {
             loadApps()
             loadAppsSlices()
+            repository.captureUsageArchive(now)
         }
     }
 
@@ -519,9 +520,9 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         _uiState.update { it.copy(appDetail = AppDetailState(app = app, network = network, isLoading = true)) }
         viewModelScope.launch {
             val now = System.currentTimeMillis()
-            val today = repository.appTotals(app.uid, TimeRanges.forPeriod(UsagePeriod.TODAY, now), network)
-            val week = repository.appTotals(app.uid, TimeRanges.forPeriod(UsagePeriod.WEEK, now), network)
-            val month = repository.appTotals(app.uid, TimeRanges.forPeriod(UsagePeriod.MONTH, now), network)
+            val today = repository.appTotals(app.uid, TimeRanges.forPeriod(UsagePeriod.TODAY, now), network, app.packageName)
+            val week = repository.appTotals(app.uid, TimeRanges.forPeriod(UsagePeriod.WEEK, now), network, app.packageName)
+            val month = repository.appTotals(app.uid, TimeRanges.forPeriod(UsagePeriod.MONTH, now), network, app.packageName)
             _uiState.update { state ->
                 val detail = state.appDetail
                 if (detail == null || detail.app.uid != app.uid || detail.network != network) {
@@ -744,7 +745,10 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
                 settings = repository.settingsStore.current,
             )
         }
-        refreshNow()
+        viewModelScope.launch {
+            repository.clearAppIdentityCache()
+            refreshNow()
+        }
     }
 
     private var speedTestJob: Job? = null

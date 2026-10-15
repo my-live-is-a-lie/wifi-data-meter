@@ -74,6 +74,13 @@ data class AppUsage(
     val label: String,
     val isSystem: Boolean,
     val totals: TrafficTotals,
+    val isInstalled: Boolean = true,
+    /** Private, device-local PNG; may be absent if Android did not expose an icon. */
+    val cachedIconPath: String? = null,
+    val iconVersion: Long = 0L,
+    /** True only for observed usage restored from the local archive after uninstall. */
+    val isArchivedUsage: Boolean = false,
+    val usageRecordedAt: Long = 0L,
 )
 
 /** A locally remembered selection from the app search UI. */

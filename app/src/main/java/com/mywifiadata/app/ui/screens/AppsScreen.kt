@@ -61,6 +61,7 @@ import com.mywifiadata.app.data.model.AppsFilter
 import com.mywifiadata.app.data.model.UsageSlice
 import com.mywifiadata.app.ui.UiState
 import com.mywifiadata.app.ui.components.AppsSearchControls
+import com.mywifiadata.app.ui.components.AppName
 import com.mywifiadata.app.ui.components.AppUsageRow
 import com.mywifiadata.app.ui.components.BarEntry
 import com.mywifiadata.app.ui.components.DailyBarChart
@@ -471,16 +472,23 @@ private fun SummaryCard(state: UiState) {
                     modifier = Modifier.weight(1f),
                 )
             }
+            if (periodApps.any { it.isArchivedUsage }) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = stringResource(R.string.apps_archived_usage_summary),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             if (topApp != null) {
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Spacer(modifier = Modifier.width(2.dp))
-                    Text(
+                    AppName(
+                        app = topApp,
                         text = stringResource(R.string.apps_top_consumer, topApp.label),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }

@@ -131,6 +131,7 @@ import com.mywifiadata.app.data.model.DashboardLayoutIds
 import com.mywifiadata.app.data.model.WifiBand
 import com.mywifiadata.app.data.model.WifiStatus
 import com.mywifiadata.app.ui.UiState
+import com.mywifiadata.app.ui.components.AppName
 import com.mywifiadata.app.ui.components.AppIcon
 import com.mywifiadata.app.ui.components.Dot
 import com.mywifiadata.app.ui.components.DottedUsageGauge
@@ -2292,16 +2293,13 @@ private fun TodayTopAppItem(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 if (app.packageName != null) {
-                    AppIcon(packageName = app.packageName, size = 30.dp)
+                    AppIcon(app = app, size = 30.dp)
                     Spacer(modifier = Modifier.width(8.dp))
                 }
-                Text(
-                    text = app.label,
+                AppName(
+                    app = app,
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
                 )
             }
             Text(
@@ -2328,16 +2326,13 @@ private fun TodayTopAppItem(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             if (app.packageName != null) {
-                AppIcon(packageName = app.packageName, size = 34.dp)
+                AppIcon(app = app, size = 34.dp)
                 Spacer(modifier = Modifier.width(10.dp))
             }
-            Text(
-                text = app.label,
+            AppName(
+                app = app,
                 modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(

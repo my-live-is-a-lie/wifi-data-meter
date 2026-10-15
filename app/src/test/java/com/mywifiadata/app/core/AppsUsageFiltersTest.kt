@@ -113,4 +113,14 @@ class AppsUsageFiltersTest {
         assertEquals(listOf(3, 1, 2), filterApps(apps, AppsFilter.ALL, 5, AppsSortOrder.LOWEST_USAGE).map { it.uid })
     }
 
+    @Test
+    fun `removed apps stay in all but are excluded from installed filter`() {
+        val installed = app(1, 100)
+        val removed = app(2, 300).copy(isInstalled = false)
+        val apps = listOf(installed, removed)
+        assertEquals(listOf(2, 1), filterApps(apps, AppsFilter.ALL).map { it.uid })
+        assertEquals(listOf(1), filterApps(apps, AppsFilter.INSTALLED).map { it.uid })
+        assertEquals(listOf(1, 2), filterApps(apps, AppsFilter.ALL, sortOrder = AppsSortOrder.LOWEST_USAGE).map { it.uid })
+    }
+
 }
