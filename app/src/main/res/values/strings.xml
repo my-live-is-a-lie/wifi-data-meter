@@ -130,7 +130,6 @@
     <string name="apps_sort_lowest_usage">الأقل استهلاكًا</string>
     <string name="apps_show_filters">إظهار فلاتر التطبيقات</string>
     <string name="apps_hide_filters">إخفاء فلاتر التطبيقات</string>
-    <string name="apps_chart_period">التفصيل الزمني — اضغط على شريحة لعرض تطبيقاتها</string>
     <string name="apps_selected_slice">الشريحة المحددة</string>
     <string name="apps_top_consumer">أعلي التطبيقات استهلاكاً: %1$s</string>
     <string name="apps_screen_title">استهلاك التطبيقات</string>
@@ -152,6 +151,14 @@
     <string name="unknown_app_label">تطبيق غير معروف</string>
     <string name="apps_count">%1$d تطبيقًا</string>
     <string name="app_detail_title">استهلاك التطبيق</string>
+    <string name="apps_list_hint">اضغط على أي تطبيق لعرض استهلاكه</string>
+    <string name="apps_search_label">بحث عن تطبيق</string>
+    <string name="apps_search_open">البحث في التطبيقات</string>
+    <string name="apps_search_close">إغلاق البحث</string>
+    <string name="apps_search_clear">مسح نص البحث</string>
+    <string name="apps_search_ranking_hint">الأكثر اختيارًا من البحث أولًا، ثم الأحدث اختيارًا</string>
+    <string name="apps_search_empty_title">لا توجد تطبيقات مطابقة</string>
+    <string name="apps_search_empty_body">جرّب اسمًا آخر أو امسح البحث. تُعرض تطبيقات الفترة والفلاتر الحالية فقط.</string>
     <string name="app_detail_hint">اضغط على أي تطبيق لعرض استهلاكه في اليوم والأسبوع والشهر.</string>
     <string name="app_detail_cd">تفاصيل استهلاك التطبيق</string>
     <string name="app_detail_loading">جارٍ حساب الاستهلاك…</string>

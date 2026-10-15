@@ -20,6 +20,7 @@ import com.mywifiadata.app.core.SpeedTestEngine
 import com.mywifiadata.app.core.TimeRange
 import com.mywifiadata.app.core.TimeRanges
 import com.mywifiadata.app.core.UsagePeriod
+import com.mywifiadata.app.data.AppSearchHistory
 import com.mywifiadata.app.data.UsageRepository
 import com.mywifiadata.app.data.model.AccentColor
 import com.mywifiadata.app.data.model.AppSettings
@@ -116,6 +117,8 @@ data class UiState(
     val appsScope: AppsUsageScope = AppsUsageScope.ALL_TIME,
     val appsCountLimit: Int? = null,
     val appsSortOrder: AppsSortOrder = AppsSortOrder.HIGHEST_USAGE,
+    val appsSearchActive: Boolean = false,
+    val appsSearchQuery: String = "",
     // تفصيل قسم التطبيقات: أسابيع/أيام/ساعات مع الشريحة المختارة حاليًا.
     val appsWeeks: List<UsageSlice> = emptyList(),
     val appsDays: List<UsageSlice> = emptyList(),
@@ -161,13 +164,24 @@ data class UiState(
 
     val filteredApps: List<AppUsage> get() = filterApps(apps, appsFilter)
 
-    val visibleApps: List<AppUsage> get() = filterApps(apps, appsFilter, appsCountLimit, appsSortOrder)
+    val visibleApps: List<AppUsage>
+        get() {
+            val sorted = filterApps(apps, appsFilter, sortOrder = appsSortOrder)
+            val matching = if (appsSearchActive) {
+                AppSearchHistory.search(sorted, appsSearchQuery, settings.appSearchHistory)
+            } else sorted
+            return appsCountLimit?.let { matching.take(it) } ?: matching
+        }
 
     // The top-N control limits rows only, never the full-period summary or percentages.
     val visiblePeriodApps: List<AppUsage> get() = filterApps(periodApps, appsFilter)
 
     fun appsRange(now: Long = this.now): TimeRange =
         appsUsageRange(appsNetwork, appsScope, settings.cycleStartDay, now)
+
+    /** Period buttons always control the summary and list; Wi-Fi scope only narrows that period. */
+    fun appsPeriodRange(now: Long = this.now): TimeRange =
+        TimeRanges.forPeriod(appsPeriod, now).within(appsRange(now))
 
     val historyDays: Int get() = TimeRanges.daysOf(historyPeriod)
 }
@@ -339,7 +353,7 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
     private suspend fun loadApps() {
         val requestId = ++appsRequestId
         val selection = _uiState.value
-        val periodRange = selection.appsRange(System.currentTimeMillis())
+        val periodRange = selection.appsPeriodRange(System.currentTimeMillis())
         val range = selection.appsSlice?.within(periodRange) ?: periodRange
         _uiState.update { it.copy(isAppsLoading = true) }
         val periodApps = repository.perAppUsage(periodRange, selection.appsNetwork)
@@ -374,7 +388,7 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
     private suspend fun loadAppsWeekDays(week: TimeRange) {
         val requestId = ++weekDaysRequestId
         val selection = _uiState.value
-        val bounds = selection.appsRange(System.currentTimeMillis())
+        val bounds = selection.appsPeriodRange(System.currentTimeMillis())
         val days = TimeRanges.daysInRange(week)
             .map { it.within(bounds) }
             .filter { it.endMillis > it.startMillis }
@@ -435,6 +449,26 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
     fun setAppsScope(scope: AppsUsageScope) {
         if (scope == _uiState.value.appsScope) return
         reloadAppsSelection { it.copy(appsScope = scope) }
+    }
+
+    fun setAppsSearchActive(active: Boolean) {
+        _uiState.update { it.copy(appsSearchActive = active, appsSearchQuery = if (active) it.appsSearchQuery else "") }
+    }
+
+    fun setAppsSearchQuery(query: String) {
+        _uiState.update { it.copy(appsSearchQuery = query) }
+    }
+
+    /** Called only by rows on the apps page, not dashboard/history detail navigation. */
+    fun openAppsListDetail(app: AppUsage) {
+        val state = _uiState.value
+        if (state.appsSearchActive) {
+            repository.settingsStore.update {
+                it.copy(appSearchHistory = AppSearchHistory.record(it.appSearchHistory, app, System.currentTimeMillis()))
+            }
+            _uiState.update { it.copy(settings = repository.settingsStore.current) }
+        }
+        openAppDetail(app, state.appsNetwork)
     }
 
     fun setAppsSortOrder(sortOrder: AppsSortOrder) {
