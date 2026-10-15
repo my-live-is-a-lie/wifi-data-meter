@@ -6,6 +6,14 @@ import com.mywifiadata.app.data.model.AppsFilter
 /** Kept independent of the dashboard's Wi-Fi-only measurements. */
 enum class UsageNetwork { WIFI, MOBILE }
 enum class AppsUsageScope { ALL_TIME, CURRENT_CYCLE }
+enum class AppsSortOrder {
+    HIGHEST_USAGE, LOWEST_USAGE;
+
+    fun reversed(): AppsSortOrder = when (this) {
+        HIGHEST_USAGE -> LOWEST_USAGE
+        LOWEST_USAGE -> HIGHEST_USAGE
+    }
+}
 
 val appsCountOptions: List<Int?> = listOf(null, 5, 10, 15, 20, 25)
 
@@ -27,13 +35,23 @@ fun TimeRange.within(bounds: TimeRange): TimeRange {
     return TimeRange(start, endMillis.coerceAtMost(bounds.endMillis).coerceAtLeast(start))
 }
 
-fun filterApps(apps: List<AppUsage>, filter: AppsFilter, limit: Int? = null): List<AppUsage> {
-    val sorted = apps.filter {
+/** Apply the app-type filter, then sort, then limit the displayed rows. */
+fun filterApps(
+    apps: List<AppUsage>,
+    filter: AppsFilter,
+    limit: Int? = null,
+    sortOrder: AppsSortOrder = AppsSortOrder.HIGHEST_USAGE,
+): List<AppUsage> {
+    val filtered = apps.filter {
         when (filter) {
             AppsFilter.ALL -> true
             AppsFilter.INSTALLED -> !it.isSystem
             AppsFilter.SYSTEM -> it.isSystem
         }
-    }.sortedByDescending { it.totals.totalBytes }
+    }
+    val sorted = when (sortOrder) {
+        AppsSortOrder.HIGHEST_USAGE -> filtered.sortedByDescending { it.totals.totalBytes }
+        AppsSortOrder.LOWEST_USAGE -> filtered.sortedBy { it.totals.totalBytes }
+    }
     return if (limit == null) sorted else sorted.take(limit.coerceAtLeast(0))
 }

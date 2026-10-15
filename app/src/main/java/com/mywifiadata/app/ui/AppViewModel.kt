@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.mywifiadata.app.core.AppsSortOrder
 import com.mywifiadata.app.core.AppsUsageScope
 import com.mywifiadata.app.core.UsageNetwork
 import com.mywifiadata.app.core.appsCountOptions
@@ -114,6 +115,7 @@ data class UiState(
     val appsNetwork: UsageNetwork = UsageNetwork.WIFI,
     val appsScope: AppsUsageScope = AppsUsageScope.ALL_TIME,
     val appsCountLimit: Int? = null,
+    val appsSortOrder: AppsSortOrder = AppsSortOrder.HIGHEST_USAGE,
     // تفصيل قسم التطبيقات: أسابيع/أيام/ساعات مع الشريحة المختارة حاليًا.
     val appsWeeks: List<UsageSlice> = emptyList(),
     val appsDays: List<UsageSlice> = emptyList(),
@@ -159,7 +161,7 @@ data class UiState(
 
     val filteredApps: List<AppUsage> get() = filterApps(apps, appsFilter)
 
-    val visibleApps: List<AppUsage> get() = filterApps(apps, appsFilter, appsCountLimit)
+    val visibleApps: List<AppUsage> get() = filterApps(apps, appsFilter, appsCountLimit, appsSortOrder)
 
     // The top-N control limits rows only, never the full-period summary or percentages.
     val visiblePeriodApps: List<AppUsage> get() = filterApps(periodApps, appsFilter)
@@ -433,6 +435,14 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
     fun setAppsScope(scope: AppsUsageScope) {
         if (scope == _uiState.value.appsScope) return
         reloadAppsSelection { it.copy(appsScope = scope) }
+    }
+
+    fun setAppsSortOrder(sortOrder: AppsSortOrder) {
+        _uiState.update { it.copy(appsSortOrder = sortOrder) }
+    }
+
+    fun reverseAppsSortOrder() {
+        _uiState.update { it.copy(appsSortOrder = it.appsSortOrder.reversed()) }
     }
 
     fun setAppsCountLimit(limit: Int?) {

@@ -12,7 +12,7 @@
 | الشاشة | ما تقدّمه |
 |---|---|
 | **لوحة المعلومات** | حلقة استهلاك متحرّكة تُظهر نسبة ما استُهلك من الباقة، وبطاقة «اليوم» بالتخطيط المرجعي: بلاطتان كبيرتان للتنزيل (أزرق) والرفع (بنفسجي)، صف الإجمالي مع إجمالي الدورة، ولوحة اختبار السرعة عبر fast.com. إضافةً إلى تفاصيل شبكة الواي فاي (الاسم، قوة الإشارة، سرعة الرابط، النطاق 2.4/5/6 جيجاهرتز، معيار الواي فاي، عنوان IP والبوابة)، إجماليات الجلسة، وأزرار سريعة (تحديث / تصفير الجلسة / ضبط الباقة). |
-| **التطبيقات** | قائمة فلاتر قابلة للإظهار والإخفاء لاختيار Wi-Fi أو بيانات الهاتف، وكل الوقت أو الباقة الحالية للواي فاي، وعرض الكل أو أعلى 5 / 10 / 15 / 20 / 25 تطبيقًا. مع تفصيل زمني (اليوم / الأسبوع / الشهر) وفلتر تطبيقات النظام. |
+| **التطبيقات** | قائمة فلاتر قابلة للإظهار والإخفاء لاختيار Wi-Fi أو بيانات الهاتف، وكل الوقت أو الباقة الحالية للواي فاي، وترتيب التطبيقات من الأعلى أو الأقل استهلاكًا، وتحديد العدد: الكل أو 5 / 10 / 15 / 20 / 25 تطبيقًا. مع تفصيل زمني (اليوم / الأسبوع / الشهر) وفلتر تطبيقات النظام. |
 | **السجل** | مخطط أعمدة لاستهلاك آخر 7 أو 30 يومًا، مع تفاصيل اليوم عند اختياره وأكثر التطبيقات استهلاكًا فيه. |
 | **الإعدادات** | حجم الباقة ويوم بدء الدورة، التنبيهات ونسبة التحذير، مُعدّل القياس، تشغيل/إيقاف المراقبة، الألوان الديناميكية، حالة صلاحية «الوصول إلى الاستخدام»، ومسح البيانات. |
 
@@ -222,7 +222,7 @@ built with **Kotlin + Jetpack Compose + Material 3 Expressive**.
 
 - Dashboard: animated usage ring vs. your plan quota, live speed, full Wi‑Fi link details (SSID, RSSI, link
   speed, band, standard, IP/gateway/DNS), today and session totals.
-- Apps: collapsible dropdown filters for Wi-Fi/mobile data, all-time/current Wi-Fi plan, and top all/5/10/15/20/25 apps. Day/week/month charts support time-slice drill-down. All-time means the history retained by Android; the current plan uses the configured cycle start day. Top-N limits rows, not summary totals. Pull down to refresh.
+- Apps: collapsible dropdown filters for Wi-Fi/mobile data, all-time/current Wi-Fi plan, highest/lowest usage ordering, and a separate all/5/10/15/20/25 app count. Day/week/month charts support time-slice drill-down. All-time means the history retained by Android; the current plan uses the configured cycle start day. The count limits rows after sorting, not summary totals or the highest-usage app in the summary. Pull down to refresh.
 - History: 7‑ or 30‑day bar chart with per‑day details and that day's top apps.
 - Settings: quota + cycle start day, alert threshold, sampling interval, background tracking, dynamic color.
 - Background monitoring through a `dataSync` foreground service with an ongoing notification and threshold alerts.
