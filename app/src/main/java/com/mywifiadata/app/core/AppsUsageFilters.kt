@@ -45,7 +45,7 @@ fun filterApps(
     val filtered = apps.filter {
         when (filter) {
             AppsFilter.ALL -> true
-            AppsFilter.INSTALLED -> !it.isSystem
+            AppsFilter.INSTALLED -> !it.isSystem && it.isInstalled
             AppsFilter.SYSTEM -> it.isSystem
         }
     }

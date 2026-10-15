@@ -38,6 +38,7 @@ import com.mywifiadata.app.core.UsageNetwork
 import com.mywifiadata.app.core.Format
 import com.mywifiadata.app.data.model.TrafficTotals
 import com.mywifiadata.app.ui.AppDetailState
+import com.mywifiadata.app.ui.components.AppName
 import com.mywifiadata.app.ui.components.AppIcon
 import com.mywifiadata.app.ui.components.ExpressiveCard
 import com.mywifiadata.app.ui.components.InfoRow
@@ -69,15 +70,13 @@ fun AppDetailScreen(
                             contentDescription = stringResource(R.string.app_detail_back),
                         )
                     }
-                    AppIcon(packageName = detail.app.packageName, size = 44.dp)
+                    AppIcon(app = detail.app, size = 44.dp)
                     Spacer(modifier = Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = detail.app.label,
+                        AppName(
+                            app = detail.app,
+                            modifier = Modifier.fillMaxWidth(),
                             style = MaterialTheme.typography.titleMediumEmphasized,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
                         )
                         Text(
                             text = detail.app.packageName
@@ -88,6 +87,17 @@ fun AppDetailScreen(
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
+                }
+                if (detail.app.isArchivedUsage) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = stringResource(
+                            R.string.app_archived_usage,
+                            "${Format.shortDate(detail.app.usageRecordedAt)} ${Format.clock(detail.app.usageRecordedAt)}",
+                        ) + " · " + stringResource(R.string.apps_archived_usage_summary),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(

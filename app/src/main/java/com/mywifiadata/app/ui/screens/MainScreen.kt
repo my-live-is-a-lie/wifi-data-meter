@@ -44,7 +44,9 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.pullToRefresh
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ShortNavigationBar
 import androidx.compose.material3.ShortNavigationBarItem
@@ -57,6 +59,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -563,29 +566,37 @@ fun MainScreen(
             }
         }
 
-        if (isDashboardEditing && currentTab == AppTab.DASHBOARD) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    // Mark Scaffold's bottom bar/navigation padding as consumed so the
-                    // apps list's imePadding only reserves the remaining keyboard inset.
-                    .consumeWindowInsets(innerPadding),
-            ) {
-                screenContent()
-            }
-        } else {
-            PullToRefreshBox(
+        val isAppsSearchVisible = currentTab == AppTab.APPS && state.appsSearchActive && state.appDetail == null
+        val pullRefreshEnabled = !isAppsSearchVisible && !(isDashboardEditing && currentTab == AppTab.DASHBOARD)
+        // Discard any partially pulled distance on entering/leaving search. Key only this
+        // state, not the content: the editor, its animation and scroll states must survive.
+        val pullRefreshState = key(pullRefreshEnabled) { rememberPullToRefreshState() }
+        val refreshModifier = if (pullRefreshEnabled) {
+            Modifier.pullToRefresh(
                 isRefreshing = state.isRefreshing,
+                state = pullRefreshState,
                 onRefresh = { viewModel.refreshNow() },
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    // Mark Scaffold's bottom bar/navigation padding as consumed so the
-                    // apps list's imePadding only reserves the remaining keyboard inset.
-                    .consumeWindowInsets(innerPadding),
-            ) {
-                screenContent()
+            )
+        } else {
+            // Removing the nested-scroll handler also blocks keyboard/cursor bring-into-view
+            // scrolling from being interpreted as a pull gesture. Hiding the icon alone is not enough.
+            Modifier
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                // Consume Scaffold padding before the apps list applies its IME inset.
+                .consumeWindowInsets(innerPadding)
+                .then(refreshModifier),
+        ) {
+            screenContent()
+            if (pullRefreshEnabled) {
+                PullToRefreshDefaults.Indicator(
+                    modifier = Modifier.align(Alignment.TopCenter),
+                    isRefreshing = state.isRefreshing,
+                    state = pullRefreshState,
+                )
             }
         }
     }
