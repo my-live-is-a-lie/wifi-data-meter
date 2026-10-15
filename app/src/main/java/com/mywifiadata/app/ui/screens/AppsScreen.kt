@@ -41,6 +41,7 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,6 +61,7 @@ import com.mywifiadata.app.data.model.AppUsage
 import com.mywifiadata.app.data.model.AppsFilter
 import com.mywifiadata.app.data.model.UsageSlice
 import com.mywifiadata.app.ui.UiState
+import com.mywifiadata.app.ui.components.AppsFastScroller
 import com.mywifiadata.app.ui.components.AppsSearchControls
 import com.mywifiadata.app.ui.components.AppName
 import com.mywifiadata.app.ui.components.AppUsageRow
@@ -117,180 +119,191 @@ fun AppsScreen(
         "${Format.shortDate(slice.startMillis)} – ${Format.shortDate(slice.endMillis - 1)}"
     }
 
-    LazyColumn(
-        modifier = modifier.fillMaxWidth().imePadding(),
-        state = if (state.appsSearchActive) searchListState else listState,
-        contentPadding = contentPadding,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        if (!state.appsSearchActive) {
-            item {
-                PeriodSelector(period = state.appsPeriod, onPeriodChange = onPeriodChange)
-            }
-        }
-
-        if (!state.hasUsageAccess) {
-            item {
-                PermissionCard(
-                    icon = Icons.Rounded.Info,
-                    title = stringResource(R.string.permission_needed_title),
-                    message = stringResource(R.string.permission_needed_body),
-                    grantLabel = stringResource(R.string.action_open_usage_access),
-                    settingsLabel = stringResource(R.string.settings_usage_access),
-                    onGrant = onOpenUsageAccess,
-                    onOpenSettings = onOpenUsageAccess,
-                )
-            }
-        } else {
+    Box(modifier = modifier.fillMaxWidth().imePadding()) {
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth(),
+            state = if (state.appsSearchActive) searchListState else listState,
+            contentPadding = contentPadding,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
             if (!state.appsSearchActive) {
                 item {
-                    SummaryCard(state = state)
+                    PeriodSelector(period = state.appsPeriod, onPeriodChange = onPeriodChange)
                 }
+            }
 
-                // التفصيل الزمني حسب الفترة: ساعات اليوم، أيام الأسبوع، أو أسابيع الشهر.
-                when (state.appsPeriod) {
-                    UsagePeriod.TODAY -> item {
-                        SliceCard(
-                            title = stringResource(R.string.apps_slices_hours),
-                            icon = Icons.Rounded.Schedule,
-                            slices = state.appsHours,
-                            label = hourLabel,
-                            selected = state.appsSlice,
-                            lineChartEnabled = state.settings.appsLineChartEnabled,
-                            onChartTypeChange = onChartTypeChange,
-                            onSelect = onAppsSliceChange,
-                        )
+            if (!state.hasUsageAccess) {
+                item {
+                    PermissionCard(
+                        icon = Icons.Rounded.Info,
+                        title = stringResource(R.string.permission_needed_title),
+                        message = stringResource(R.string.permission_needed_body),
+                        grantLabel = stringResource(R.string.action_open_usage_access),
+                        settingsLabel = stringResource(R.string.settings_usage_access),
+                        onGrant = onOpenUsageAccess,
+                        onOpenSettings = onOpenUsageAccess,
+                    )
+                }
+            } else {
+                if (!state.appsSearchActive) {
+                    item {
+                        SummaryCard(state = state)
                     }
 
-                    UsagePeriod.WEEK -> item {
-                        SliceCard(
-                            title = stringResource(R.string.apps_slices_days),
-                            icon = Icons.Rounded.DateRange,
-                            slices = state.appsDays,
-                            label = dayLabel,
-                            selected = state.appsSlice,
-                            lineChartEnabled = state.settings.appsLineChartEnabled,
-                            onChartTypeChange = onChartTypeChange,
-                            onSelect = onAppsSliceChange,
-                        )
-                    }
-
-                    UsagePeriod.MONTH -> {
-                        item {
+                    // التفصيل الزمني حسب الفترة: ساعات اليوم، أيام الأسبوع، أو أسابيع الشهر.
+                    when (state.appsPeriod) {
+                        UsagePeriod.TODAY -> item {
                             SliceCard(
-                                title = stringResource(R.string.apps_slices_weeks),
-                                icon = Icons.Rounded.CalendarMonth,
-                                slices = state.appsWeeks,
-                                label = weekLabel,
-                                selected = state.appsWeek,
+                                title = stringResource(R.string.apps_slices_hours),
+                                icon = Icons.Rounded.Schedule,
+                                slices = state.appsHours,
+                                label = hourLabel,
+                                selected = state.appsSlice,
                                 lineChartEnabled = state.settings.appsLineChartEnabled,
                                 onChartTypeChange = onChartTypeChange,
-                                onSelect = onAppsWeekChange,
+                                onSelect = onAppsSliceChange,
                             )
                         }
-                        if (state.appsWeek != null) {
+
+                        UsagePeriod.WEEK -> item {
+                            SliceCard(
+                                title = stringResource(R.string.apps_slices_days),
+                                icon = Icons.Rounded.DateRange,
+                                slices = state.appsDays,
+                                label = dayLabel,
+                                selected = state.appsSlice,
+                                lineChartEnabled = state.settings.appsLineChartEnabled,
+                                onChartTypeChange = onChartTypeChange,
+                                onSelect = onAppsSliceChange,
+                            )
+                        }
+
+                        UsagePeriod.MONTH -> {
                             item {
                                 SliceCard(
-                                    title = stringResource(R.string.apps_slices_days),
-                                    icon = Icons.Rounded.DateRange,
-                                    slices = state.appsWeekDays,
-                                    label = dayLabel,
-                                    selected = state.appsSlice,
+                                    title = stringResource(R.string.apps_slices_weeks),
+                                    icon = Icons.Rounded.CalendarMonth,
+                                    slices = state.appsWeeks,
+                                    label = weekLabel,
+                                    selected = state.appsWeek,
                                     lineChartEnabled = state.settings.appsLineChartEnabled,
                                     onChartTypeChange = onChartTypeChange,
-                                    onSelect = onAppsSliceChange,
+                                    onSelect = onAppsWeekChange,
                                 )
+                            }
+                            if (state.appsWeek != null) {
+                                item {
+                                    SliceCard(
+                                        title = stringResource(R.string.apps_slices_days),
+                                        icon = Icons.Rounded.DateRange,
+                                        slices = state.appsWeekDays,
+                                        label = dayLabel,
+                                        selected = state.appsSlice,
+                                        lineChartEnabled = state.settings.appsLineChartEnabled,
+                                        onChartTypeChange = onChartTypeChange,
+                                        onSelect = onAppsSliceChange,
+                                    )
+                                }
                             }
                         }
                     }
                 }
-
-                // فلتر نوع التطبيقات: الكل (الافتراضي) أو المثبتة أو النظام — فوق قائمة التطبيقات.
-                item {
-                    Column(modifier = Modifier.padding(horizontal = 4.dp)) {
-                        Text(
-                            text = stringResource(R.string.apps_filter_label),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        AppsFilterRow(
-                            filter = state.appsFilter,
-                            onFilterChange = onAppsFilterChange,
-                        )
-                    }
-                }
-
-                item {
-                    SectionHeader(
-                        title = stringResource(R.string.tab_apps),
-                        supportingText = stringResource(R.string.apps_count, apps.size) +
-                            if (state.appsSlice == null) "" else " · " + stringResource(R.string.apps_selected_slice),
-                    )
-                }
-            }
-            stickyHeader(key = "apps_search_controls") {
-                AppsSearchControls(
-                    expanded = state.appsSearchActive,
-                    query = state.appsSearchQuery,
-                    sortOrder = state.appsSortOrder,
-                    onExpandedChange = ::changeSearchActive,
-                    onQueryChange = { query ->
-                        // Apply the new query and its top position in the same remeasure.
-                        // No animated scroll, row-height feedback, or per-keystroke effects.
-                        searchListState.requestScrollToItem(0)
-                        onSearchQueryChange(query)
-                    },
-                    onReverseSortOrder = onReverseSortOrder,
-                )
-            }
-
-            if (state.isAppsLoading && apps.isEmpty()) {
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 40.dp),
-                        contentAlignment = Alignment.Center,
+                // One sticky container: separate sticky headers would push each other away.
+                // Keep the existing filter → count → search order and an opaque background so
+                // scrolling app rows never show through the filter buttons or the gaps.
+                stickyHeader(key = "apps_search_controls") {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        LoadingIndicator(
-                            modifier = Modifier.size(56.dp),
-                            color = MaterialTheme.colorScheme.primary,
+                        // Search keeps its compact, independent viewport just as before.
+                        if (!state.appsSearchActive) {
+                            // Only the segmented selector is shown here, without its old title.
+                            Box(modifier = Modifier.padding(horizontal = 4.dp)) {
+                                AppsFilterRow(
+                                    filter = state.appsFilter,
+                                    onFilterChange = onAppsFilterChange,
+                                )
+                            }
+                            SectionHeader(
+                                title = stringResource(R.string.tab_apps),
+                                supportingText = stringResource(R.string.apps_count, apps.size) +
+                                    if (state.appsSlice == null) "" else " · " + stringResource(R.string.apps_selected_slice),
+                            )
+                        }
+                        AppsSearchControls(
+                            expanded = state.appsSearchActive,
+                            query = state.appsSearchQuery,
+                            sortOrder = state.appsSortOrder,
+                            onExpandedChange = ::changeSearchActive,
+                            onQueryChange = { query ->
+                                // Apply the new query and its top position in the same remeasure.
+                                // No animated scroll, row-height feedback, or per-keystroke effects.
+                                searchListState.requestScrollToItem(0)
+                                onSearchQueryChange(query)
+                            },
+                            onReverseSortOrder = onReverseSortOrder,
                         )
                     }
                 }
-            } else if (apps.isEmpty()) {
-                item {
-                    ExpressiveCard {
-                        EmptyState(
-                            icon = Icons.Rounded.Apps,
-                            title = stringResource(
-                                when {
-                                    !state.appsSearchActive || state.appsSearchQuery.isBlank() -> R.string.apps_empty_title
-                                    else -> R.string.apps_search_empty_title
-                                },
-                            ),
-                            message = stringResource(
-                                when {
-                                    !state.appsSearchActive || state.appsSearchQuery.isBlank() -> R.string.apps_empty_body
-                                    else -> R.string.apps_search_empty_body
-                                },
-                            ),
+
+                if (state.isAppsLoading && apps.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 40.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            LoadingIndicator(
+                                modifier = Modifier.size(56.dp),
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    }
+                } else if (apps.isEmpty()) {
+                    item {
+                        ExpressiveCard {
+                            EmptyState(
+                                icon = Icons.Rounded.Apps,
+                                title = stringResource(
+                                    when {
+                                        !state.appsSearchActive || state.appsSearchQuery.isBlank() -> R.string.apps_empty_title
+                                        else -> R.string.apps_search_empty_title
+                                    },
+                                ),
+                                message = stringResource(
+                                    when {
+                                        !state.appsSearchActive || state.appsSearchQuery.isBlank() -> R.string.apps_empty_body
+                                        else -> R.string.apps_search_empty_body
+                                    },
+                                ),
+                            )
+                        }
+                    }
+                } else {
+                    itemsIndexed(
+                        items = apps,
+                        key = { _, app -> app.uid },
+                    ) { index, app ->
+                        AppUsageRow(
+                            app = app,
+                            share = app.totals.totalBytes.toFloat() / totalBytes.toFloat(),
+                            rank = index + 1,
+                            onClick = { onAppClick(app) },
                         )
                     }
                 }
-            } else {
-                itemsIndexed(
-                    items = apps,
-                    key = { _, app -> app.uid },
-                ) { index, app ->
-                    AppUsageRow(
-                        app = app,
-                        share = app.totals.totalBytes.toFloat() / totalBytes.toFloat(),
-                        rank = index + 1,
-                        onClick = { onAppClick(app) },
-                    )
-                }
+            }
+        }
+        if (state.hasUsageAccess && !state.appsSearchActive && apps.isNotEmpty()) {
+            // A different filter/order/range cancels any in-progress grab; refreshes with the
+            // same app identities leave it intact. Search retains its independent viewport.
+            key(
+                state.appsFilter, state.appsSortOrder, state.appsPeriod, state.appsSlice,
+                state.appsNetwork, state.appsScope, apps.map { it.uid },
+            ) {
+                AppsFastScroller(listState, apps.size, headerKey = "apps_search_controls")
             }
         }
     }

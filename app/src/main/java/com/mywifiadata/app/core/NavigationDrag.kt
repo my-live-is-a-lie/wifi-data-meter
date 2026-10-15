@@ -46,3 +46,57 @@ internal fun navigationIndicatorBounds(
         right = (center + half - stretch.coerceAtMost(0f)).coerceIn(0f, barWidth),
     )
 }
+
+/** Hit-test the visible rounded capsule, not the whole tab or its label. */
+internal fun navigationIndicatorContains(
+    x: Float,
+    y: Float,
+    bounds: NavigationIndicatorBounds,
+    centerY: Float,
+    height: Float,
+): Boolean {
+    if (!x.isFinite() || !y.isFinite() || !centerY.isFinite() || !height.isFinite() ||
+        !bounds.left.isFinite() || !bounds.right.isFinite() || height <= 0f || bounds.right <= bounds.left) return false
+    val halfHeight = height / 2f
+    if (y < centerY - halfHeight || y > centerY + halfHeight || x < bounds.left || x > bounds.right) return false
+    val radius = minOf(halfHeight, (bounds.right - bounds.left) / 2f)
+    val cornerX = x.coerceIn(bounds.left + radius, bounds.right - radius)
+    val cornerY = y.coerceIn(centerY - halfHeight + radius, centerY + halfHeight - radius)
+    val dx = x - cornerX
+    val dy = y - cornerY
+    return dx * dx + dy * dy <= radius * radius
+}
+
+/** A short swipe supplements scrubbing; it must never add another step to a completed scrub. */
+internal fun navigationShortSwipeTarget(
+    startIndex: Int,
+    deltaX: Float,
+    count: Int,
+    isRtl: Boolean,
+    threshold: Float,
+    startedOnIndicator: Boolean,
+    crossedTab: Boolean,
+    completed: Boolean,
+): Int? {
+    if (!completed || !startedOnIndicator || crossedTab || count <= 1 || startIndex !in 0 until count) return null
+    if (!deltaX.isFinite() || !threshold.isFinite() || threshold <= 0f || abs(deltaX) < threshold) return null
+    val physicalStep = if (deltaX > 0f) 1 else -1
+    val logicalStep = if (isRtl) -physicalStep else physicalStep
+    // No wraparound from either end of the bar.
+    return (startIndex + logicalStep).takeIf { it in 0 until count }
+}
+
+/** Scale is driven by proximity to the capsule's center, not selection or its elastic tail. */
+internal fun navigationIconScale(
+    indicatorCenter: Float,
+    iconCenter: Float,
+    influenceRadius: Float,
+    pressed: Boolean,
+): Float {
+    if (!pressed || !indicatorCenter.isFinite() || !iconCenter.isFinite() ||
+        !influenceRadius.isFinite() || influenceRadius <= 0f) return 1f
+    val proximity = (1f - abs(indicatorCenter - iconCenter) / influenceRadius).coerceIn(0f, 1f)
+    // Smoothstep avoids a sudden growth/shrink at either end; a held center stays at 120%.
+    val eased = proximity * proximity * (3f - 2f * proximity)
+    return 1f + 0.2f * eased
+}
