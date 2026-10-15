@@ -316,4 +316,8 @@
     <string name="unit_gb">جيجابايت</string>
     <string name="unit_mbps">ميجابت/ث</string>
     <string name="unit_dbm">ديسيبل</string>
+    <string name="history_day_apps">تطبيقات اليوم المحدد</string>
+    <string name="history_least_apps">أقل التطبيقات استهلاكًا</string>
+    <string name="history_apps_search_empty">لا يوجد تطبيق مطابق في اليوم المحدد. جرّب اسمًا آخر أو امسح البحث.</string>
+    <string name="history_apps_empty">لا توجد بيانات استهلاك للتطبيقات في اليوم المحدد.</string>
 </resources>

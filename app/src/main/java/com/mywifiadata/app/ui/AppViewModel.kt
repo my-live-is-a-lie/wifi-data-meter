@@ -13,6 +13,7 @@ import com.mywifiadata.app.core.appsUsageRange
 import com.mywifiadata.app.core.filterApps
 import com.mywifiadata.app.core.within
 import com.mywifiadata.app.core.AppLanguage
+import com.mywifiadata.app.core.historyApps
 import com.mywifiadata.app.core.Format
 import com.mywifiadata.app.core.LauncherIconVisibility
 import com.mywifiadata.app.core.SamplingIntervals
@@ -112,6 +113,10 @@ data class UiState(
     val historyPeriod: UsagePeriod = UsagePeriod.MONTH,
     val selectedDayIndex: Int? = null,
     val selectedDayApps: List<AppUsage> = emptyList(),
+    val isSelectedDayAppsLoading: Boolean = false,
+    val historySearchActive: Boolean = false,
+    val historySearchQuery: String = "",
+    val historyAppsSortOrder: AppsSortOrder = AppsSortOrder.HIGHEST_USAGE,
     val appsFilter: AppsFilter = AppsFilter.ALL,
     val appsNetwork: UsageNetwork = UsageNetwork.WIFI,
     val appsScope: AppsUsageScope = AppsUsageScope.ALL_TIME,
@@ -183,6 +188,9 @@ data class UiState(
     fun appsPeriodRange(now: Long = this.now): TimeRange =
         TimeRanges.forPeriod(appsPeriod, now).within(appsRange(now))
 
+    val visibleHistoryApps: List<AppUsage>
+        get() = historyApps(selectedDayApps, historySearchActive, historySearchQuery, historyAppsSortOrder)
+
     val historyDays: Int get() = TimeRanges.daysOf(historyPeriod)
 }
 
@@ -223,6 +231,7 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
     private var todayAppsLoadedAt: Long = 0L
     private var todayAppsLoadedRangeStartMillis: Long = 0L
     private var todayAppsJob: Job? = null
+    private var selectedDayAppsJob: Job? = null
     private var dailyLoadedAt: Long = 0L
     private var dailyLoadedDays: Int = 0
     private var monthPeakLoadedAt: Long = 0L
@@ -502,9 +511,16 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
     fun setHistoryPeriod(period: UsagePeriod) {
         if (period == _uiState.value.historyPeriod) return
         val days = TimeRanges.daysOf(period)
-        _uiState.update { it.copy(historyPeriod = period, selectedDayIndex = null, selectedDayApps = emptyList()) }
+        selectedDayAppsJob?.cancel()
+        _uiState.update {
+            it.copy(
+                historyPeriod = period, selectedDayIndex = null, selectedDayApps = emptyList(),
+                isSelectedDayAppsLoading = false, historySearchActive = false, historySearchQuery = "",
+            )
+        }
         viewModelScope.launch {
             val daily = repository.dailyUsage(days)
+            if (_uiState.value.historyPeriod != period) return@launch
             dailyLoadedDays = days
             dailyLoadedAt = System.currentTimeMillis()
             _uiState.update { it.copy(daily = daily) }
@@ -546,19 +562,41 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         _uiState.update { it.copy(appDetail = null) }
     }
 
-    fun selectDay(index: Int?) {
-        _uiState.update { it.copy(selectedDayIndex = index) }
-        if (index == null) {
-            _uiState.update { it.copy(selectedDayApps = emptyList()) }
-            return
+    fun setHistorySearchActive(active: Boolean) {
+        _uiState.update {
+            val enabled = active && it.selectedDayIndex != null
+            it.copy(historySearchActive = enabled, historySearchQuery = if (enabled) it.historySearchQuery else "")
         }
-        val day = _uiState.value.daily.getOrNull(index) ?: return
-        viewModelScope.launch {
+    }
+
+    fun setHistorySearchQuery(query: String) {
+        _uiState.update { it.copy(historySearchQuery = query) }
+    }
+
+    fun reverseHistoryAppsSortOrder() {
+        _uiState.update { it.copy(historyAppsSortOrder = it.historyAppsSortOrder.reversed()) }
+    }
+
+    fun selectDay(index: Int?) {
+        val day = index?.let { _uiState.value.daily.getOrNull(it) }
+        selectedDayAppsJob?.cancel()
+        // Never search the previous day's rows while the new selection is still loading.
+        _uiState.update {
+            it.copy(
+                selectedDayIndex = index.takeIf { day != null }, selectedDayApps = emptyList(),
+                isSelectedDayAppsLoading = day != null, historySearchActive = false, historySearchQuery = "",
+            )
+        }
+        if (day == null) return
+        selectedDayAppsJob = viewModelScope.launch {
             val apps = repository.perAppUsage(
                 com.mywifiadata.app.core.TimeRange(day.startMillis, day.endMillis),
             )
             _uiState.update { state ->
-                if (state.selectedDayIndex == index) state.copy(selectedDayApps = apps) else state
+                val currentDay = state.selectedDayIndex?.let { state.daily.getOrNull(it) }
+                if (currentDay?.startMillis == day.startMillis && currentDay.endMillis == day.endMillis) {
+                    state.copy(selectedDayApps = apps, isSelectedDayAppsLoading = false)
+                } else state
             }
         }
     }
@@ -730,6 +768,8 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
     }
 
     fun clearData() {
+        selectedDayAppsJob?.cancel()
+        selectedDayAppsJob = null
         todayAppsJob?.cancel()
         todayAppsJob = null
         todayAppsLoadedAt = 0L
