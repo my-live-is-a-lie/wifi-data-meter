@@ -101,6 +101,7 @@ fun MainScreen(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val dashboardListState = rememberLazyListState()
+    val appsListState = rememberLazyListState()
 
     var selectedTabIndex by rememberSaveable { mutableIntStateOf(0) }
     var languageMenuExpanded by rememberSaveable { mutableStateOf(false) }
@@ -510,7 +511,13 @@ fun MainScreen(
                                 onAppsSliceChange = { viewModel.selectAppsSlice(it) },
                                 onChartTypeChange = { viewModel.setAppsLineChartEnabled(it) },
                                 onOpenUsageAccess = { SystemActions.openUsageAccessSettings(context) },
-                                onAppClick = { viewModel.openAppDetail(it, state.appsNetwork) },
+                                onAppClick = viewModel::openAppsListDetail,
+                                onSearchActiveChange = { active ->
+                                    if (active) appsFiltersExpanded = false
+                                    viewModel.setAppsSearchActive(active)
+                                },
+                                onSearchQueryChange = viewModel::setAppsSearchQuery,
+                                listState = appsListState,
                                 onReverseSortOrder = viewModel::reverseAppsSortOrder,
                             )
                         }

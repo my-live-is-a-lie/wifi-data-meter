@@ -1,5 +1,7 @@
 package com.mywifiadata.app.ui.screens
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -9,11 +11,14 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -25,12 +30,10 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.DateRange
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Schedule
-import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
@@ -38,21 +41,24 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mywifiadata.app.R
-import com.mywifiadata.app.core.AppsSortOrder
-import com.mywifiadata.app.core.AppsUsageScope
 import com.mywifiadata.app.core.UsageNetwork
 import com.mywifiadata.app.core.Format
 import com.mywifiadata.app.core.TimeRange
@@ -61,6 +67,7 @@ import com.mywifiadata.app.data.model.AppUsage
 import com.mywifiadata.app.data.model.AppsFilter
 import com.mywifiadata.app.data.model.UsageSlice
 import com.mywifiadata.app.ui.UiState
+import com.mywifiadata.app.ui.components.AppsSearchControls
 import com.mywifiadata.app.ui.components.AppUsageRow
 import com.mywifiadata.app.ui.components.BarEntry
 import com.mywifiadata.app.ui.components.DailyBarChart
@@ -76,7 +83,7 @@ import com.mywifiadata.app.ui.theme.LocalUploadColor
  * مع تفصيل زمني (ساعات اليوم / أيام الأسبوع / آخر 4 أسابيع) يمكن الضغط عليه
  * لعرض تطبيقات تلك الشريحة، وفلترة حسب نوع التطبيق.
  */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun AppsScreen(
     state: UiState,
@@ -87,12 +94,40 @@ fun AppsScreen(
     onOpenUsageAccess: () -> Unit,
     onAppClick: (AppUsage) -> Unit,
     onReverseSortOrder: () -> Unit,
+    onSearchActiveChange: (Boolean) -> Unit,
+    onSearchQueryChange: (String) -> Unit,
     onChartTypeChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(16.dp),
+    listState: LazyListState = rememberLazyListState(),
 ) {
+    BackHandler(enabled = state.appsSearchActive) { onSearchActiveChange(false) }
     val apps = state.visibleApps
     val totalBytes = state.filteredApps.sumOf { it.totals.totalBytes }.coerceAtLeast(1L)
+    val density = LocalDensity.current
+    val rowHeights = remember { mutableStateMapOf<Int, Int>() }
+    var toolbarHeight by remember { mutableIntStateOf(0) }
+    var searchHintHeight by remember { mutableIntStateOf(0) }
+    var emptyHeight by remember(state.appsSearchQuery) { mutableIntStateOf(0) }
+    // Short/no-result searches still need enough scroll range to put the toolbar at the top.
+    // Longer lists remain fully lazy and receive no extra space.
+    val measuredResults = if (apps.isEmpty()) emptyHeight > 0 else apps.all { it.uid in rowHeights }
+    val searchBottomSpace = if (state.appsSearchActive && !state.isAppsLoading && measuredResults) {
+        val resultHeight = if (apps.isEmpty()) emptyHeight else apps.sumOf { rowHeights[it.uid] ?: 0 }
+        val gapsAndPadding = with(density) {
+            (12.dp * (apps.size.coerceAtLeast(1) + 2) +
+                contentPadding.calculateTopPadding() + contentPadding.calculateBottomPadding()).roundToPx()
+        }
+        (listState.layoutInfo.viewportSize.height - toolbarHeight - searchHintHeight - resultHeight - gapsAndPadding)
+            .coerceAtLeast(0)
+    } else 0
+    LaunchedEffect(state.appsSearchActive, state.appsSearchQuery, searchBottomSpace) {
+        if (state.appsSearchActive) {
+            val index = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == "apps_search_controls" }?.index
+            if (index != null) listState.animateScrollToItem(index)
+        }
+    }
+
 
     // تسميات الشرائح: ساعة "14:00 – 15:00"، يوم "الأحد، 28 سبتمبر"، أسبوع "21 – 27 سبتمبر".
     val hourLabel: (UsageSlice) -> String = { slice ->
@@ -106,10 +141,15 @@ fun AppsScreen(
     }
 
     LazyColumn(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().imePadding(),
+        state = listState,
         contentPadding = contentPadding,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        item {
+            PeriodSelector(period = state.appsPeriod, onPeriodChange = onPeriodChange)
+        }
+
         if (!state.hasUsageAccess) {
             item {
                 PermissionCard(
@@ -125,16 +165,6 @@ fun AppsScreen(
         } else {
             item {
                 SummaryCard(state = state)
-            }
-
-            item {
-                Text(
-                    text = stringResource(R.string.apps_chart_period),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                PeriodSelector(period = state.appsPeriod, onPeriodChange = onPeriodChange)
             }
 
             // التفصيل الزمني حسب الفترة: ساعات اليوم، أيام الأسبوع، أو أسابيع الشهر.
@@ -211,6 +241,36 @@ fun AppsScreen(
                 }
             }
 
+            item {
+                SectionHeader(
+                    title = stringResource(R.string.tab_apps),
+                    supportingText = stringResource(R.string.apps_count, apps.size) +
+                        if (state.appsSlice == null) "" else " · " + stringResource(R.string.apps_selected_slice),
+                )
+            }
+            stickyHeader(key = "apps_search_controls") {
+                Box(modifier = Modifier.onSizeChanged { toolbarHeight = it.height }) {
+                    AppsSearchControls(
+                        expanded = state.appsSearchActive,
+                        query = state.appsSearchQuery,
+                        sortOrder = state.appsSortOrder,
+                        onExpandedChange = onSearchActiveChange,
+                        onQueryChange = onSearchQueryChange,
+                        onReverseSortOrder = onReverseSortOrder,
+                    )
+                }
+            }
+            if (state.appsSearchActive) {
+                item {
+                    Text(
+                        text = stringResource(R.string.apps_search_ranking_hint),
+                        modifier = Modifier.onSizeChanged { searchHintHeight = it.height },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
             if (state.isAppsLoading && apps.isEmpty()) {
                 item {
                     Box(
@@ -227,62 +287,39 @@ fun AppsScreen(
                 }
             } else if (apps.isEmpty()) {
                 item {
-                    ExpressiveCard {
+                    ExpressiveCard(modifier = Modifier.onSizeChanged { emptyHeight = it.height }) {
                         EmptyState(
                             icon = Icons.Rounded.Apps,
-                            title = stringResource(R.string.apps_empty_title),
-                            message = stringResource(R.string.apps_empty_body),
+                            title = stringResource(
+                                if (state.appsSearchActive && state.appsSearchQuery.isNotBlank())
+                                    R.string.apps_search_empty_title else R.string.apps_empty_title,
+                            ),
+                            message = stringResource(
+                                if (state.appsSearchActive && state.appsSearchQuery.isNotBlank())
+                                    R.string.apps_search_empty_body else R.string.apps_empty_body,
+                            ),
                         )
                     }
                 }
             } else {
-                item {
-                    SectionHeader(
-                        title = stringResource(R.string.tab_apps),
-                        supportingText = stringResource(R.string.apps_count, apps.size) +
-                            if (state.appsSlice == null) "" else " · " + stringResource(R.string.apps_selected_slice),
-                    )
-                }
-
-                item {
-                    val sortDescription = stringResource(
-                        if (state.appsSortOrder == AppsSortOrder.HIGHEST_USAGE)
-                            R.string.apps_sort_highest_usage else R.string.apps_sort_lowest_usage,
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Text(
-                            text = stringResource(R.string.app_detail_hint),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.weight(1f),
-                        )
-                        // Trailing edge is the far left in the Arabic (RTL) layout.
-                        IconButton(
-                            onClick = onReverseSortOrder,
-                            modifier = Modifier.semantics { stateDescription = sortDescription },
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.SwapVert,
-                                contentDescription = stringResource(R.string.apps_reverse_sort),
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
-                        }
-                    }
-                }
                 itemsIndexed(
                     items = apps,
                     key = { _, app -> app.uid },
                 ) { index, app ->
                     AppUsageRow(
                         app = app,
+                        modifier = Modifier.onSizeChanged {
+                            if (state.appsSearchActive) rowHeights[app.uid] = it.height
+                        },
                         share = app.totals.totalBytes.toFloat() / totalBytes.toFloat(),
                         rank = index + 1,
                         onClick = { onAppClick(app) },
                     )
+                }
+            }
+            if (state.appsSearchActive) {
+                item(key = "search_bottom_space") {
+                    Spacer(modifier = Modifier.height(with(density) { searchBottomSpace.toDp() }))
                 }
             }
         }
@@ -432,10 +469,7 @@ private fun SummaryCard(state: UiState) {
     ExpressiveCard {
         Column(modifier = Modifier.fillMaxWidth()) {
             SectionHeader(
-                title = stringResource(
-                    if (state.appsNetwork == UsageNetwork.WIFI && state.appsScope == AppsUsageScope.CURRENT_CYCLE)
-                        R.string.apps_scope_current_cycle else R.string.apps_scope_all_time,
-                ),
+                title = stringResource(R.string.label_period),
                 supportingText = stringResource(
                     if (state.appsNetwork == UsageNetwork.WIFI) R.string.apps_network_wifi else R.string.apps_network_mobile,
                 ) + " · " + stringResource(R.string.apps_count, periodApps.size),

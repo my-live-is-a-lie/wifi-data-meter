@@ -119,7 +119,6 @@
     <string name="apps_sort_lowest_usage">Lowest usage</string>
     <string name="apps_show_filters">Show app filters</string>
     <string name="apps_hide_filters">Hide app filters</string>
-    <string name="apps_chart_period">Timeline — tap a slice to view its apps</string>
     <string name="apps_selected_slice">Selected time slice</string>
     <string name="apps_top_consumer">Highest usage: %1$s</string>
     <string name="apps_screen_title">App usage</string>
@@ -141,6 +140,14 @@
     <string name="unknown_app_label">Unknown app</string>
     <string name="apps_count">%1$d apps</string>
     <string name="app_detail_title">App usage</string>
+    <string name="apps_list_hint">Tap any app to view its usage</string>
+    <string name="apps_search_label">Search apps</string>
+    <string name="apps_search_open">Search apps</string>
+    <string name="apps_search_close">Close search</string>
+    <string name="apps_search_clear">Clear search text</string>
+    <string name="apps_search_ranking_hint">Most selected in search first, then most recently selected</string>
+    <string name="apps_search_empty_title">No matching apps</string>
+    <string name="apps_search_empty_body">Try another name or clear the search. Only apps within the current period and filters are shown.</string>
     <string name="app_detail_hint">Tap any app to see its usage for today, the week and the month.</string>
     <string name="app_detail_cd">App usage details</string>
     <string name="app_detail_loading">Calculating usage…</string>

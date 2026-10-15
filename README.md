@@ -222,7 +222,7 @@ built with **Kotlin + Jetpack Compose + Material 3 Expressive**.
 
 - Dashboard: animated usage ring vs. your plan quota, live speed, full Wi‑Fi link details (SSID, RSSI, link
   speed, band, standard, IP/gateway/DNS), today and session totals.
-- Apps: collapsible dropdown filters for Wi-Fi/mobile data, all-time/current Wi-Fi plan, highest/lowest usage ordering, and a separate all/5/10/15/20/25 app count. Day/week/month charts support time-slice drill-down. All-time means the history retained by Android; the current plan uses the configured cycle start day. The count limits rows after sorting, not summary totals or the highest-usage app in the summary. Pull down to refresh.
+- Apps: collapsible dropdown filters for Wi-Fi/mobile data, all-time/current Wi-Fi plan, highest/lowest usage ordering, and a separate all/5/10/15/20/25 app count. Day/week/month charts support time-slice drill-down. The day/week/month buttons control the period summary and app list. The all-time scope adds no billing-cycle restriction to that selected period; the current plan narrows it to the configured cycle start day. The count limits rows after sorting, not summary totals or the highest-usage app in the summary. Pull down to refresh.
 - History: 7‑ or 30‑day bar chart with per‑day details and that day's top apps.
 - Settings: quota + cycle start day, alert threshold, sampling interval, background tracking, dynamic color.
 - Background monitoring through a `dataSync` foreground service with an ongoing notification and threshold alerts.
@@ -234,3 +234,12 @@ built with **Kotlin + Jetpack Compose + Material 3 Expressive**.
 Build with `./gradlew assembleDebug` (AGP 9.3.1 · Kotlin 2.4.10 · Gradle 9.5.0 · Compose BOM 2026.09.00 ·
 Material 3 1.5.0‑alpha29 · compileSdk 37 · minSdk 26). Grant **Usage Access** on first run to enable per‑app stats.
 Everything stays on-device — no analytics, no network calls.
+
+
+### البحث في التطبيقات
+- زر البحث بجوار زر عكس الترتيب يفتح حقلًا يتمدّد إلى اليمين في الواجهة العربية، ويُمرّر القائمة إلى شريط البحث المثبّت أعلى منطقة المحتوى.
+- البحث بالاسم أو اسم الحزمة داخل الفترة ونوع الشبكة وفلتر التطبيقات المختارة؛ يُطبّق العدد بعد البحث وليس قبله.
+- تظهر التطبيقات المختارة سابقًا من البحث أولًا حسب عدد مرات الاختيار، ثم الأحدث عند التساوي. تُحفظ آخر 100 هوية تطبيق مختارة محليًا، ولا يُحفظ نص البحث.
+- إغلاق البحث يعيد ترتيب الاستهلاك المحدد، ومسح بيانات التطبيق من الإعدادات يمسح سجل الاختيارات أيضًا.
+
+Manual UI checks: open Apps in Arabic, verify period buttons precede the summary, then open search beside the sort icon. Confirm rightward expansion, keyboard focus and scrolling to the pinned toolbar; try a name, a package, and no matches; clear/close search. Open a result, return, repeat selections and restart to check frequency/recency ordering. Repeat with top-5, mobile data, current plan, rotation, large text and English layout.

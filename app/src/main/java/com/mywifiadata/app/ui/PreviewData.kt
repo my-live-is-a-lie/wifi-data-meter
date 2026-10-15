@@ -145,6 +145,8 @@ private fun AppsPreview() {
             onOpenUsageAccess = {},
             onAppClick = {},
             onReverseSortOrder = {},
+            onSearchActiveChange = {},
+            onSearchQueryChange = {},
         )
     }
 }

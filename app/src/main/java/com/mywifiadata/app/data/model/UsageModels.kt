@@ -76,6 +76,13 @@ data class AppUsage(
     val totals: TrafficTotals,
 )
 
+/** A locally remembered selection from the app search UI. */
+data class AppSearchSelection(
+    val appKey: String,
+    val selectionCount: Long,
+    val lastSelectedMillis: Long,
+)
+
 /** استهلاك يوم كامل. */
 data class DayUsage(
     val startMillis: Long,
@@ -161,6 +168,7 @@ data class AppSettings(
     val historyLineChartEnabled: Boolean = false,
     /** نمط مخططات التطبيقات محفوظ ليستمر بعد إعادة تشغيل التطبيق. */
     val appsLineChartEnabled: Boolean = false,
+    val appSearchHistory: List<AppSearchSelection> = emptyList(),
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val sessionStartMillis: Long = System.currentTimeMillis(),
     val sessionBaseline: TrafficTotals = TrafficTotals.Empty,
