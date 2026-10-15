@@ -118,6 +118,20 @@
     <string name="permission_granted_body">يمكن للتطبيق الآن قراءة الاستهلاك بالفعل.</string>
 
     <!-- شاشة التطبيقات -->
+    <string name="apps_network_filter">نوع الشبكة</string>
+    <string name="apps_network_wifi">Wi-Fi</string>
+    <string name="apps_network_mobile">بيانات الهاتف</string>
+    <string name="apps_scope_all_time">كل الوقت</string>
+    <string name="apps_scope_current_cycle">الباقة الحالية</string>
+    <string name="apps_count_filter">العدد</string>
+    <string name="apps_reverse_sort">عكس ترتيب التطبيقات</string>
+    <string name="apps_sort_filter">ترتيب التطبيقات</string>
+    <string name="apps_sort_highest_usage">الأعلى استهلاكًا</string>
+    <string name="apps_sort_lowest_usage">الأقل استهلاكًا</string>
+    <string name="apps_show_filters">إظهار فلاتر التطبيقات</string>
+    <string name="apps_hide_filters">إخفاء فلاتر التطبيقات</string>
+    <string name="apps_selected_slice">الشريحة المحددة</string>
+    <string name="apps_top_consumer">أعلي التطبيقات استهلاكاً: %1$s</string>
     <string name="apps_screen_title">استهلاك التطبيقات</string>
     <string name="apps_empty_title">لا يوجد استهلاك مسجّل</string>
     <string name="apps_empty_body">لم تُسجّل أي بيانات لهذه الفترة حتى الآن. جرّب تصفح الإنترنت أو تحديث القائمة.</string>
@@ -134,9 +148,19 @@
     <string name="apps_slices_days">الأيام</string>
     <string name="apps_slices_weeks">الأسابيع</string>
     <string name="apps_slices_hours">الساعات</string>
+    <string name="app_archived_usage">آخر قراءة محفوظة: %1$s</string>
+    <string name="apps_archived_usage_summary">يتضمن الاستهلاك قراءات محفوظة قبل حذف التطبيقات؛ قد لا تشمل ما لم يُرصد قبل الحذف.</string>
+    <string name="app_not_installed">غير مثبت</string>
     <string name="unknown_app_label">تطبيق غير معروف</string>
     <string name="apps_count">%1$d تطبيقًا</string>
     <string name="app_detail_title">استهلاك التطبيق</string>
+    <string name="apps_list_hint">اضغط على أي تطبيق لعرض استهلاكه</string>
+    <string name="apps_search_label">بحث عن تطبيق</string>
+    <string name="apps_search_open">البحث في التطبيقات</string>
+    <string name="apps_search_close">إغلاق البحث</string>
+    <string name="apps_search_clear">مسح نص البحث</string>
+    <string name="apps_search_empty_title">لا توجد تطبيقات مطابقة</string>
+    <string name="apps_search_empty_body">جرّب اسمًا آخر أو امسح البحث. تُعرض تطبيقات الفترة والفلاتر الحالية فقط.</string>
     <string name="app_detail_hint">اضغط على أي تطبيق لعرض استهلاكه في اليوم والأسبوع والشهر.</string>
     <string name="app_detail_cd">تفاصيل استهلاك التطبيق</string>
     <string name="app_detail_loading">جارٍ حساب الاستهلاك…</string>
@@ -292,4 +316,9 @@
     <string name="unit_gb">جيجابايت</string>
     <string name="unit_mbps">ميجابت/ث</string>
     <string name="unit_dbm">ديسيبل</string>
+    <string name="history_day_apps">تطبيقات اليوم المحدد</string>
+    <string name="history_least_apps">أقل التطبيقات استهلاكًا</string>
+    <string name="history_apps_search_empty">لا يوجد تطبيق مطابق في اليوم المحدد. جرّب اسمًا آخر أو امسح البحث.</string>
+    <string name="history_apps_empty">لا توجد بيانات استهلاك للتطبيقات في اليوم المحدد.</string>
+    <string name="apps_fast_scroll">موضع القائمة والسحب السريع بين التطبيقات</string>
 </resources>

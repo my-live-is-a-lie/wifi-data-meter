@@ -34,9 +34,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mywifiadata.app.R
+import com.mywifiadata.app.core.UsageNetwork
 import com.mywifiadata.app.core.Format
 import com.mywifiadata.app.data.model.TrafficTotals
 import com.mywifiadata.app.ui.AppDetailState
+import com.mywifiadata.app.ui.components.AppName
 import com.mywifiadata.app.ui.components.AppIcon
 import com.mywifiadata.app.ui.components.ExpressiveCard
 import com.mywifiadata.app.ui.components.InfoRow
@@ -44,7 +46,7 @@ import com.mywifiadata.app.ui.theme.LocalDownloadColor
 import com.mywifiadata.app.ui.theme.LocalUploadColor
 
 /**
- * تفاصيل تطبيق واحد: استهلاكه على شبكة الواي فاي في اليوم وآخر ٧ أيام وآخر ٣٠ يومًا.
+ * تفاصيل تطبيق واحد: استهلاكه على الشبكة المختارة في اليوم وآخر ٧ أيام وآخر ٣٠ يومًا.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -68,15 +70,13 @@ fun AppDetailScreen(
                             contentDescription = stringResource(R.string.app_detail_back),
                         )
                     }
-                    AppIcon(packageName = detail.app.packageName, size = 44.dp)
+                    AppIcon(app = detail.app, size = 44.dp)
                     Spacer(modifier = Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = detail.app.label,
+                        AppName(
+                            app = detail.app,
+                            modifier = Modifier.fillMaxWidth(),
                             style = MaterialTheme.typography.titleMediumEmphasized,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
                         )
                         Text(
                             text = detail.app.packageName
@@ -88,9 +88,22 @@ fun AppDetailScreen(
                         )
                     }
                 }
+                if (detail.app.isArchivedUsage) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = stringResource(
+                            R.string.app_archived_usage,
+                            "${Format.shortDate(detail.app.usageRecordedAt)} ${Format.clock(detail.app.usageRecordedAt)}",
+                        ) + " · " + stringResource(R.string.apps_archived_usage_summary),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = stringResource(R.string.app_detail_hint),
+                    text = stringResource(
+                        if (detail.network == UsageNetwork.WIFI) R.string.apps_network_wifi else R.string.apps_network_mobile,
+                    ) + " · " + stringResource(R.string.app_detail_hint),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
