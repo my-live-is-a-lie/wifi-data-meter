@@ -320,4 +320,5 @@
     <string name="history_least_apps">أقل التطبيقات استهلاكًا</string>
     <string name="history_apps_search_empty">لا يوجد تطبيق مطابق في اليوم المحدد. جرّب اسمًا آخر أو امسح البحث.</string>
     <string name="history_apps_empty">لا توجد بيانات استهلاك للتطبيقات في اليوم المحدد.</string>
+    <string name="apps_fast_scroll">موضع القائمة والسحب السريع بين التطبيقات</string>
 </resources>

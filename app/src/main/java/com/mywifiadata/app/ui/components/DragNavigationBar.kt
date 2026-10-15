@@ -1,8 +1,12 @@
 package com.mywifiadata.app.ui.components
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitHorizontalTouchSlopOrCancellation
+import androidx.compose.foundation.gestures.horizontalDrag
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -31,6 +35,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
@@ -43,7 +48,10 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.mywifiadata.app.core.navigationDragCenter
+import com.mywifiadata.app.core.navigationIconScale
 import com.mywifiadata.app.core.navigationIndexAt
+import com.mywifiadata.app.core.navigationIndicatorContains
+import com.mywifiadata.app.core.navigationShortSwipeTarget
 import com.mywifiadata.app.core.navigationIndicatorBounds
 import com.mywifiadata.app.core.navigationTabCenter
 import com.mywifiadata.app.core.navigationTrailImpulse
@@ -75,12 +83,14 @@ internal fun DragNavigationBar(
     var barCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     val iconCentersY = remember { mutableStateMapOf<Int, Float>() }
     var fingerX by remember { mutableStateOf<Float?>(null) }
+    var isBarPressed by remember { mutableStateOf(false) }
     val center = remember { Animatable(0f) }
     var positioned by remember { mutableStateOf(false) }
     var previousGeometry by remember { mutableStateOf<Pair<Float, Boolean>?>(null) }
     val trail = remember { Animatable(0f) }
     var trailJob by remember { mutableStateOf<Job?>(null) }
     val maxTrail = with(density) { 18.dp.toPx() }
+    val shortSwipeDistance = with(density) { 16.dp.toPx() }
     val pillWidth = with(density) { 56.dp.toPx() }
     val pillHeight = with(density) { 32.dp.toPx() }
     val fallbackCenterY = with(density) { 22.dp.toPx() }
@@ -140,42 +150,92 @@ internal fun DragNavigationBar(
                     }
                     // Never key this on selectedIndex, a callback, or page content: a single
                     // uninterrupted pointer stream must be able to visit all four destinations.
-                    .pointerInput(items.size, isRtl, barSize, maxTrail) {
-                        var lastSelected = currentSelection
-                        fun moveTo(position: Offset) {
-                            // Leaving vertically suspends switching; re-entering resumes it.
-                            if (position.y < 0f || position.y > size.height) return
-                            val index = navigationIndexAt(position.x, size.width.toFloat(), items.size, isRtl)
-                                ?: return
-                            val nextX = navigationDragCenter(position.x, size.width.toFloat(), items.size)
-                            val previousX = fingerX
-                            fingerX = nextX
-                            // The first position may be far from the old selection. Only actual
-                            // finger movement determines which edge trails, not that initial jump.
-                            if (previousX != null) stretch(nextX - previousX)
-                            if (index != lastSelected) {
-                                lastSelected = index
-                                currentOnSelect(index)
-                            }
-                        }
+                    .pointerInput(items.size, isRtl, barSize, maxTrail, shortSwipeDistance) {
                         try {
-                            detectHorizontalDragGestures(
-                                onDragStart = { position ->
-                                    lastSelected = currentSelection
-                                    trailJob?.cancel()
-                                    trailJob = scope.launch { trail.snapTo(0f) }
-                                    moveTo(position)
-                                },
-                                onHorizontalDrag = { change, _ ->
-                                    change.consume()
-                                    moveTo(change.position)
-                                },
-                                onDragEnd = { fingerX = null },
-                                onDragCancel = { fingerX = null },
-                            )
+                            awaitEachGesture {
+                                // Capture the actual press, not the later touch-slop position.
+                                // Don't consume it: ordinary clicks and accessibility stay intact.
+                                val down = awaitFirstDown(requireUnconsumed = false)
+                                isBarPressed = down.position.x in 0f..size.width.toFloat() &&
+                                    down.position.y in 0f..size.height.toFloat()
+                                try {
+                                    val startIndex = currentSelection
+                                    val bounds = navigationIndicatorBounds(
+                                        center = fingerX ?: center.value,
+                                        pillWidth = pillWidth,
+                                        stretch = trail.value,
+                                        barWidth = size.width.toFloat(),
+                                    )
+                                    var shortcutAllowed = positioned && navigationIndicatorContains(
+                                        down.position.x, down.position.y, bounds,
+                                        iconCentersY[startIndex] ?: fallbackCenterY, pillHeight,
+                                    )
+                                    var lastSelected = startIndex
+                                    var crossedTab = false
+                                    var lastPosition = down.position
+
+                                    fun moveTo(position: Offset) {
+                                        lastPosition = position
+                                        // Re-entry may resume scrubbing, but never an accidental shortcut.
+                                        if (position.y < 0f || position.y > size.height) {
+                                            shortcutAllowed = false
+                                            isBarPressed = false
+                                            return
+                                        }
+                                        isBarPressed = true
+                                        val index = navigationIndexAt(position.x, size.width.toFloat(), items.size, isRtl)
+                                            ?: return
+                                        val nextX = navigationDragCenter(position.x, size.width.toFloat(), items.size)
+                                        val previousX = fingerX
+                                        fingerX = nextX
+                                        if (previousX != null) stretch(nextX - previousX)
+                                        if (index != startIndex) crossedTab = true
+                                        if (index != lastSelected) {
+                                            lastSelected = index
+                                            currentOnSelect(index)
+                                        }
+                                    }
+
+                                    val firstDrag = awaitHorizontalTouchSlopOrCancellation(down.id) { change, _ ->
+                                        change.consume()
+                                    }
+                                    if (firstDrag != null) {
+                                        if (firstDrag.id != down.id || currentEvent.changes.size > 1) shortcutAllowed = false
+                                        trailJob?.cancel()
+                                        trailJob = scope.launch { trail.snapTo(0f) }
+                                        moveTo(firstDrag.position)
+                                        val completed = horizontalDrag(firstDrag.id) { change ->
+                                            if (change.id != down.id || currentEvent.changes.size > 1) shortcutAllowed = false
+                                            change.consume()
+                                            moveTo(change.position)
+                                        }
+                                        // The final up can carry a last movement not seen in a move event.
+                                        val up = currentEvent.changes.firstOrNull { !it.pressed && it.previousPressed }
+                                        if (completed && up != null) moveTo(up.position)
+                                        val next = navigationShortSwipeTarget(
+                                            startIndex = startIndex,
+                                            deltaX = lastPosition.x - down.position.x,
+                                            count = items.size,
+                                            isRtl = isRtl,
+                                            threshold = maxOf(shortSwipeDistance, viewConfiguration.touchSlop),
+                                            startedOnIndicator = shortcutAllowed,
+                                            crossedTab = crossedTab,
+                                            completed = completed && up?.id == down.id && currentEvent.changes.size == 1,
+                                        )
+                                        if (next != null) currentOnSelect(next)
+                                        // Release animates the same shared capsule toward the new icon.
+                                        // A long scrub or a cancelled drag never receives an extra step.
+                                        fingerX = null
+                                    }
+                                } finally {
+                                    // Covers taps (no drag), release, gesture cancellation and disposal.
+                                    isBarPressed = false
+                                }
+                            }
                         } finally {
                             // Also reset if rotation, layout direction or disposal cancels input.
                             fingerX = null
+                            isBarPressed = false
                             trailJob?.cancel()
                             scope.launch { trail.snapTo(0f) }
                         }
@@ -192,16 +252,39 @@ internal fun DragNavigationBar(
                             onClick = { currentOnSelect(index) },
                             colors = ShortNavigationBarItemDefaults.colors(selectedIndicatorColor = Color.Transparent),
                             icon = {
-                                Icon(
-                                    imageVector = item.icon,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(24.dp).onGloballyPositioned { icon ->
+                                val iconScale by animateFloatAsState(
+                                    targetValue = navigationIconScale(
+                                        indicatorCenter = fingerX ?: center.value,
+                                        iconCenter = navigationTabCenter(index, width, items.size, isRtl),
+                                        influenceRadius = width / items.size,
+                                        pressed = isBarPressed && positioned,
+                                    ),
+                                    animationSpec = spring(
+                                        dampingRatio = 1f,
+                                        stiffness = 650f,
+                                        visibilityThreshold = 0.001f,
+                                    ),
+                                    label = "Navigation icon proximity $index",
+                                )
+                                // Measure the unscaled wrapper: growth must not move the capsule,
+                                // labels, tab hit regions or the bar itself.
+                                Box(
+                                    Modifier.size(24.dp).onGloballyPositioned { icon ->
                                         val bar = barCoordinates
                                         if (bar != null && bar.isAttached && icon.isAttached) {
                                             iconCentersY[index] = bar.localBoundingBoxOf(icon, clipBounds = false).center.y
                                         }
                                     },
-                                )
+                                ) {
+                                    Icon(
+                                        imageVector = item.icon,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(24.dp).graphicsLayer {
+                                            scaleX = iconScale
+                                            scaleY = iconScale
+                                        },
+                                    )
+                                }
                             },
                             label = { Text(item.label) },
                         )

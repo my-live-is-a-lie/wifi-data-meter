@@ -283,3 +283,40 @@ Validation: `HistoryAppsTest` adds eight JVM tests for top/bottom ten, searching
 Validation: `NavigationDragTest` has 16 JVM checks for continuous RTL/LTR sweeps, boundary crossing, edge clamping, resizing, direction reversals and bounded one-sided indicator geometry. These passed locally with Kotlin 2.4.10 / Java 25 and JUnit 4.12. The Compose integration and animation still require an Android build/device check; pure geometry tests do not validate gestures or rendered frames.
 
 Manual checks: in Arabic, drag from Home through Apps, History and Settings without lifting; reverse in the same gesture; pause with the finger down and check the tail retracts; release between icons and check settling; start dragging on a label; leave vertically and return; test ordinary taps, TalkBack, RTL/LTR, large fonts, rotation, gesture/three-button system navigation, and leaving dashboard edit mode. Check that the final page is not changed by an extra click on release.
+
+### السحبة القصيرة من التظليل
+- بدء السحب من داخل الكبسولة المظللة ثم إفلات سحبة أفقية قصيرة (16dp على الأقل، أو عتبة لمس النظام إذا كانت أكبر) يختار الأيقونة المجاورة في اتجاه حركة الإصبع ويحرّك الكبسولة إليها بالأنيميشن الموجود، دون الحاجة للوصول إلى منطقة الأيقونة التالية.
+- هذه إضافة للسحب المستمر: إذا مر الإصبع بتبويب آخر بالفعل، لا تحدث خطوة إضافية عند الإفلات، حتى عند الرجوع إلى التبويب الأصلي في نفس السحبة. السحب من خارج الكبسولة يحتفظ بسلوك التنقل حسب موضع الإصبع فقط.
+- لا التفاف بين طرفي الشريط، ولا انتقال إضافي عند إلغاء الإيماءة أو اهتزاز الإصبع البسيط. حساب الاتجاه فعلي على الشاشة في العربية والإنجليزية، واختبار بداية اللمس يطابق حدود الكبسولة المستديرة بما فيها ذيلها المرئي.
+
+Validation: the navigation JVM suite now passes 28 tests (12 new checks for short swipes and capsule hit-testing). The new release gesture path has not yet been built or exercised on an Android device. Manual checks: short left/right swipes starting on the selected capsule in RTL/LTR; a tap and sub-threshold jitter; an outward swipe at either end; long scrubs and out-and-back scrubs with no extra page on release; starts on a label/outside the capsule; cancellation and multi-touch.
+
+### تكبير الأيقونة حسب قرب التظليل
+- أثناء لمس شريط التنقل، تتدرج الأيقونة من حجمها العادي إلى 120% كلما اقترب مركز التظليل من مركزها. التكبير يعتمد على المسافة الفعلية بينهما، وليس مجرد اختيار الصفحة أو طول ذيل التظليل، ويعمل في RTL وLTR.
+- يبقى الحجم مكبّرًا عند التوقف فوق الأيقونة مع إبقاء الإصبع مضغوطًا. الابتعاد عنها يصغّرها تدريجيًا ويكبّر الأيقونة التالية؛ الإفلات أو إلغاء الإيماءة يعيد الحجم الطبيعي بسلاسة، بما في ذلك اللمس دون سحب.
+- التكبير تحوّل رسومي داخل غلاف ثابت بحجم 24dp، فلا يتغيّر ارتفاع الشريط أو مكان النصوص أو مناطق اللمس أو مركز الكبسولة. السحب المستمر والسحبة القصيرة إلى الأيقونة المجاورة محفوظان.
+
+Validation: all 36 navigation JVM tests passed locally (8 new proximity-scale tests: gradual approach/departure, stationary hold, release, neighbor handoff, symmetry, RTL/LTR, bounds/resizing and invalid measurements). These validate target-scale math, not Compose rendering or physical gestures; the latest short-swipe and scaling integration still needs an Android build/device check. Manual checks: approach each icon slowly, hold for several seconds without moving, reverse direction, lift between icons, tap/hold without dragging, cancel or rotate during a gesture, and verify icons shrink smoothly without moving labels or the capsule. Also check that release settling and the elastic tail do not leave another icon enlarged.
+
+### تثبيت نوع التطبيقات مع أدوات القائمة
+- يظهر شريط «الكل / المثبتة / النظام» وحده دون نص «نوع التطبيقات» أو المسافة التي كانت أسفله؛ يبقى عنوان «التطبيقات» والعدد تحت الشريط كما في التصميم المطلوب.
+- يجتمع فلتر «نوع التطبيقات» (الكل / المثبتة / النظام)، ثم عنوان القائمة وعدد التطبيقات، ثم البحث والترتيب داخل رأس ثابت واحد في قسم التطبيقات. يحتفظ بالترتيب والمسافات السابقة ويظل ظاهرًا عند تمرير صفوف الاستهلاك، دون أن يدفع رأس ثابت آخر الفلتر خارج الشاشة.
+- خلفية الرأس معتمة حتى لا تظهر صفوف التطبيقات خلف أزرار الفلتر أو الفراغات أثناء السحب. السلوك المدمج أثناء البحث لم يتغير: يُخفى النوع والعنوان مؤقتًا ويبقى حقل البحث وحده، مع الاحتفاظ بفلتر النوع المختار وموضع التمرير المستقل قبل البحث.
+
+Manual checks: scroll past the period summary/charts into app rows and verify the type selector remains above search/sort; switch All/Installed/System while pinned and check the count and rows; open, type, clear and close search and verify scroll restoration; repeat with empty results, long lists and large fonts. This header-only change passed whitespace/diff checks; Android rendering/build validation is still pending with the other local navigation changes.
+
+### مقبض التمرير السريع لقائمة التطبيقات
+- عند تثبيت شريط نوع التطبيقات، يظهر في أقصى اليمين الفعلي (حتى في العربية) مقبض رأسي صغير بحجم 2×12dp وعتامة 40%، يوضح موضع التمرير بين بداية تطبيقات القائمة ونهايتها. لا يحتسب المخططات والملخصات والفلاتر ضمن تقدير الموضع.
+- هذه الميزة في **قسم التطبيقات وقائمة تطبيقات اليوم المحدد في السجل**، باستخدام نفس المكوّن مع حالة تمرير مستقلة لكل قائمة. السحب الرأسي من أي موضع ضمن آخر 24dp من الحافة اليمنى لقائمة التطبيقات يكبّر المقبض إلى 5×32dp وينقله إلى ارتفاع الإصبع ويحرك القائمة معه؛ لا يلزم لمس المقبض الصغير أولًا. اللمسة وحدها أو الاهتزاز البسيط لا يقفزان بالقائمة.
+- عند رفع الإصبع أو تحريكه خارج الحافة اليمنى يصغر المقبض ويعود خافتًا فور بدء أنيميشن الرجوع، ويتوقف التمرير السريع. الرجوع إلى الحافة بعد إلغاء السحبة يتطلب بدء لمسة جديدة. يبقى التمرير العادي خارج الشريط الضيق كما هو، وتظل الشرطة صغيرة وخافتة أثناءه.
+- مساره يبدأ أسفل الرأس المثبت وينتهي قبل حافة القائمة السفلية، ولا يغطي الفلاتر أو شريط التنقل. يُخفى قبل تثبيت الرأس، وفي البحث أو غياب الصلاحية أو خلو القائمة أو عندما تتسع الشاشة لكل التطبيقات.
+- مؤشر الموضع تقديري بحسب الصفوف المرئية لأن بعض الصفوف أطول (مثل القراءات المحفوظة). الوصول للنهاية يستخدم آخر صف فعلي؛ الرجوع للبداية يبقي التطبيق الأول تحت الرأس المثبت. تغيير النوع أو الترتيب أو نطاق البيانات يلغي الإمساك القديم، ويُتاح ضبط الموضع أيضًا عبر إجراء إمكانية الوصول.
+
+Validation: 58 local JVM checks passed across `NavigationDragTest` and `AppsFastScrollTest`, including edge-wide activation, absolute finger mapping, horizontal exit, rail boundaries, pinned-only visibility, empty/fitting lists, top/middle/end mapping, padding, partial rows, variable heights and filtered counts. XML parsing and diff checks passed. Compose build and device interaction checks remain pending. Manual checks: scroll until the type bar pins, start a vertical drag anywhere on the right edge away from the small thumb, hold and drag to both ends, exit sideways without lifting, release/cancel, reverse sort and change type/count, reopen search, test saved-usage rows/large fonts, and verify ordinary list dragging away from the thumb still works and neither the header nor bottom navigation is covered.
+
+### مقبض الحافة في تطبيقات السجل
+- بعد الضغط على عمود يوم في مخطط السجل، يظهر نفس المقبض على يمين تطبيقات ذلك اليوم عندما يصل شريط البحث والترتيب إلى موضعه المثبت. السحب من أي موضع على الحافة اليمنى يحرّك القائمة والمقبض معًا؛ الإفلات أو الابتعاد عن الحافة يعيده صغيرًا وخافتًا.
+- لا يغطي المخطط أو بطاقة اليوم أو الملخص، ولا يظهر قبل تحديد يوم، أو أثناء التحميل/البحث، أو عندما تكفي الشاشة لعرض كل الصفوف. الانتقال ليوم/فترة أخرى أو تغيير ترتيب التطبيقات يلغي سحبة اليوم السابق.
+- يُحسب المدى من التطبيقات المعروضة فعلًا (أعلى/أقل عشرة في العرض العادي كما كان)، لا من إجمالي التطبيقات غير المعروضة. لم يتغير نطاق البحث أو عدد الصفوف أو حالة تمرير قسم التطبيقات.
+
+Validation: 62 tests in the local navigation/fast-scroll JVM suite pass, including four History-specific checks for the shorter pinned header, rendered-row bounds, pinned-only visibility and independent list targets. Device/build verification is still pending. Manual checks: select a chart column, scroll to pin the app controls, drag from the right edge to both ends and leave sideways; change day/period/order, close the day card, try a short/empty day, open/close search, and switch between Apps and History to verify independent positions.
