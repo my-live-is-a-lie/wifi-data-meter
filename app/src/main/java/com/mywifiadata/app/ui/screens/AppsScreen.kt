@@ -97,8 +97,9 @@ fun AppsScreen(
     contentPadding: PaddingValues = PaddingValues(16.dp),
     listState: LazyListState = rememberLazyListState(),
     searchListState: LazyListState = rememberLazyListState(),
+    isActive: Boolean = true,
 ) {
-    BackHandler(enabled = state.appsSearchActive) { onSearchActiveChange(false) }
+    BackHandler(enabled = isActive && state.appsSearchActive) { onSearchActiveChange(false) }
     val apps = state.visibleApps
     val totalBytes = state.filteredApps.sumOf { it.totals.totalBytes }.coerceAtLeast(1L)
     // Search has its own viewport. The normal list state is never scrolled or measured
@@ -232,6 +233,7 @@ fun AppsScreen(
                             )
                         }
                         AppsSearchControls(
+                            isActive = isActive,
                             expanded = state.appsSearchActive,
                             query = state.appsSearchQuery,
                             sortOrder = state.appsSortOrder,

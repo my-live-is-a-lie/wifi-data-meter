@@ -16,7 +16,15 @@ import android.os.Bundle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.updateTransition
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.Column
@@ -62,17 +70,27 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mywifiadata.app.R
+import com.mywifiadata.app.core.navigationPageEntrySide
 import com.mywifiadata.app.core.AppLanguage
 import com.mywifiadata.app.core.SystemActions
 import com.mywifiadata.app.data.model.DashboardLayout
@@ -102,6 +120,10 @@ fun MainScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    val pageStateHolder = rememberSaveableStateHolder()
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val dashboardListState = rememberLazyListState()
@@ -111,6 +133,7 @@ fun MainScreen(
     val historySearchListState = rememberLazyListState()
 
     var selectedTabIndex by rememberSaveable { mutableIntStateOf(0) }
+    var pageEntrySide by remember { mutableIntStateOf(0) }
     var languageMenuExpanded by rememberSaveable { mutableStateOf(false) }
     var appsFiltersExpanded by rememberSaveable { mutableStateOf(false) }
     var appsFiltersBeforeSearch by rememberSaveable { mutableStateOf(false) }
@@ -346,6 +369,22 @@ fun MainScreen(
 
     val tabs = AppTab.entries
     val currentTab = tabs[selectedTabIndex.coerceIn(0, tabs.lastIndex)]
+    val pageTransition = updateTransition(currentTab, label = "Navigation pages")
+    val isPageChanging = pageTransition.currentState != pageTransition.targetState
+
+    fun selectTab(index: Int) {
+        val next = index.coerceIn(0, tabs.lastIndex)
+        if (next == selectedTabIndex) return
+        if (isDashboardEditing && next != AppTab.DASHBOARD.ordinal) cancelDashboardEditing()
+        // Outgoing pages remain composed briefly; release their editor before the new page
+        // requests focus. The bottom navigation itself stays mounted throughout the slide.
+        focusManager.clearFocus()
+        keyboard?.hide()
+        // Use the last requested tab, not the last settled animation state: a quick
+        // reversal halfway through a slide must reverse direction immediately.
+        pageEntrySide = navigationPageEntrySide(selectedTabIndex, next, isRtl)
+        selectedTabIndex = next
+    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -446,22 +485,19 @@ fun MainScreen(
             DragNavigationBar(
                 items = tabs.map { DragNavigationItem(stringResource(it.labelRes), it.icon) },
                 selectedIndex = selectedTabIndex,
-                onSelect = { index ->
-                    if (isDashboardEditing && index != AppTab.DASHBOARD.ordinal) {
-                        cancelDashboardEditing()
-                    }
-                    selectedTabIndex = index
-                },
+                onSelect = ::selectTab,
             )
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
     ) { innerPadding ->
-        val screenContent: @Composable () -> Unit = {
-            when (currentTab) {
+        val screenContent: @Composable (AppTab) -> Unit = { pageTab ->
+            // Render the animation's page, not currentTab: outgoing content must remain
+            // its own screen rather than suddenly being replaced with the destination.
+            when (pageTab) {
                 AppTab.DASHBOARD -> DashboardScreen(
                     state = state,
                     onOpenUsageAccess = { SystemActions.openUsageAccessSettings(context) },
-                    onOpenQuotaSettings = { selectedTabIndex = AppTab.SETTINGS.ordinal },
+                    onOpenQuotaSettings = { selectTab(AppTab.SETTINGS.ordinal) },
                     onRefresh = { viewModel.refreshNow() },
                     onResetSession = { showResetDialog = true },
                     onToggleTracking = { toggleTracking(!state.settings.trackingEnabled) },
@@ -501,6 +537,7 @@ fun MainScreen(
                             }
                             AppsScreen(
                                 state = state,
+                                isActive = pageTab == currentTab,
                                 modifier = Modifier.weight(1f),
                                 onPeriodChange = { viewModel.setAppsPeriod(it) },
                                 onAppsFilterChange = { viewModel.setAppsFilter(it) },
@@ -529,6 +566,7 @@ fun MainScreen(
 
                 AppTab.HISTORY -> HistoryScreen(
                     state = state,
+                    isActive = pageTab == currentTab,
                     listState = historyListState,
                     searchListState = historySearchListState,
                     onSearchActiveChange = viewModel::setHistorySearchActive,
@@ -565,7 +603,7 @@ fun MainScreen(
         val isAppsSearchVisible = currentTab == AppTab.APPS && state.appsSearchActive && state.appDetail == null
         val isHistorySearchVisible = currentTab == AppTab.HISTORY && state.historySearchActive && state.hasUsageAccess &&
             state.selectedDayIndex?.let { state.daily.getOrNull(it) } != null && state.appDetail == null
-        val pullRefreshEnabled = !isAppsSearchVisible && !isHistorySearchVisible &&
+        val pullRefreshEnabled = !isPageChanging && !isAppsSearchVisible && !isHistorySearchVisible &&
             !(isDashboardEditing && currentTab == AppTab.DASHBOARD)
         // Discard any partially pulled distance on entering/leaving search. Key only this
         // state, not the content: the editor, its animation and scroll states must survive.
@@ -589,7 +627,35 @@ fun MainScreen(
                 .consumeWindowInsets(innerPadding)
                 .then(refreshModifier),
         ) {
-            screenContent()
+            pageTransition.AnimatedContent(
+                modifier = Modifier.fillMaxSize().clipToBounds().pointerInput(isPageChanging) {
+                    // Don't let a tap hit an outgoing row while it slides away. This gate
+                    // covers page content only, never the live drag-navigation bar.
+                    if (isPageChanging) {
+                        awaitPointerEventScope {
+                            while (true) {
+                                awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
+                            }
+                        }
+                    }
+                },
+                contentKey = { it },
+                transitionSpec = {
+                    val side = pageEntrySide
+                    (slideInHorizontally(tween(240, easing = FastOutSlowInEasing)) { width -> side * width } togetherWith
+                        slideOutHorizontally(tween(240, easing = FastOutSlowInEasing)) { width -> -side * width })
+                        .using(null) // Fixed viewport: no height/size animation or page bounce.
+                },
+            ) { pageTab ->
+                pageStateHolder.SaveableStateProvider(pageTab.name) {
+                    Box(
+                        Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
+                            .then(if (pageTab != currentTab) Modifier.clearAndSetSemantics { } else Modifier),
+                    ) {
+                        screenContent(pageTab)
+                    }
+                }
+            }
             if (pullRefreshEnabled) {
                 PullToRefreshDefaults.Indicator(
                     modifier = Modifier.align(Alignment.TopCenter),

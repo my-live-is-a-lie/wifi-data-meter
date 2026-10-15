@@ -96,7 +96,7 @@ internal fun BoxScope.AppsFastScroller(
     // doesn't jump from an outdated visual location. Only size and opacity are animated.
     val progress = if (dragging) dragProgress else current.progress
     val thumbWidth by animateDpAsState(if (dragging) 5.dp else 2.dp, tween(120), label = "App thumb width")
-    val thumbHeight by animateDpAsState(if (dragging) 32.dp else 12.dp, tween(120), label = "App thumb height")
+    val thumbHeight by animateDpAsState(if (dragging) 32.dp else 16.dp, tween(120), label = "App thumb height")
     val alpha by animateFloatAsState(if (dragging) 1f else 0.4f, tween(120), label = "App thumb opacity")
     val tint = MaterialTheme.colorScheme.primary
     val description = stringResource(R.string.apps_fast_scroll)
