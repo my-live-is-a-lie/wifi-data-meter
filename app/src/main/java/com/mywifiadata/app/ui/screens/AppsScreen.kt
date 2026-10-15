@@ -41,19 +41,12 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -100,34 +93,17 @@ fun AppsScreen(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(16.dp),
     listState: LazyListState = rememberLazyListState(),
+    searchListState: LazyListState = rememberLazyListState(),
 ) {
     BackHandler(enabled = state.appsSearchActive) { onSearchActiveChange(false) }
     val apps = state.visibleApps
     val totalBytes = state.filteredApps.sumOf { it.totals.totalBytes }.coerceAtLeast(1L)
-    val density = LocalDensity.current
-    val rowHeights = remember { mutableStateMapOf<Int, Int>() }
-    var toolbarHeight by remember { mutableIntStateOf(0) }
-    var searchHintHeight by remember { mutableIntStateOf(0) }
-    var emptyHeight by remember(state.appsSearchQuery) { mutableIntStateOf(0) }
-    // Short/no-result searches still need enough scroll range to put the toolbar at the top.
-    // Longer lists remain fully lazy and receive no extra space.
-    val measuredResults = if (apps.isEmpty()) emptyHeight > 0 else apps.all { it.uid in rowHeights }
-    val searchBottomSpace = if (state.appsSearchActive && !state.isAppsLoading && measuredResults) {
-        val resultHeight = if (apps.isEmpty()) emptyHeight else apps.sumOf { rowHeights[it.uid] ?: 0 }
-        val gapsAndPadding = with(density) {
-            (12.dp * (apps.size.coerceAtLeast(1) + 2) +
-                contentPadding.calculateTopPadding() + contentPadding.calculateBottomPadding()).roundToPx()
-        }
-        (listState.layoutInfo.viewportSize.height - toolbarHeight - searchHintHeight - resultHeight - gapsAndPadding)
-            .coerceAtLeast(0)
-    } else 0
-    LaunchedEffect(state.appsSearchActive, state.appsSearchQuery, searchBottomSpace) {
-        if (state.appsSearchActive) {
-            val index = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == "apps_search_controls" }?.index
-            if (index != null) listState.animateScrollToItem(index)
-        }
+    // Search has its own viewport. The normal list state is never scrolled or measured
+    // against filtered results, so closing search restores its exact index and offset.
+    fun changeSearchActive(active: Boolean) {
+        if (active) searchListState.requestScrollToItem(0)
+        onSearchActiveChange(active)
     }
-
 
     // تسميات الشرائح: ساعة "14:00 – 15:00"، يوم "الأحد، 28 سبتمبر"، أسبوع "21 – 27 سبتمبر".
     val hourLabel: (UsageSlice) -> String = { slice ->
@@ -142,12 +118,14 @@ fun AppsScreen(
 
     LazyColumn(
         modifier = modifier.fillMaxWidth().imePadding(),
-        state = listState,
+        state = if (state.appsSearchActive) searchListState else listState,
         contentPadding = contentPadding,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item {
-            PeriodSelector(period = state.appsPeriod, onPeriodChange = onPeriodChange)
+        if (!state.appsSearchActive) {
+            item {
+                PeriodSelector(period = state.appsPeriod, onPeriodChange = onPeriodChange)
+            }
         }
 
         if (!state.hasUsageAccess) {
@@ -163,112 +141,107 @@ fun AppsScreen(
                 )
             }
         } else {
-            item {
-                SummaryCard(state = state)
-            }
-
-            // التفصيل الزمني حسب الفترة: ساعات اليوم، أيام الأسبوع، أو أسابيع الشهر.
-            when (state.appsPeriod) {
-                UsagePeriod.TODAY -> item {
-                    SliceCard(
-                        title = stringResource(R.string.apps_slices_hours),
-                        icon = Icons.Rounded.Schedule,
-                        slices = state.appsHours,
-                        label = hourLabel,
-                        selected = state.appsSlice,
-                        lineChartEnabled = state.settings.appsLineChartEnabled,
-                        onChartTypeChange = onChartTypeChange,
-                        onSelect = onAppsSliceChange,
-                    )
+            if (!state.appsSearchActive) {
+                item {
+                    SummaryCard(state = state)
                 }
 
-                UsagePeriod.WEEK -> item {
-                    SliceCard(
-                        title = stringResource(R.string.apps_slices_days),
-                        icon = Icons.Rounded.DateRange,
-                        slices = state.appsDays,
-                        label = dayLabel,
-                        selected = state.appsSlice,
-                        lineChartEnabled = state.settings.appsLineChartEnabled,
-                        onChartTypeChange = onChartTypeChange,
-                        onSelect = onAppsSliceChange,
-                    )
-                }
-
-                UsagePeriod.MONTH -> {
-                    item {
+                // التفصيل الزمني حسب الفترة: ساعات اليوم، أيام الأسبوع، أو أسابيع الشهر.
+                when (state.appsPeriod) {
+                    UsagePeriod.TODAY -> item {
                         SliceCard(
-                            title = stringResource(R.string.apps_slices_weeks),
-                            icon = Icons.Rounded.CalendarMonth,
-                            slices = state.appsWeeks,
-                            label = weekLabel,
-                            selected = state.appsWeek,
+                            title = stringResource(R.string.apps_slices_hours),
+                            icon = Icons.Rounded.Schedule,
+                            slices = state.appsHours,
+                            label = hourLabel,
+                            selected = state.appsSlice,
                             lineChartEnabled = state.settings.appsLineChartEnabled,
                             onChartTypeChange = onChartTypeChange,
-                            onSelect = onAppsWeekChange,
+                            onSelect = onAppsSliceChange,
                         )
                     }
-                    if (state.appsWeek != null) {
+
+                    UsagePeriod.WEEK -> item {
+                        SliceCard(
+                            title = stringResource(R.string.apps_slices_days),
+                            icon = Icons.Rounded.DateRange,
+                            slices = state.appsDays,
+                            label = dayLabel,
+                            selected = state.appsSlice,
+                            lineChartEnabled = state.settings.appsLineChartEnabled,
+                            onChartTypeChange = onChartTypeChange,
+                            onSelect = onAppsSliceChange,
+                        )
+                    }
+
+                    UsagePeriod.MONTH -> {
                         item {
                             SliceCard(
-                                title = stringResource(R.string.apps_slices_days),
-                                icon = Icons.Rounded.DateRange,
-                                slices = state.appsWeekDays,
-                                label = dayLabel,
-                                selected = state.appsSlice,
+                                title = stringResource(R.string.apps_slices_weeks),
+                                icon = Icons.Rounded.CalendarMonth,
+                                slices = state.appsWeeks,
+                                label = weekLabel,
+                                selected = state.appsWeek,
                                 lineChartEnabled = state.settings.appsLineChartEnabled,
                                 onChartTypeChange = onChartTypeChange,
-                                onSelect = onAppsSliceChange,
+                                onSelect = onAppsWeekChange,
                             )
+                        }
+                        if (state.appsWeek != null) {
+                            item {
+                                SliceCard(
+                                    title = stringResource(R.string.apps_slices_days),
+                                    icon = Icons.Rounded.DateRange,
+                                    slices = state.appsWeekDays,
+                                    label = dayLabel,
+                                    selected = state.appsSlice,
+                                    lineChartEnabled = state.settings.appsLineChartEnabled,
+                                    onChartTypeChange = onChartTypeChange,
+                                    onSelect = onAppsSliceChange,
+                                )
+                            }
                         }
                     }
                 }
-            }
 
-            // فلتر نوع التطبيقات: الكل (الافتراضي) أو المثبتة أو النظام — فوق قائمة التطبيقات.
-            item {
-                Column(modifier = Modifier.padding(horizontal = 4.dp)) {
-                    Text(
-                        text = stringResource(R.string.apps_filter_label),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    AppsFilterRow(
-                        filter = state.appsFilter,
-                        onFilterChange = onAppsFilterChange,
+                // فلتر نوع التطبيقات: الكل (الافتراضي) أو المثبتة أو النظام — فوق قائمة التطبيقات.
+                item {
+                    Column(modifier = Modifier.padding(horizontal = 4.dp)) {
+                        Text(
+                            text = stringResource(R.string.apps_filter_label),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        AppsFilterRow(
+                            filter = state.appsFilter,
+                            onFilterChange = onAppsFilterChange,
+                        )
+                    }
+                }
+
+                item {
+                    SectionHeader(
+                        title = stringResource(R.string.tab_apps),
+                        supportingText = stringResource(R.string.apps_count, apps.size) +
+                            if (state.appsSlice == null) "" else " · " + stringResource(R.string.apps_selected_slice),
                     )
                 }
-            }
-
-            item {
-                SectionHeader(
-                    title = stringResource(R.string.tab_apps),
-                    supportingText = stringResource(R.string.apps_count, apps.size) +
-                        if (state.appsSlice == null) "" else " · " + stringResource(R.string.apps_selected_slice),
-                )
             }
             stickyHeader(key = "apps_search_controls") {
-                Box(modifier = Modifier.onSizeChanged { toolbarHeight = it.height }) {
-                    AppsSearchControls(
-                        expanded = state.appsSearchActive,
-                        query = state.appsSearchQuery,
-                        sortOrder = state.appsSortOrder,
-                        onExpandedChange = onSearchActiveChange,
-                        onQueryChange = onSearchQueryChange,
-                        onReverseSortOrder = onReverseSortOrder,
-                    )
-                }
-            }
-            if (state.appsSearchActive) {
-                item {
-                    Text(
-                        text = stringResource(R.string.apps_search_ranking_hint),
-                        modifier = Modifier.onSizeChanged { searchHintHeight = it.height },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                AppsSearchControls(
+                    expanded = state.appsSearchActive,
+                    query = state.appsSearchQuery,
+                    sortOrder = state.appsSortOrder,
+                    onExpandedChange = ::changeSearchActive,
+                    onQueryChange = { query ->
+                        // Apply the new query and its top position in the same remeasure.
+                        // No animated scroll, row-height feedback, or per-keystroke effects.
+                        searchListState.requestScrollToItem(0)
+                        onSearchQueryChange(query)
+                    },
+                    onReverseSortOrder = onReverseSortOrder,
+                )
             }
 
             if (state.isAppsLoading && apps.isEmpty()) {
@@ -287,16 +260,20 @@ fun AppsScreen(
                 }
             } else if (apps.isEmpty()) {
                 item {
-                    ExpressiveCard(modifier = Modifier.onSizeChanged { emptyHeight = it.height }) {
+                    ExpressiveCard {
                         EmptyState(
                             icon = Icons.Rounded.Apps,
                             title = stringResource(
-                                if (state.appsSearchActive && state.appsSearchQuery.isNotBlank())
-                                    R.string.apps_search_empty_title else R.string.apps_empty_title,
+                                when {
+                                    !state.appsSearchActive || state.appsSearchQuery.isBlank() -> R.string.apps_empty_title
+                                    else -> R.string.apps_search_empty_title
+                                },
                             ),
                             message = stringResource(
-                                if (state.appsSearchActive && state.appsSearchQuery.isNotBlank())
-                                    R.string.apps_search_empty_body else R.string.apps_empty_body,
+                                when {
+                                    !state.appsSearchActive || state.appsSearchQuery.isBlank() -> R.string.apps_empty_body
+                                    else -> R.string.apps_search_empty_body
+                                },
                             ),
                         )
                     }
@@ -308,18 +285,10 @@ fun AppsScreen(
                 ) { index, app ->
                     AppUsageRow(
                         app = app,
-                        modifier = Modifier.onSizeChanged {
-                            if (state.appsSearchActive) rowHeights[app.uid] = it.height
-                        },
                         share = app.totals.totalBytes.toFloat() / totalBytes.toFloat(),
                         rank = index + 1,
                         onClick = { onAppClick(app) },
                     )
-                }
-            }
-            if (state.appsSearchActive) {
-                item(key = "search_bottom_space") {
-                    Spacer(modifier = Modifier.height(with(density) { searchBottomSpace.toDp() }))
                 }
             }
         }

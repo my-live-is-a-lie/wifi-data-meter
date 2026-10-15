@@ -104,7 +104,9 @@ fun AppsSearchControls(
         Row(
             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            // Close the gap to the sort button: the search icon moves 4dp left in RTL,
+            // without shrinking either 48dp touch target or overlapping the buttons.
+            horizontalArrangement = Arrangement.spacedBy(0.dp),
         ) {
             BoxWithConstraints(modifier = Modifier.weight(1f)) {
                 if (!fieldVisible) {

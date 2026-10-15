@@ -25,7 +25,8 @@ internal object AppSearchHistory {
             .take(LIMIT)
     }
 
-    /** Input order breaks ties for apps with no history, preserving the usage sort choice. */
+    /** Blank input promotes prior selections, then includes every remaining app.
+     * Input order breaks ties for apps with no history, preserving the usage sort choice. */
     fun search(
         apps: List<AppUsage>,
         query: String,

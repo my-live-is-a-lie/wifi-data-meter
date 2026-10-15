@@ -237,13 +237,15 @@ Everything stays on-device — no analytics, no network calls.
 
 
 ### البحث في التطبيقات
-- زر البحث بجوار زر عكس الترتيب يفتح حقلًا يتمدّد إلى اليمين في الواجهة العربية، ويُمرّر القائمة إلى شريط البحث المثبّت أعلى منطقة المحتوى.
+- زر البحث بجوار زر عكس الترتيب يفتح حقلًا يتمدّد إلى اليمين في الواجهة العربية، ويعرض نتائج البحث في قائمة مستقلة ذات شريط بحث مثبّت أعلى منطقة المحتوى، مع الاحتفاظ بموضع القائمة الأصلية.
 - البحث بالاسم أو اسم الحزمة داخل الفترة ونوع الشبكة وفلتر التطبيقات المختارة؛ يُطبّق العدد بعد البحث وليس قبله.
-- تظهر التطبيقات المختارة سابقًا من البحث أولًا حسب عدد مرات الاختيار، ثم الأحدث عند التساوي. تُحفظ آخر 100 هوية تطبيق مختارة محليًا، ولا يُحفظ نص البحث.
+- عندما يكون الحقل فارغًا تظهر التطبيقات المختارة سابقًا من البحث أولًا، حسب عدد مرات الاختيار ثم الأحدث عند التساوي، وتحتها بقية التطبيقات دون تكرار وبترتيب الاستهلاك المختار. إذا لم توجد اختيارات سابقة تظهر القائمة كاملة حسب الفلاتر وحد العدد الحالي. بعد الكتابة يشمل البحث كل التطبيقات المطابقة للفلاتر الحالية. تُحفظ آخر 100 هوية تطبيق مختارة محليًا، ولا يُحفظ نص البحث.
 - حقل البحث بارتفاع 48dp وحواف مستديرة، وزره الداخلي يمسح النص إذا وُجد، وإلا يغلق الحقل بحركة انكماش إلى أيقونة البحث. يبقى النص الإرشادي مخفيًا طوال فتح الحقل وحركة إغلاقه.
-- إغلاق البحث يعيد ترتيب الاستهلاك المحدد، ومسح بيانات التطبيق من الإعدادات يمسح سجل الاختيارات أيضًا.
+- إغلاق البحث يعيد ترتيب الاستهلاك المحدد وموضع الصفحة السابق (العنصر وإزاحة التمرير)، دون إعادة التمرير المتحركة عند كل حرف. مسح بيانات التطبيق من الإعدادات يمسح سجل الاختيارات أيضًا.
 - تُستهلك حشوات Scaffold قبل تطبيق حشوة لوحة المفاتيح، لتجنب حجز مساحة شريط التنقل مرتين وترك مستطيل فارغ فوق لوحة المفاتيح.
 
 Manual UI checks: open Apps in Arabic, verify period buttons precede the summary, then open search beside the sort icon. Confirm rightward expansion, keyboard focus and scrolling to the pinned toolbar; try a name, a package, and no matches; clear/close search. Open a result, return, repeat selections and restart to check frequency/recency ordering. Repeat with top-5, mobile data, current plan, rotation, large text and English layout.
 
 Search-field regression checks: on a device/emulator with gesture navigation and again with three-button navigation, open the keyboard and verify app rows reach its top without an extra bottom-bar-sized gap. Type a query and tap the in-field X: only the query should clear and the keyboard should stay open. Tap X again: the empty pill should retract toward the search icon, the keyboard should dismiss, and only then should the list hint return. Repeat rapid open/close, system Back, no results, large fonts and RTL/LTR layouts.
+
+Search-position regression checks: note the normal list position with the controls partly visible, open search with zero history, type a query, clear it, and close using both X and system Back. The normal index/offset and filter panel visibility should return. Repeat with a populated history, one/no/many matches, rapid typing/deletion, keyboard hide/show, opening a result and returning, and rotation. No ranking hint or height-based spacer should appear in search mode, and editing should never animate the list down/up.
