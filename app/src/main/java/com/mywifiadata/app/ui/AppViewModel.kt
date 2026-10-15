@@ -5,7 +5,15 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.mywifiadata.app.core.AppsSortOrder
+import com.mywifiadata.app.core.AppsUsageScope
+import com.mywifiadata.app.core.UsageNetwork
+import com.mywifiadata.app.core.appsCountOptions
+import com.mywifiadata.app.core.appsUsageRange
+import com.mywifiadata.app.core.filterApps
+import com.mywifiadata.app.core.within
 import com.mywifiadata.app.core.AppLanguage
+import com.mywifiadata.app.core.historyApps
 import com.mywifiadata.app.core.Format
 import com.mywifiadata.app.core.LauncherIconVisibility
 import com.mywifiadata.app.core.SamplingIntervals
@@ -13,6 +21,7 @@ import com.mywifiadata.app.core.SpeedTestEngine
 import com.mywifiadata.app.core.TimeRange
 import com.mywifiadata.app.core.TimeRanges
 import com.mywifiadata.app.core.UsagePeriod
+import com.mywifiadata.app.data.AppSearchHistory
 import com.mywifiadata.app.data.UsageRepository
 import com.mywifiadata.app.data.model.AccentColor
 import com.mywifiadata.app.data.model.AppSettings
@@ -104,7 +113,17 @@ data class UiState(
     val historyPeriod: UsagePeriod = UsagePeriod.MONTH,
     val selectedDayIndex: Int? = null,
     val selectedDayApps: List<AppUsage> = emptyList(),
+    val isSelectedDayAppsLoading: Boolean = false,
+    val historySearchActive: Boolean = false,
+    val historySearchQuery: String = "",
+    val historyAppsSortOrder: AppsSortOrder = AppsSortOrder.HIGHEST_USAGE,
     val appsFilter: AppsFilter = AppsFilter.ALL,
+    val appsNetwork: UsageNetwork = UsageNetwork.WIFI,
+    val appsScope: AppsUsageScope = AppsUsageScope.ALL_TIME,
+    val appsCountLimit: Int? = null,
+    val appsSortOrder: AppsSortOrder = AppsSortOrder.HIGHEST_USAGE,
+    val appsSearchActive: Boolean = false,
+    val appsSearchQuery: String = "",
     // تفصيل قسم التطبيقات: أسابيع/أيام/ساعات مع الشريحة المختارة حاليًا.
     val appsWeeks: List<UsageSlice> = emptyList(),
     val appsDays: List<UsageSlice> = emptyList(),
@@ -148,19 +167,29 @@ data class UiState(
 
     val sessionDurationMillis: Long get() = (now - settings.sessionStartMillis).coerceAtLeast(0L)
 
+    val filteredApps: List<AppUsage> get() = filterApps(apps, appsFilter)
+
     val visibleApps: List<AppUsage>
-        get() = when (appsFilter) {
-            AppsFilter.ALL -> apps
-            AppsFilter.INSTALLED -> apps.filterNot { it.isSystem }
-            AppsFilter.SYSTEM -> apps.filter { it.isSystem }
+        get() {
+            val sorted = filterApps(apps, appsFilter, sortOrder = appsSortOrder)
+            val matching = if (appsSearchActive) {
+                AppSearchHistory.search(sorted, appsSearchQuery, settings.appSearchHistory)
+            } else sorted
+            return appsCountLimit?.let { matching.take(it) } ?: matching
         }
 
-    val visiblePeriodApps: List<AppUsage>
-        get() = when (appsFilter) {
-            AppsFilter.ALL -> periodApps
-            AppsFilter.INSTALLED -> periodApps.filterNot { it.isSystem }
-            AppsFilter.SYSTEM -> periodApps.filter { it.isSystem }
-        }
+    // The top-N control limits rows only, never the full-period summary or percentages.
+    val visiblePeriodApps: List<AppUsage> get() = filterApps(periodApps, appsFilter)
+
+    fun appsRange(now: Long = this.now): TimeRange =
+        appsUsageRange(appsNetwork, appsScope, settings.cycleStartDay, now)
+
+    /** Period buttons always control the summary and list; Wi-Fi scope only narrows that period. */
+    fun appsPeriodRange(now: Long = this.now): TimeRange =
+        TimeRanges.forPeriod(appsPeriod, now).within(appsRange(now))
+
+    val visibleHistoryApps: List<AppUsage>
+        get() = historyApps(selectedDayApps, historySearchActive, historySearchQuery, historyAppsSortOrder)
 
     val historyDays: Int get() = TimeRanges.daysOf(historyPeriod)
 }
@@ -170,6 +199,7 @@ data class UiState(
  */
 data class AppDetailState(
     val app: AppUsage,
+    val network: UsageNetwork = UsageNetwork.WIFI,
     val isLoading: Boolean = true,
     val today: TrafficTotals = TrafficTotals.Empty,
     val week: TrafficTotals = TrafficTotals.Empty,
@@ -195,9 +225,13 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
     private var lastTotals: TrafficTotals = TrafficTotals.Empty
     private var lastSampleMillis: Long = 0L
     private var appsLoadedAt: Long = 0L
+    private var appsRequestId = 0L
+    private var slicesRequestId = 0L
+    private var weekDaysRequestId = 0L
     private var todayAppsLoadedAt: Long = 0L
     private var todayAppsLoadedRangeStartMillis: Long = 0L
     private var todayAppsJob: Job? = null
+    private var selectedDayAppsJob: Job? = null
     private var dailyLoadedAt: Long = 0L
     private var dailyLoadedDays: Int = 0
     private var monthPeakLoadedAt: Long = 0L
@@ -277,6 +311,7 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         if (hasAccess && (force || now - appsLoadedAt > APPS_TTL_MILLIS)) {
             loadApps()
             loadAppsSlices()
+            repository.captureUsageArchive(now)
         }
     }
 
@@ -316,56 +351,60 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         return SpeedSample(timestampMillis = now, rxBytesPerSecond = rx, txBytesPerSecond = tx)
     }
 
+    private fun UiState.hasSameAppsSelection(other: UiState): Boolean =
+        appsNetwork == other.appsNetwork && appsScope == other.appsScope &&
+            settings.cycleStartDay == other.settings.cycleStartDay &&
+            appsPeriod == other.appsPeriod && appsWeek == other.appsWeek && appsSlice == other.appsSlice
+
     /**
      * تحميل التطبيقات للنطاق الحالي: الشريحة المختارة (ساعة/يوم) إن وُجدت،
      * وإلا الفترة الكاملة المختارة.
      */
     private suspend fun loadApps() {
-        val period = _uiState.value.appsPeriod
-        val slice = _uiState.value.appsSlice
-        val periodRange = TimeRanges.forPeriod(period)
-        val range = slice ?: periodRange
+        val requestId = ++appsRequestId
+        val selection = _uiState.value
+        val periodRange = selection.appsPeriodRange(System.currentTimeMillis())
+        val range = selection.appsSlice?.within(periodRange) ?: periodRange
         _uiState.update { it.copy(isAppsLoading = true) }
-        // تُحمَّل فترة كاملة دائمًا (لبطاقة «الفترة» الثابتة) + نطاق الشريحة إن وُجد.
-        val periodApps = repository.perAppUsage(periodRange)
-        val apps = if (range == periodRange) periodApps else repository.perAppUsage(range)
+        val periodApps = repository.perAppUsage(periodRange, selection.appsNetwork)
+        val apps = if (range == periodRange) periodApps else repository.perAppUsage(range, selection.appsNetwork)
+        if (requestId != appsRequestId || !_uiState.value.hasSameAppsSelection(selection)) return
         appsLoadedAt = System.currentTimeMillis()
         _uiState.update {
             it.copy(apps = apps, periodApps = periodApps, isAppsLoading = false)
         }
     }
 
-    /**
-     * تحميل شرائح التفصيل للفترة الحالية: ساعات اليوم (بما فيها الساعة الجارية
-     * بحدّها «الآن»)، أيام الأسبوع، أو آخر 4 أسابيع — مع حذف الشرائح التي لا
-     * يوجد بها استهلاك حتى لا تُعرض صفوف فارغة.
-     */
+    /** Charts use the same network and cycle bounds as the app list. */
     private suspend fun loadAppsSlices() {
-        // تُحمَّل شرائح اليوم/الأسبوع/الشهر دومًا ليظهر بطاقة أي فترة فورًا
-        // عند التبديل بينها (بلا فراغ أو وميض)، مع تجديد الفترة الحالية.
-        val hours = TimeRanges.hoursOfToday()
-            .map { range -> range.toSlice(repository.deviceTotals(range)) }
+        val requestId = ++slicesRequestId
+        val selection = _uiState.value
+        val now = System.currentTimeMillis()
+        val bounds = selection.appsRange(now)
+        suspend fun slices(ranges: List<TimeRange>): List<UsageSlice> = ranges
+            .map { it.within(bounds) }
+            .filter { it.endMillis > it.startMillis }
+            .map { it.toSlice(repository.deviceTotals(it, selection.appsNetwork)) }
             .filter { it.totals.totalBytes > 0L }
-        _uiState.update { it.copy(appsHours = hours) }
 
-        val days = TimeRanges.lastDays(7)
-            .map { range -> range.toSlice(repository.deviceTotals(range)) }
-            .filter { it.totals.totalBytes > 0L }
-        _uiState.update { it.copy(appsDays = days) }
-
-        val weeks = TimeRanges.lastWeeks()
-            .map { range -> range.toSlice(repository.deviceTotals(range)) }
-            .filter { it.totals.totalBytes > 0L }
-        _uiState.update { it.copy(appsWeeks = weeks) }
-
-        _uiState.value.appsWeek?.let { loadAppsWeekDays(it) }
+        val hours = slices(TimeRanges.hoursOfToday(now))
+        val days = slices(TimeRanges.lastDays(7, now))
+        val weeks = slices(TimeRanges.lastWeeks(now = now))
+        if (requestId != slicesRequestId || !_uiState.value.hasSameAppsSelection(selection)) return
+        _uiState.update { it.copy(appsHours = hours, appsDays = days, appsWeeks = weeks) }
+        selection.appsWeek?.let { loadAppsWeekDays(it) }
     }
 
-    /** أيام الأسبوع المحدد في عرض الشهر (الأحدث أولًا، بدون أيام فارغة). */
     private suspend fun loadAppsWeekDays(week: TimeRange) {
+        val requestId = ++weekDaysRequestId
+        val selection = _uiState.value
+        val bounds = selection.appsPeriodRange(System.currentTimeMillis())
         val days = TimeRanges.daysInRange(week)
-            .map { range -> range.toSlice(repository.deviceTotals(range)) }
+            .map { it.within(bounds) }
+            .filter { it.endMillis > it.startMillis }
+            .map { it.toSlice(repository.deviceTotals(it, selection.appsNetwork)) }
             .filter { it.totals.totalBytes > 0L }
+        if (requestId != weekDaysRequestId || !_uiState.value.hasSameAppsSelection(selection)) return
         _uiState.update { it.copy(appsWeekDays = days) }
     }
 
@@ -412,12 +451,76 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
 
     fun setAppsFilter(filter: AppsFilter) = _uiState.update { it.copy(appsFilter = filter) }
 
+    fun setAppsNetwork(network: UsageNetwork) {
+        if (network == _uiState.value.appsNetwork) return
+        reloadAppsSelection { it.copy(appsNetwork = network) }
+    }
+
+    fun setAppsScope(scope: AppsUsageScope) {
+        if (scope == _uiState.value.appsScope) return
+        reloadAppsSelection { it.copy(appsScope = scope) }
+    }
+
+    fun setAppsSearchActive(active: Boolean) {
+        _uiState.update { it.copy(appsSearchActive = active, appsSearchQuery = if (active) it.appsSearchQuery else "") }
+    }
+
+    fun setAppsSearchQuery(query: String) {
+        _uiState.update { it.copy(appsSearchQuery = query) }
+    }
+
+    /** Called only by rows on the apps page, not dashboard/history detail navigation. */
+    fun openAppsListDetail(app: AppUsage) {
+        val state = _uiState.value
+        if (state.appsSearchActive) {
+            repository.settingsStore.update {
+                it.copy(appSearchHistory = AppSearchHistory.record(it.appSearchHistory, app, System.currentTimeMillis()))
+            }
+            _uiState.update { it.copy(settings = repository.settingsStore.current) }
+        }
+        openAppDetail(app, state.appsNetwork)
+    }
+
+    fun setAppsSortOrder(sortOrder: AppsSortOrder) {
+        _uiState.update { it.copy(appsSortOrder = sortOrder) }
+    }
+
+    fun reverseAppsSortOrder() {
+        _uiState.update { it.copy(appsSortOrder = it.appsSortOrder.reversed()) }
+    }
+
+    fun setAppsCountLimit(limit: Int?) {
+        if (limit !in appsCountOptions) return
+        _uiState.update { it.copy(appsCountLimit = limit) }
+    }
+
+    private fun reloadAppsSelection(change: (UiState) -> UiState) {
+        _uiState.update {
+            change(it).copy(
+                apps = emptyList(), periodApps = emptyList(), isAppsLoading = true,
+                appsWeek = null, appsSlice = null, appsWeeks = emptyList(),
+                appsDays = emptyList(), appsWeekDays = emptyList(), appsHours = emptyList(),
+            )
+        }
+        viewModelScope.launch {
+            loadApps()
+            loadAppsSlices()
+        }
+    }
+
     fun setHistoryPeriod(period: UsagePeriod) {
         if (period == _uiState.value.historyPeriod) return
         val days = TimeRanges.daysOf(period)
-        _uiState.update { it.copy(historyPeriod = period, selectedDayIndex = null, selectedDayApps = emptyList()) }
+        selectedDayAppsJob?.cancel()
+        _uiState.update {
+            it.copy(
+                historyPeriod = period, selectedDayIndex = null, selectedDayApps = emptyList(),
+                isSelectedDayAppsLoading = false, historySearchActive = false, historySearchQuery = "",
+            )
+        }
         viewModelScope.launch {
             val daily = repository.dailyUsage(days)
+            if (_uiState.value.historyPeriod != period) return@launch
             dailyLoadedDays = days
             dailyLoadedAt = System.currentTimeMillis()
             _uiState.update { it.copy(daily = daily) }
@@ -429,16 +532,16 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
     }
 
     /** فتح تفاصيل تطبيق واحد (اليوم/الأسبوع/الشهر). */
-    fun openAppDetail(app: AppUsage) {
-        _uiState.update { it.copy(appDetail = AppDetailState(app = app, isLoading = true)) }
+    fun openAppDetail(app: AppUsage, network: UsageNetwork = UsageNetwork.WIFI) {
+        _uiState.update { it.copy(appDetail = AppDetailState(app = app, network = network, isLoading = true)) }
         viewModelScope.launch {
             val now = System.currentTimeMillis()
-            val today = repository.appTotals(app.uid, TimeRanges.forPeriod(UsagePeriod.TODAY, now))
-            val week = repository.appTotals(app.uid, TimeRanges.forPeriod(UsagePeriod.WEEK, now))
-            val month = repository.appTotals(app.uid, TimeRanges.forPeriod(UsagePeriod.MONTH, now))
+            val today = repository.appTotals(app.uid, TimeRanges.forPeriod(UsagePeriod.TODAY, now), network, app.packageName)
+            val week = repository.appTotals(app.uid, TimeRanges.forPeriod(UsagePeriod.WEEK, now), network, app.packageName)
+            val month = repository.appTotals(app.uid, TimeRanges.forPeriod(UsagePeriod.MONTH, now), network, app.packageName)
             _uiState.update { state ->
                 val detail = state.appDetail
-                if (detail == null || detail.app.uid != app.uid) {
+                if (detail == null || detail.app.uid != app.uid || detail.network != network) {
                     state
                 } else {
                     state.copy(
@@ -459,19 +562,41 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         _uiState.update { it.copy(appDetail = null) }
     }
 
-    fun selectDay(index: Int?) {
-        _uiState.update { it.copy(selectedDayIndex = index) }
-        if (index == null) {
-            _uiState.update { it.copy(selectedDayApps = emptyList()) }
-            return
+    fun setHistorySearchActive(active: Boolean) {
+        _uiState.update {
+            val enabled = active && it.selectedDayIndex != null
+            it.copy(historySearchActive = enabled, historySearchQuery = if (enabled) it.historySearchQuery else "")
         }
-        val day = _uiState.value.daily.getOrNull(index) ?: return
-        viewModelScope.launch {
+    }
+
+    fun setHistorySearchQuery(query: String) {
+        _uiState.update { it.copy(historySearchQuery = query) }
+    }
+
+    fun reverseHistoryAppsSortOrder() {
+        _uiState.update { it.copy(historyAppsSortOrder = it.historyAppsSortOrder.reversed()) }
+    }
+
+    fun selectDay(index: Int?) {
+        val day = index?.let { _uiState.value.daily.getOrNull(it) }
+        selectedDayAppsJob?.cancel()
+        // Never search the previous day's rows while the new selection is still loading.
+        _uiState.update {
+            it.copy(
+                selectedDayIndex = index.takeIf { day != null }, selectedDayApps = emptyList(),
+                isSelectedDayAppsLoading = day != null, historySearchActive = false, historySearchQuery = "",
+            )
+        }
+        if (day == null) return
+        selectedDayAppsJob = viewModelScope.launch {
             val apps = repository.perAppUsage(
                 com.mywifiadata.app.core.TimeRange(day.startMillis, day.endMillis),
             )
             _uiState.update { state ->
-                if (state.selectedDayIndex == index) state.copy(selectedDayApps = apps) else state
+                val currentDay = state.selectedDayIndex?.let { state.daily.getOrNull(it) }
+                if (currentDay?.startMillis == day.startMillis && currentDay.endMillis == day.endMillis) {
+                    state.copy(selectedDayApps = apps, isSelectedDayAppsLoading = false)
+                } else state
             }
         }
     }
@@ -643,6 +768,8 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
     }
 
     fun clearData() {
+        selectedDayAppsJob?.cancel()
+        selectedDayAppsJob = null
         todayAppsJob?.cancel()
         todayAppsJob = null
         todayAppsLoadedAt = 0L
@@ -658,7 +785,10 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
                 settings = repository.settingsStore.current,
             )
         }
-        refreshNow()
+        viewModelScope.launch {
+            repository.clearAppIdentityCache()
+            refreshNow()
+        }
     }
 
     private var speedTestJob: Job? = null

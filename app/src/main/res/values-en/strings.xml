@@ -107,6 +107,20 @@
     <string name="permission_granted_title">Usage access granted</string>
     <string name="permission_granted_body">The app can now read your actual usage.</string>
 
+    <string name="apps_network_filter">Network</string>
+    <string name="apps_network_wifi">Wi-Fi</string>
+    <string name="apps_network_mobile">Mobile data</string>
+    <string name="apps_scope_all_time">All time</string>
+    <string name="apps_scope_current_cycle">Current plan</string>
+    <string name="apps_count_filter">Count</string>
+    <string name="apps_reverse_sort">Reverse app order</string>
+    <string name="apps_sort_filter">App order</string>
+    <string name="apps_sort_highest_usage">Highest usage</string>
+    <string name="apps_sort_lowest_usage">Lowest usage</string>
+    <string name="apps_show_filters">Show app filters</string>
+    <string name="apps_hide_filters">Hide app filters</string>
+    <string name="apps_selected_slice">Selected time slice</string>
+    <string name="apps_top_consumer">Highest usage: %1$s</string>
     <string name="apps_screen_title">App usage</string>
     <string name="apps_empty_title">No usage recorded</string>
     <string name="apps_empty_body">No data for this period yet. Browse a bit and refresh.</string>
@@ -123,9 +137,19 @@
     <string name="apps_slices_days">Days</string>
     <string name="apps_slices_weeks">Weeks</string>
     <string name="apps_slices_hours">Hours</string>
+    <string name="app_archived_usage">Last saved reading: %1$s</string>
+    <string name="apps_archived_usage_summary">Usage includes readings saved before apps were uninstalled; activity not observed before removal may be missing.</string>
+    <string name="app_not_installed">Not installed</string>
     <string name="unknown_app_label">Unknown app</string>
     <string name="apps_count">%1$d apps</string>
     <string name="app_detail_title">App usage</string>
+    <string name="apps_list_hint">Tap any app to view its usage</string>
+    <string name="apps_search_label">Search apps</string>
+    <string name="apps_search_open">Search apps</string>
+    <string name="apps_search_close">Close search</string>
+    <string name="apps_search_clear">Clear search text</string>
+    <string name="apps_search_empty_title">No matching apps</string>
+    <string name="apps_search_empty_body">Try another name or clear the search. Only apps within the current period and filters are shown.</string>
     <string name="app_detail_hint">Tap any app to see its usage for today, the week and the month.</string>
     <string name="app_detail_cd">App usage details</string>
     <string name="app_detail_loading">Calculating usage…</string>
@@ -277,4 +301,9 @@
     <string name="unit_gb">GB</string>
     <string name="unit_mbps">Mbps</string>
     <string name="unit_dbm">dBm</string>
+    <string name="history_day_apps">Selected day’s apps</string>
+    <string name="history_least_apps">Lowest-usage apps</string>
+    <string name="history_apps_search_empty">No matching app for the selected day. Try another name or clear the search.</string>
+    <string name="history_apps_empty">No app usage data for the selected day.</string>
+    <string name="apps_fast_scroll">App list position and fast scrolling</string>
 </resources>

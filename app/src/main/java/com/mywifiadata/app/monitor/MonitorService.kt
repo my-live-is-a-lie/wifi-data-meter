@@ -42,6 +42,7 @@ class MonitorService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var loopJob: Job? = null
+    private var archiveJob: Job? = null
 
     private lateinit var repository: UsageRepository
     private lateinit var notifier: Notifier
@@ -128,6 +129,11 @@ class MonitorService : Service() {
             }
 
             runCatching { sample(settings) }
+            // Keep observed per-app usage while monitoring without delaying notification samples.
+            // The repository throttles writes and coalesces concurrent UI/startup requests.
+            if (archiveJob?.isActive != true) {
+                archiveJob = scope.launch { runCatching { repository.captureUsageArchive() } }
+            }
 
             val intervalIndex = SamplingIntervals.coerceIndex(settings.sampleIntervalIndex)
             val intervalMillis = SamplingIntervals.options[intervalIndex].durationMillis

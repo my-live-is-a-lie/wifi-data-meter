@@ -1,5 +1,7 @@
 package com.mywifiadata.app.ui.screens
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -13,9 +15,12 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
@@ -33,6 +38,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -49,11 +55,14 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.mywifiadata.app.R
+import com.mywifiadata.app.core.AppsSortOrder
 import com.mywifiadata.app.core.Format
 import com.mywifiadata.app.core.UsagePeriod
 import com.mywifiadata.app.data.model.AppUsage
 import com.mywifiadata.app.data.model.DayUsage
 import com.mywifiadata.app.ui.UiState
+import com.mywifiadata.app.ui.components.AppsFastScroller
+import com.mywifiadata.app.ui.components.AppsSearchControls
 import com.mywifiadata.app.ui.components.AppUsageRow
 import com.mywifiadata.app.ui.components.BarEntry
 import com.mywifiadata.app.ui.components.DailyBarChart
@@ -73,7 +82,7 @@ import com.mywifiadata.app.ui.theme.LocalUploadColor
 /**
  * شاشة السجلّ: مخطط استهلاك الأيام وتفاصيل اليوم المحدد.
  */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun HistoryScreen(
     state: UiState,
@@ -81,102 +90,151 @@ fun HistoryScreen(
     onSelectDay: (Int?) -> Unit,
     onOpenUsageAccess: () -> Unit,
     onAppClick: (AppUsage) -> Unit,
+    onSearchActiveChange: (Boolean) -> Unit,
+    onSearchQueryChange: (String) -> Unit,
+    onReverseSortOrder: () -> Unit,
     onChartTypeChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(16.dp),
+    listState: LazyListState = rememberLazyListState(),
+    searchListState: LazyListState = rememberLazyListState(),
+    isActive: Boolean = true,
 ) {
     val daily = state.daily
-    val selectedIndex = state.selectedDayIndex
-    val selectedDay = selectedIndex?.let { daily.getOrNull(it) }
+    val selectedDay = state.selectedDayIndex?.let { daily.getOrNull(it) }
+    val searching = state.historySearchActive && selectedDay != null && state.hasUsageAccess
+    val apps = state.visibleHistoryApps
+    BackHandler(enabled = isActive && searching) { onSearchActiveChange(false) }
 
-    LazyColumn(
-        modifier = modifier.fillMaxWidth(),
-        contentPadding = contentPadding,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        item {
-            PeriodSelector(
-                period = state.historyPeriod,
-                onPeriodChange = onPeriodChange,
-            )
-        }
-
-        if (!state.hasUsageAccess) {
-            item {
-                PermissionCard(
-                    icon = Icons.Rounded.Info,
-                    title = stringResource(R.string.permission_needed_title),
-                    message = stringResource(R.string.permission_needed_body),
-                    grantLabel = stringResource(R.string.action_open_usage_access),
-                    settingsLabel = stringResource(R.string.settings_usage_access),
-                    onGrant = onOpenUsageAccess,
-                    onOpenSettings = onOpenUsageAccess,
-                )
-            }
-        } else {
-            item {
-                ChartCard(
-                    state = state,
-                    onSelectDay = onSelectDay,
-                    onChartTypeChange = onChartTypeChange,
-                )
-            }
-
-            // بطاقة اليوم المحدد تظهر فورًا فوق سجل الاستهلاك.
-            if (selectedDay != null) {
-                item {
-                    SelectedDayCard(
-                        day = selectedDay,
-                        onClose = { onSelectDay(null) },
-                    )
+    Box(modifier = modifier.fillMaxWidth().imePadding()) {
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth(),
+            // Match the Apps tab: typing cannot move the normal history viewport. Closing
+            // search restores the selected column, summary and pre-search scroll position.
+            state = if (searching) searchListState else listState,
+            contentPadding = contentPadding,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            if (!searching) {
+                item(key = "history_period") {
+                    PeriodSelector(period = state.historyPeriod, onPeriodChange = onPeriodChange)
                 }
             }
 
-            if (daily.isNotEmpty()) {
-                item { HistorySummaryCard(daily = daily, monthPeak = state.monthPeak) }
+            if (!state.hasUsageAccess) {
+                item(key = "history_permission") {
+                    PermissionCard(
+                        icon = Icons.Rounded.Info,
+                        title = stringResource(R.string.permission_needed_title),
+                        message = stringResource(R.string.permission_needed_body),
+                        grantLabel = stringResource(R.string.action_open_usage_access),
+                        settingsLabel = stringResource(R.string.settings_usage_access),
+                        onGrant = onOpenUsageAccess,
+                        onOpenSettings = onOpenUsageAccess,
+                    )
+                }
             } else {
-                item {
-                    ExpressiveCard {
-                        EmptyState(
-                            icon = Icons.Rounded.ShowChart,
-                            title = stringResource(R.string.history_empty_title),
-                            message = stringResource(R.string.history_empty_body),
+                if (!searching) {
+                    item(key = "history_chart") {
+                        ChartCard(state = state, onSelectDay = onSelectDay, onChartTypeChange = onChartTypeChange)
+                    }
+
+                    if (selectedDay != null) {
+                        item(key = "history_selected_day") {
+                            SelectedDayCard(day = selectedDay, onClose = { onSelectDay(null) })
+                        }
+                    }
+
+                    item(key = "history_summary") {
+                        if (daily.isNotEmpty()) {
+                            HistorySummaryCard(daily = daily, monthPeak = state.monthPeak)
+                        } else {
+                            ExpressiveCard {
+                                EmptyState(
+                                    icon = Icons.Rounded.ShowChart,
+                                    title = stringResource(R.string.history_empty_title),
+                                    message = stringResource(R.string.history_empty_body),
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (selectedDay != null) {
+                    item(key = "history_apps_title") {
+                        SectionHeader(
+                            title = stringResource(
+                                when {
+                                    searching -> R.string.history_day_apps
+                                    state.historyAppsSortOrder == AppsSortOrder.LOWEST_USAGE -> R.string.history_least_apps
+                                    else -> R.string.history_top_apps
+                                },
+                            ),
+                            supportingText = Format.fullDate(selectedDay.startMillis),
                         )
+                    }
+                    stickyHeader(key = "history_apps_search") {
+                        AppsSearchControls(
+                            isActive = isActive,
+                            expanded = searching,
+                            query = state.historySearchQuery,
+                            sortOrder = state.historyAppsSortOrder,
+                            onExpandedChange = { active ->
+                                if (active) searchListState.requestScrollToItem(0)
+                                onSearchActiveChange(active)
+                            },
+                            onQueryChange = { query ->
+                                searchListState.requestScrollToItem(0)
+                                onSearchQueryChange(query)
+                            },
+                            onReverseSortOrder = {
+                                if (searching) searchListState.requestScrollToItem(0)
+                                onReverseSortOrder()
+                            },
+                        )
+                    }
+
+                    when {
+                        state.isSelectedDayAppsLoading -> item(key = "history_apps_loading") {
+                            Box(Modifier.fillMaxWidth().padding(vertical = 32.dp), contentAlignment = Alignment.Center) {
+                                LoadingIndicator(modifier = Modifier.size(48.dp))
+                            }
+                        }
+                        apps.isEmpty() -> item(key = "history_apps_empty") {
+                            EmptyState(
+                                icon = Icons.Rounded.Info,
+                                title = stringResource(
+                                    if (searching && state.historySearchQuery.isNotBlank()) R.string.apps_search_empty_title
+                                    else R.string.apps_empty_title,
+                                ),
+                                message = stringResource(
+                                    if (searching && state.historySearchQuery.isNotBlank()) R.string.history_apps_search_empty
+                                    else R.string.history_apps_empty,
+                                ),
+                            )
+                        }
+                        else -> itemsIndexed(items = apps, key = { _, app -> app.uid }) { index, app ->
+                            val dayTotal = selectedDay.totals.totalBytes.coerceAtLeast(1L)
+                            AppUsageRow(
+                                app = app,
+                                share = app.totals.totalBytes.toFloat() / dayTotal.toFloat(),
+                                rank = index + 1,
+                                onClick = { onAppClick(app) },
+                            )
+                        }
                     }
                 }
             }
-
-            if (selectedDay != null) {
-
-                item {
-                    SectionHeader(
-                        title = stringResource(R.string.history_top_apps),
-                        supportingText = Format.fullDate(selectedDay.startMillis),
-                    )
-                }
-
-                if (state.selectedDayApps.isEmpty()) {
-                    item {
-                        EmptyState(
-                            icon = Icons.Rounded.Info,
-                            title = stringResource(R.string.apps_empty_title),
-                            message = stringResource(R.string.apps_no_permission),
-                        )
-                    }
-                } else {
-                    itemsIndexed(
-                        items = state.selectedDayApps.take(10),
-                        key = { _, app -> app.uid },
-                    ) { index, app ->
-                        val dayTotal = selectedDay.totals.totalBytes.coerceAtLeast(1L)
-                        AppUsageRow(
-                            app = app,
-                            share = app.totals.totalBytes.toFloat() / dayTotal.toFloat(),
-                            rank = index + 1,
-                            onClick = { onAppClick(app) },
-                        )
-                    }
-                }
+        }
+        if (state.hasUsageAccess && selectedDay != null && !searching &&
+            !state.isSelectedDayAppsLoading && apps.isNotEmpty()) {
+            // Reuse the same edge gesture, but keep its state and targets local to this day.
+            // Use the rendered row count (normally top ten), not all selectedDayApps.
+            key(
+                selectedDay.startMillis, selectedDay.endMillis, state.historyPeriod,
+                state.historyAppsSortOrder, apps.map { it.uid },
+            ) {
+                AppsFastScroller(listState, apps.size, headerKey = "history_apps_search")
             }
         }
     }

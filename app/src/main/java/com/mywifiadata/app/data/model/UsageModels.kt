@@ -74,6 +74,20 @@ data class AppUsage(
     val label: String,
     val isSystem: Boolean,
     val totals: TrafficTotals,
+    val isInstalled: Boolean = true,
+    /** Private, device-local PNG; may be absent if Android did not expose an icon. */
+    val cachedIconPath: String? = null,
+    val iconVersion: Long = 0L,
+    /** True only for observed usage restored from the local archive after uninstall. */
+    val isArchivedUsage: Boolean = false,
+    val usageRecordedAt: Long = 0L,
+)
+
+/** A locally remembered selection from the app search UI. */
+data class AppSearchSelection(
+    val appKey: String,
+    val selectionCount: Long,
+    val lastSelectedMillis: Long,
 )
 
 /** استهلاك يوم كامل. */
@@ -161,6 +175,7 @@ data class AppSettings(
     val historyLineChartEnabled: Boolean = false,
     /** نمط مخططات التطبيقات محفوظ ليستمر بعد إعادة تشغيل التطبيق. */
     val appsLineChartEnabled: Boolean = false,
+    val appSearchHistory: List<AppSearchSelection> = emptyList(),
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val sessionStartMillis: Long = System.currentTimeMillis(),
     val sessionBaseline: TrafficTotals = TrafficTotals.Empty,
