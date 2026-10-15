@@ -49,4 +49,42 @@ class NavigationPageMotionTest {
             assertEquals(-navigationPageEntrySide(from, to, false), navigationPageEntrySide(from, to, true))
         }
     }
+
+    @Test fun `a tap changes pages instantly whether idle or interrupting a slide`() {
+        for (from in 0..3) for (to in 0..3) if (from != to) {
+            for (running in listOf(false, true)) {
+                assertEquals(NavigationPageChange.SNAP, navigationPageChange(from, to, false, running))
+            }
+        }
+    }
+
+    @Test fun `continuous drag and short swipe selections keep their slide motion`() {
+        for (from in 0..3) for (to in 0..3) if (from != to) {
+            for (running in listOf(false, true)) {
+                assertEquals(NavigationPageChange.SLIDE, navigationPageChange(from, to, true, running))
+            }
+        }
+    }
+
+    @Test fun `an ordinary tap on the already settled page is a no-op`() {
+        for (index in 0..3) {
+            assertEquals(NavigationPageChange.NONE, navigationPageChange(index, index, false, false))
+        }
+    }
+
+    @Test fun `tapping the selected destination of an unfinished slide settles it immediately`() {
+        assertEquals(NavigationPageChange.SNAP, navigationPageChange(1, 1, false, true))
+    }
+
+    @Test fun `remaining in the same drag slot does not interrupt its running slide`() {
+        assertEquals(NavigationPageChange.NONE, navigationPageChange(1, 1, true, true))
+    }
+
+    @Test fun `tap and drag motion choices do not leak into the next interaction`() {
+        assertEquals(NavigationPageChange.SLIDE, navigationPageChange(0, 1, true, false))
+        assertEquals(NavigationPageChange.SNAP, navigationPageChange(1, 3, false, true))
+        assertEquals(NavigationPageChange.SLIDE, navigationPageChange(3, 2, true, false))
+        assertEquals(NavigationPageChange.SNAP, navigationPageChange(2, 2, false, true))
+        assertEquals(NavigationPageChange.NONE, navigationPageChange(2, 2, false, false))
+    }
 }

@@ -63,6 +63,7 @@ internal data class DragNavigationItem(val label: String, val icon: ImageVector)
 /**
  * Material's original items retain their click, ripple, keyboard and accessibility semantics.
  * A parent horizontal gesture takes over only after touch slop, cancelling the child's click.
+ * Gesture selections have a separate callback so only drags request a sliding page transition.
  * The one shared capsule lives above the system inset and behind all icons, never in a page.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -71,6 +72,7 @@ internal fun DragNavigationBar(
     items: List<DragNavigationItem>,
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
+    onDragSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (items.isEmpty()) return
@@ -78,6 +80,7 @@ internal fun DragNavigationBar(
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
     val currentOnSelect by rememberUpdatedState(onSelect)
+    val currentOnDragSelect by rememberUpdatedState(onDragSelect)
     val currentSelection by rememberUpdatedState(selectedIndex)
     var barSize by remember { mutableStateOf(IntSize.Zero) }
     var barCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
@@ -192,7 +195,7 @@ internal fun DragNavigationBar(
                                         if (index != startIndex) crossedTab = true
                                         if (index != lastSelected) {
                                             lastSelected = index
-                                            currentOnSelect(index)
+                                            currentOnDragSelect(index)
                                         }
                                     }
 
@@ -222,7 +225,7 @@ internal fun DragNavigationBar(
                                             crossedTab = crossedTab,
                                             completed = completed && up?.id == down.id && currentEvent.changes.size == 1,
                                         )
-                                        if (next != null) currentOnSelect(next)
+                                        if (next != null) currentOnDragSelect(next)
                                         // Release animates the same shared capsule toward the new icon.
                                         // A long scrub or a cancelled drag never receives an extra step.
                                         fingerX = null

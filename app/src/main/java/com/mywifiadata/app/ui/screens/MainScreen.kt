@@ -19,6 +19,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
@@ -90,6 +91,8 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mywifiadata.app.R
+import com.mywifiadata.app.core.NavigationPageChange
+import com.mywifiadata.app.core.navigationPageChange
 import com.mywifiadata.app.core.navigationPageEntrySide
 import com.mywifiadata.app.core.AppLanguage
 import com.mywifiadata.app.core.SystemActions
@@ -369,20 +372,34 @@ fun MainScreen(
 
     val tabs = AppTab.entries
     val currentTab = tabs[selectedTabIndex.coerceIn(0, tabs.lastIndex)]
-    val pageTransition = updateTransition(currentTab, label = "Navigation pages")
+    var pageTransitionState by remember { mutableStateOf(MutableTransitionState(currentTab)) }
+    val pageTransition = updateTransition(pageTransitionState, label = "Navigation pages")
     val isPageChanging = pageTransition.currentState != pageTransition.targetState
 
-    fun selectTab(index: Int) {
+    fun selectTab(index: Int, fromDrag: Boolean = false) {
         val next = index.coerceIn(0, tabs.lastIndex)
-        if (next == selectedTabIndex) return
-        if (isDashboardEditing && next != AppTab.DASHBOARD.ordinal) cancelDashboardEditing()
-        // Outgoing pages remain composed briefly; release their editor before the new page
-        // requests focus. The bottom navigation itself stays mounted throughout the slide.
-        focusManager.clearFocus()
-        keyboard?.hide()
-        // Use the last requested tab, not the last settled animation state: a quick
-        // reversal halfway through a slide must reverse direction immediately.
-        pageEntrySide = navigationPageEntrySide(selectedTabIndex, next, isRtl)
+        val change = navigationPageChange(selectedTabIndex, next, fromDrag, !pageTransitionState.isIdle)
+        if (change == NavigationPageChange.NONE) return
+        if (next != selectedTabIndex) {
+            if (isDashboardEditing && next != AppTab.DASHBOARD.ordinal) cancelDashboardEditing()
+            // Release the outgoing editor before the destination requests focus.
+            focusManager.clearFocus()
+            keyboard?.hide()
+        }
+        when (change) {
+            NavigationPageChange.SLIDE -> {
+                // A quick reversal uses the last requested tab, not the last settled page.
+                pageEntrySide = navigationPageEntrySide(selectedTabIndex, next, isRtl)
+                pageTransitionState.targetState = tabs[next]
+            }
+            NavigationPageChange.SNAP -> {
+                pageEntrySide = 0
+                // Start already settled: no enter/exit movement, even when a tap interrupts
+                // a running drag slide or taps its already-selected destination.
+                pageTransitionState = MutableTransitionState(tabs[next])
+            }
+            NavigationPageChange.NONE -> Unit
+        }
         selectedTabIndex = next
     }
 
@@ -485,7 +502,8 @@ fun MainScreen(
             DragNavigationBar(
                 items = tabs.map { DragNavigationItem(stringResource(it.labelRes), it.icon) },
                 selectedIndex = selectedTabIndex,
-                onSelect = ::selectTab,
+                onSelect = { selectTab(it) },
+                onDragSelect = { selectTab(it, fromDrag = true) },
             )
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
