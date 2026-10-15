@@ -157,6 +157,9 @@ private fun HistoryPreview() {
     PreviewFrame {
         HistoryScreen(
             state = sampleState(),
+            onSearchActiveChange = {},
+            onSearchQueryChange = {},
+            onReverseSortOrder = {},
             onPeriodChange = {},
             onSelectDay = {},
             onChartTypeChange = {},
