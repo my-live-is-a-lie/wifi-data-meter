@@ -18,6 +18,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -558,7 +559,10 @@ fun MainScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(innerPadding),
+                    .padding(innerPadding)
+                    // Mark Scaffold's bottom bar/navigation padding as consumed so the
+                    // apps list's imePadding only reserves the remaining keyboard inset.
+                    .consumeWindowInsets(innerPadding),
             ) {
                 screenContent()
             }
@@ -568,7 +572,10 @@ fun MainScreen(
                 onRefresh = { viewModel.refreshNow() },
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(innerPadding),
+                    .padding(innerPadding)
+                    // Mark Scaffold's bottom bar/navigation padding as consumed so the
+                    // apps list's imePadding only reserves the remaining keyboard inset.
+                    .consumeWindowInsets(innerPadding),
             ) {
                 screenContent()
             }
