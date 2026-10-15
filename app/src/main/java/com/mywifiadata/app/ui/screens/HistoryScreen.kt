@@ -98,12 +98,13 @@ fun HistoryScreen(
     contentPadding: PaddingValues = PaddingValues(16.dp),
     listState: LazyListState = rememberLazyListState(),
     searchListState: LazyListState = rememberLazyListState(),
+    isActive: Boolean = true,
 ) {
     val daily = state.daily
     val selectedDay = state.selectedDayIndex?.let { daily.getOrNull(it) }
     val searching = state.historySearchActive && selectedDay != null && state.hasUsageAccess
     val apps = state.visibleHistoryApps
-    BackHandler(enabled = searching) { onSearchActiveChange(false) }
+    BackHandler(enabled = isActive && searching) { onSearchActiveChange(false) }
 
     Box(modifier = modifier.fillMaxWidth().imePadding()) {
         LazyColumn(
@@ -174,6 +175,7 @@ fun HistoryScreen(
                     }
                     stickyHeader(key = "history_apps_search") {
                         AppsSearchControls(
+                            isActive = isActive,
                             expanded = searching,
                             query = state.historySearchQuery,
                             sortOrder = state.historyAppsSortOrder,

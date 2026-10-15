@@ -65,6 +65,7 @@ fun AppsSearchControls(
     onExpandedChange: (Boolean) -> Unit,
     onQueryChange: (String) -> Unit,
     onReverseSortOrder: () -> Unit,
+    isActive: Boolean = true,
 ) {
     val keyboard = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
@@ -90,7 +91,10 @@ fun AppsSearchControls(
         else R.string.apps_sort_lowest_usage,
     )
 
-    LaunchedEffect(expanded) {
+    LaunchedEffect(expanded, isActive) {
+        // Animated navigation keeps outgoing content alive; it must not steal focus or
+        // hide the destination's keyboard when its search state changes during the exit.
+        if (!isActive) return@LaunchedEffect
         if (expanded) {
             focusRequester.requestFocus()
             keyboard?.show()
