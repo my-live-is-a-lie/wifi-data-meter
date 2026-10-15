@@ -156,7 +156,6 @@
     <string name="apps_search_open">البحث في التطبيقات</string>
     <string name="apps_search_close">إغلاق البحث</string>
     <string name="apps_search_clear">مسح نص البحث</string>
-    <string name="apps_search_ranking_hint">الأكثر اختيارًا من البحث أولًا، ثم الأحدث اختيارًا</string>
     <string name="apps_search_empty_title">لا توجد تطبيقات مطابقة</string>
     <string name="apps_search_empty_body">جرّب اسمًا آخر أو امسح البحث. تُعرض تطبيقات الفترة والفلاتر الحالية فقط.</string>
     <string name="app_detail_hint">اضغط على أي تطبيق لعرض استهلاكه في اليوم والأسبوع والشهر.</string>

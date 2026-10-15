@@ -129,7 +129,23 @@ class AppsUiStateTest {
             )),
         )
         assertEquals(listOf(1, 3, 10, 9, 8), searching.visibleApps.map { it.uid })
+        assertEquals(listOf(1, 3, 10, 9, 8), searching.copy(appsSearchQuery = "App").visibleApps.map { it.uid })
         assertEquals(listOf(10, 9, 8, 7, 6), searching.copy(appsSearchActive = false).visibleApps.map { it.uid })
+    }
+
+    @Test
+    fun `blank search promotes history without hiding remaining apps and clearing restores suggestions`() {
+        val apps = (1..10).map { AppUsage(it, "app.$it", "App $it", false, TrafficTotals(it.toLong(), 0)) }
+        val state = UiState(apps = apps, periodApps = apps, appsSearchActive = true)
+        assertEquals((10 downTo 1).toList(), state.visibleApps.map { it.uid })
+        val withHistory = state.copy(settings = state.settings.copy(
+            appSearchHistory = listOf(AppSearchSelection("app.1", 1, 100)),
+        ))
+        assertEquals(listOf(1) + (10 downTo 2).toList(), withHistory.visibleApps.map { it.uid })
+        assertEquals(listOf(2), withHistory.copy(appsSearchQuery = "App 2").visibleApps.map { it.uid })
+        assertEquals(listOf(1) + (10 downTo 2).toList(), withHistory.copy(appsSearchQuery = "").visibleApps.map { it.uid })
+        assertEquals(10, withHistory.copy(appsSearchActive = false).visibleApps.size)
+        assertEquals(state.visiblePeriodApps, withHistory.visiblePeriodApps)
     }
 
 }

@@ -103,10 +103,12 @@ fun MainScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val dashboardListState = rememberLazyListState()
     val appsListState = rememberLazyListState()
+    val appsSearchListState = rememberLazyListState()
 
     var selectedTabIndex by rememberSaveable { mutableIntStateOf(0) }
     var languageMenuExpanded by rememberSaveable { mutableStateOf(false) }
     var appsFiltersExpanded by rememberSaveable { mutableStateOf(false) }
+    var appsFiltersBeforeSearch by rememberSaveable { mutableStateOf(false) }
     var isDashboardEditing by remember { mutableStateOf(false) }
     var dashboardLayoutDraft by remember { mutableStateOf(state.settings.dashboardLayout.normalized()) }
 
@@ -514,11 +516,17 @@ fun MainScreen(
                                 onOpenUsageAccess = { SystemActions.openUsageAccessSettings(context) },
                                 onAppClick = viewModel::openAppsListDetail,
                                 onSearchActiveChange = { active ->
-                                    if (active) appsFiltersExpanded = false
+                                    if (active && !state.appsSearchActive) {
+                                        appsFiltersBeforeSearch = appsFiltersExpanded
+                                        appsFiltersExpanded = false
+                                    } else if (!active && state.appsSearchActive) {
+                                        appsFiltersExpanded = appsFiltersBeforeSearch
+                                    }
                                     viewModel.setAppsSearchActive(active)
                                 },
                                 onSearchQueryChange = viewModel::setAppsSearchQuery,
                                 listState = appsListState,
+                                searchListState = appsSearchListState,
                                 onReverseSortOrder = viewModel::reverseAppsSortOrder,
                             )
                         }

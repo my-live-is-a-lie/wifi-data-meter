@@ -145,7 +145,6 @@
     <string name="apps_search_open">Search apps</string>
     <string name="apps_search_close">Close search</string>
     <string name="apps_search_clear">Clear search text</string>
-    <string name="apps_search_ranking_hint">Most selected in search first, then most recently selected</string>
     <string name="apps_search_empty_title">No matching apps</string>
     <string name="apps_search_empty_body">Try another name or clear the search. Only apps within the current period and filters are shown.</string>
     <string name="app_detail_hint">Tap any app to see its usage for today, the week and the month.</string>

@@ -27,7 +27,7 @@ class AppSearchHistoryTest {
             AppSearchSelection("app.2", 1, 300),
             AppSearchSelection("app.3", 1, 200),
         )
-        assertEquals(listOf(1, 2, 3, 5, 4), AppSearchHistory.search(apps, "", history).map { it.uid })
+        assertEquals(listOf(1, 2, 3, 5, 4), AppSearchHistory.search(apps, "App", history).map { it.uid })
     }
 
     @Test
@@ -43,6 +43,7 @@ class AppSearchHistoryTest {
     fun `history never introduces apps outside the supplied period and filters`() {
         val history = listOf(AppSearchSelection("app.99", 100, 900))
         assertEquals(listOf(1), AppSearchHistory.search(listOf(app(1)), "", history).map { it.uid })
+        assertEquals(listOf(1), AppSearchHistory.search(listOf(app(1)), "App", history).map { it.uid })
     }
 
     @Test
@@ -70,4 +71,26 @@ class AppSearchHistoryTest {
         assertEquals("app.11", history.last().appKey)
         assertEquals(history, AppSearchHistory.decode(AppSearchHistory.encode(history)))
     }
+    @Test
+    fun `empty and whitespace queries show prior selections followed by remaining apps`() {
+        val apps = (5 downTo 1).map { app(it) }
+        val history = listOf(
+            AppSearchSelection("app.1", 3, 100),
+            AppSearchSelection("app.2", 1, 300),
+            AppSearchSelection("app.3", 1, 200),
+        )
+        for (query in listOf("", "   ")) {
+            val result = AppSearchHistory.search(apps, query, history)
+            assertEquals(listOf(1, 2, 3, 5, 4), result.map { it.uid })
+            assertEquals(apps.size, result.map { it.uid }.distinct().size)
+        }
+    }
+
+    @Test
+    fun `empty history preserves all apps in their input order`() {
+        val apps = listOf(app(1), app(2))
+        assertEquals(apps, AppSearchHistory.search(apps, "", emptyList()))
+        assertEquals(listOf(1, 2), AppSearchHistory.search(apps, "App", emptyList()).map { it.uid })
+    }
+
 }
