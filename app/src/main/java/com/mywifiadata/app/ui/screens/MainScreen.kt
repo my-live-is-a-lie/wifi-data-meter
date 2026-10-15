@@ -107,6 +107,8 @@ fun MainScreen(
     val dashboardListState = rememberLazyListState()
     val appsListState = rememberLazyListState()
     val appsSearchListState = rememberLazyListState()
+    val historyListState = rememberLazyListState()
+    val historySearchListState = rememberLazyListState()
 
     var selectedTabIndex by rememberSaveable { mutableIntStateOf(0) }
     var languageMenuExpanded by rememberSaveable { mutableStateOf(false) }
@@ -538,6 +540,11 @@ fun MainScreen(
 
                 AppTab.HISTORY -> HistoryScreen(
                     state = state,
+                    listState = historyListState,
+                    searchListState = historySearchListState,
+                    onSearchActiveChange = viewModel::setHistorySearchActive,
+                    onSearchQueryChange = viewModel::setHistorySearchQuery,
+                    onReverseSortOrder = viewModel::reverseHistoryAppsSortOrder,
                     onPeriodChange = { viewModel.setHistoryPeriod(it) },
                     onSelectDay = { viewModel.selectDay(it) },
                     onChartTypeChange = { viewModel.setHistoryLineChartEnabled(it) },
@@ -567,7 +574,10 @@ fun MainScreen(
         }
 
         val isAppsSearchVisible = currentTab == AppTab.APPS && state.appsSearchActive && state.appDetail == null
-        val pullRefreshEnabled = !isAppsSearchVisible && !(isDashboardEditing && currentTab == AppTab.DASHBOARD)
+        val isHistorySearchVisible = currentTab == AppTab.HISTORY && state.historySearchActive && state.hasUsageAccess &&
+            state.selectedDayIndex?.let { state.daily.getOrNull(it) } != null && state.appDetail == null
+        val pullRefreshEnabled = !isAppsSearchVisible && !isHistorySearchVisible &&
+            !(isDashboardEditing && currentTab == AppTab.DASHBOARD)
         // Discard any partially pulled distance on entering/leaving search. Key only this
         // state, not the content: the editor, its animation and scroll states must survive.
         val pullRefreshState = key(pullRefreshEnabled) { rememberPullToRefreshState() }

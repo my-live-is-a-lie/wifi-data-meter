@@ -301,4 +301,8 @@
     <string name="unit_gb">GB</string>
     <string name="unit_mbps">Mbps</string>
     <string name="unit_dbm">dBm</string>
+    <string name="history_day_apps">Selected day’s apps</string>
+    <string name="history_least_apps">Lowest-usage apps</string>
+    <string name="history_apps_search_empty">No matching app for the selected day. Try another name or clear the search.</string>
+    <string name="history_apps_empty">No app usage data for the selected day.</string>
 </resources>
