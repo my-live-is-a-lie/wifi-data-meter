@@ -48,8 +48,6 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.pullToRefresh
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.ShortNavigationBar
-import androidx.compose.material3.ShortNavigationBarItem
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
@@ -79,6 +77,8 @@ import com.mywifiadata.app.core.AppLanguage
 import com.mywifiadata.app.core.SystemActions
 import com.mywifiadata.app.data.model.DashboardLayout
 import com.mywifiadata.app.monitor.MonitoringTileService
+import com.mywifiadata.app.ui.components.DragNavigationBar
+import com.mywifiadata.app.ui.components.DragNavigationItem
 import com.mywifiadata.app.ui.components.AppsUsageFilterBar
 import com.mywifiadata.app.ui.AppViewModel
 import com.mywifiadata.app.ui.theme.AppButtonShape
@@ -443,27 +443,16 @@ fun MainScreen(
             }
         },
         bottomBar = {
-            ShortNavigationBar {
-                tabs.forEachIndexed { index, tab ->
-                    ShortNavigationBarItem(
-                        selected = index == selectedTabIndex,
-                        onClick = {
-                            if (isDashboardEditing && index != AppTab.DASHBOARD.ordinal) {
-                                cancelDashboardEditing()
-                            }
-                            selectedTabIndex = index
-                        },
-                        icon = {
-                            Icon(
-                                imageVector = tab.icon,
-                                contentDescription = null,
-                                modifier = Modifier.size(24.dp),
-                            )
-                        },
-                        label = { Text(text = stringResource(tab.labelRes)) },
-                    )
-                }
-            }
+            DragNavigationBar(
+                items = tabs.map { DragNavigationItem(stringResource(it.labelRes), it.icon) },
+                selectedIndex = selectedTabIndex,
+                onSelect = { index ->
+                    if (isDashboardEditing && index != AppTab.DASHBOARD.ordinal) {
+                        cancelDashboardEditing()
+                    }
+                    selectedTabIndex = index
+                },
+            )
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
     ) { innerPadding ->

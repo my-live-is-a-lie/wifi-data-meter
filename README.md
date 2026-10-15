@@ -273,3 +273,13 @@ Local validation: actual production storage/archive/filter sources and six JUnit
 - البحث له موضع تمرير مستقل، مع إخفاء المخطط والملخص مؤقتًا والتركيز على قائمة اليوم. إغلاقه يعيد موضع السجل السابق. زر الرجوع يغلق البحث، وزر الإغلاق داخل الحقل يمسح النص أولًا ثم يغلق البحث إذا كان فارغًا. السحب للتحديث معطل أثناء البحث.
 
 Validation: `HistoryAppsTest` adds eight JVM tests for top/bottom ten, searching beyond the first ten, blank queries, Arabic diacritics, package names, ordering, removed apps and empty results. All 63 tests in the local seven-class JVM suite passed. Device checks: select a chart column, search for a low-usage app, reverse order while typing, clear/close/back, reopen details, change day/period, and verify the date, scroll restoration, keyboard clearance and absence of the refresh indicator.
+
+### السحب للتنقل بين الصفحات
+- شريط التنقل السفلي يدعم النقر المعتاد والسحب الأفقي المستمر عبر الأيقونات أو تسمياتها. بعد تجاوز عتبة السحب، يتبدل التبويب عند دخول الإصبع منطقته دون الحاجة لرفعه، مع عكس ترتيب المناطق تلقائيًا في العربية.
+- التظليل كبسولة مشتركة تتحرك خلف الأيقونات وتتبع موضع الإصبع، مع امتداد محدود (حتى 18dp) في الجانب المعاكس للحركة. يعود الامتداد تدريجيًا للصفر بمجرد توقف الحركة حتى إذا بقي الإصبع على الشاشة، ثم تستقر الكبسولة على أيقونة التبويب المحدد عند الإفلات أو إلغاء السحب.
+- تبقى ألوان وأيقونات وتسميات وأهداف لمس Material وإتاحة TalkBack والنقر بلوحة المفاتيح كما هي. منطقة إيماءات النظام أسفل الشريط مستثناة. الخروج عموديًا من الشريط يوقف تغيير الصفحات حتى العودة إليه، والنقر العادي لا يتحول إلى سحب بسبب اهتزاز بسيط للإصبع.
+- حالة الإيماءة لا تعتمد على الصفحة المحددة، ولذلك لا تنقطع عند أول تبديل. تغيير اتجاه الواجهة أو حجم الشريط يلغي السحب بأمان ويعيد وضع التظليل.
+
+Validation: `NavigationDragTest` has 16 JVM checks for continuous RTL/LTR sweeps, boundary crossing, edge clamping, resizing, direction reversals and bounded one-sided indicator geometry. These passed locally with Kotlin 2.4.10 / Java 25 and JUnit 4.12. The Compose integration and animation still require an Android build/device check; pure geometry tests do not validate gestures or rendered frames.
+
+Manual checks: in Arabic, drag from Home through Apps, History and Settings without lifting; reverse in the same gesture; pause with the finger down and check the tail retracts; release between icons and check settling; start dragging on a label; leave vertically and return; test ordinary taps, TalkBack, RTL/LTR, large fonts, rotation, gesture/three-button system navigation, and leaving dashboard edit mode. Check that the final page is not changed by an extra click on release.
