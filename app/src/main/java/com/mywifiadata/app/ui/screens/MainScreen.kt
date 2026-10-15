@@ -494,9 +494,11 @@ fun MainScreen(
                                     network = state.appsNetwork,
                                     scope = state.appsScope,
                                     countLimit = state.appsCountLimit,
+                                    sortOrder = state.appsSortOrder,
                                     onNetworkChange = viewModel::setAppsNetwork,
                                     onScopeChange = viewModel::setAppsScope,
                                     onCountLimitChange = viewModel::setAppsCountLimit,
+                                    onSortOrderChange = viewModel::setAppsSortOrder,
                                 )
                             }
                             AppsScreen(
@@ -509,6 +511,7 @@ fun MainScreen(
                                 onChartTypeChange = { viewModel.setAppsLineChartEnabled(it) },
                                 onOpenUsageAccess = { SystemActions.openUsageAccessSettings(context) },
                                 onAppClick = { viewModel.openAppDetail(it, state.appsNetwork) },
+                                onReverseSortOrder = viewModel::reverseAppsSortOrder,
                             )
                         }
                     }

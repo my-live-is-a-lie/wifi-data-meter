@@ -25,10 +25,12 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.DateRange
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
@@ -43,10 +45,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mywifiadata.app.R
+import com.mywifiadata.app.core.AppsSortOrder
 import com.mywifiadata.app.core.AppsUsageScope
 import com.mywifiadata.app.core.UsageNetwork
 import com.mywifiadata.app.core.Format
@@ -81,6 +86,7 @@ fun AppsScreen(
     onAppsSliceChange: (TimeRange) -> Unit,
     onOpenUsageAccess: () -> Unit,
     onAppClick: (AppUsage) -> Unit,
+    onReverseSortOrder: () -> Unit,
     onChartTypeChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(16.dp),
@@ -239,12 +245,33 @@ fun AppsScreen(
                 }
 
                 item {
-                    Text(
-                        text = stringResource(R.string.app_detail_hint),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 4.dp),
+                    val sortDescription = stringResource(
+                        if (state.appsSortOrder == AppsSortOrder.HIGHEST_USAGE)
+                            R.string.apps_sort_highest_usage else R.string.apps_sort_lowest_usage,
                     )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.app_detail_hint),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f),
+                        )
+                        // Trailing edge is the far left in the Arabic (RTL) layout.
+                        IconButton(
+                            onClick = onReverseSortOrder,
+                            modifier = Modifier.semantics { stateDescription = sortDescription },
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.SwapVert,
+                                contentDescription = stringResource(R.string.apps_reverse_sort),
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    }
                 }
                 itemsIndexed(
                     items = apps,
@@ -446,7 +473,7 @@ private fun SummaryCard(state: UiState) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Spacer(modifier = Modifier.width(2.dp))
                     Text(
-                        text = "${stringResource(R.string.apps_screen_title)}: ${topApp.label}",
+                        text = stringResource(R.string.apps_top_consumer, topApp.label),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
                         maxLines = 1,

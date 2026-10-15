@@ -31,6 +31,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.mywifiadata.app.R
+import com.mywifiadata.app.core.AppsSortOrder
 import com.mywifiadata.app.core.AppsUsageScope
 import com.mywifiadata.app.core.UsageNetwork
 import com.mywifiadata.app.core.appsCountOptions
@@ -41,9 +42,11 @@ fun AppsUsageFilterBar(
     network: UsageNetwork,
     scope: AppsUsageScope,
     countLimit: Int?,
+    sortOrder: AppsSortOrder,
     onNetworkChange: (UsageNetwork) -> Unit,
     onScopeChange: (AppsUsageScope) -> Unit,
     onCountLimitChange: (Int?) -> Unit,
+    onSortOrderChange: (AppsSortOrder) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Surface(modifier = modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surfaceContainerLow) {
@@ -69,6 +72,17 @@ fun AppsUsageFilterBar(
                     onSelect = onScopeChange,
                 )
             }
+            FilterMenu(
+                title = stringResource(R.string.apps_sort_filter),
+                selected = sortOrder,
+                options = AppsSortOrder.entries.map {
+                    it to stringResource(
+                        if (it == AppsSortOrder.HIGHEST_USAGE) R.string.apps_sort_highest_usage
+                        else R.string.apps_sort_lowest_usage,
+                    )
+                },
+                onSelect = onSortOrderChange,
+            )
             FilterMenu(
                 title = stringResource(R.string.apps_count_filter),
                 selected = countLimit,

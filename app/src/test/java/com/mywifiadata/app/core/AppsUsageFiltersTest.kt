@@ -88,4 +88,29 @@ class AppsUsageFiltersTest {
             assertEquals(1, filterApps(listOf(app(1, 100)), AppsFilter.ALL, limit).size)
         }
     }
+
+    @Test
+    fun `lowest usage is sorted before applying each count limit`() {
+        val apps = (30 downTo 1).map { app(it, it.toLong()) }
+        appsCountOptions.forEach { limit ->
+            val result = filterApps(apps, AppsFilter.ALL, limit, AppsSortOrder.LOWEST_USAGE)
+            assertEquals((1..(limit ?: 30)).toList(), result.map { it.uid })
+        }
+        assertEquals(30, apps.first().uid)
+    }
+
+    @Test
+    fun `lowest usage respects app type before selecting rows`() {
+        val apps = listOf(app(1, 10, true), app(2, 100), app(3, 30), app(4, 40, true))
+        assertEquals(listOf(3), filterApps(apps, AppsFilter.INSTALLED, 1, AppsSortOrder.LOWEST_USAGE).map { it.uid })
+        assertEquals(listOf(1, 4), filterApps(apps, AppsFilter.SYSTEM, 5, AppsSortOrder.LOWEST_USAGE).map { it.uid })
+    }
+
+    @Test
+    fun `lowest usage handles empty lists and ties`() {
+        assertTrue(filterApps(emptyList(), AppsFilter.ALL, 5, AppsSortOrder.LOWEST_USAGE).isEmpty())
+        val apps = listOf(app(1, 20), app(2, 20), app(3, 10))
+        assertEquals(listOf(3, 1, 2), filterApps(apps, AppsFilter.ALL, 5, AppsSortOrder.LOWEST_USAGE).map { it.uid })
+    }
+
 }

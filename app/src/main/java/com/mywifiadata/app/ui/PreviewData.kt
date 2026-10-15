@@ -144,6 +144,7 @@ private fun AppsPreview() {
             onChartTypeChange = {},
             onOpenUsageAccess = {},
             onAppClick = {},
+            onReverseSortOrder = {},
         )
     }
 }
