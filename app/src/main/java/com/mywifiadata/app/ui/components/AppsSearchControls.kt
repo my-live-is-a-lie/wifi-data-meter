@@ -1,6 +1,5 @@
 package com.mywifiadata.app.ui.components
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.shrinkHorizontally
@@ -70,7 +69,7 @@ fun AppsSearchControls(
                     )
                 }
                 // The trailing edge is beside the buttons: expand rightward in Arabic.
-                AnimatedVisibility(
+                androidx.compose.animation.AnimatedVisibility(
                     visible = expanded,
                     enter = expandHorizontally(expandFrom = Alignment.End),
                     exit = shrinkHorizontally(shrinkTowards = Alignment.End),
