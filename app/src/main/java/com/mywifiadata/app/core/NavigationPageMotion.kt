@@ -5,3 +5,17 @@ internal fun navigationPageEntrySide(fromIndex: Int, toIndex: Int, isRtl: Boolea
     val logicalDirection = toIndex.compareTo(fromIndex)
     return if (isRtl) -logicalDirection else logicalDirection
 }
+
+internal enum class NavigationPageChange { NONE, SNAP, SLIDE }
+
+/** A tap can also finish an interrupted slide to the already-selected destination. */
+internal fun navigationPageChange(
+    fromIndex: Int,
+    toIndex: Int,
+    fromDrag: Boolean,
+    isTransitionRunning: Boolean,
+): NavigationPageChange = when {
+    !fromDrag && (fromIndex != toIndex || isTransitionRunning) -> NavigationPageChange.SNAP
+    fromDrag && fromIndex != toIndex -> NavigationPageChange.SLIDE
+    else -> NavigationPageChange.NONE
+}
