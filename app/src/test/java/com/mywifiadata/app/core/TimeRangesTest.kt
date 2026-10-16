@@ -84,4 +84,21 @@ class TimeRangesTest {
         assertEquals(dayStart(2026, 3, 11), days.last().endMillis)
         days.forEach { assertTrue(it.endMillis > it.startMillis) }
     }
+
+    @Test
+    fun `days of month returns days up to today for current month and full month for past months`() {
+        val now = at(2026, 10, 16, 14)
+        val currentMonthDays = TimeRanges.daysOfMonth(2026, 10, now)
+        assertEquals(16, currentMonthDays.size)
+        assertEquals(dayStart(2026, 10, 1), currentMonthDays.first().startMillis)
+        assertEquals(dayStart(2026, 10, 16), currentMonthDays.last().startMillis)
+
+        val pastMonthDays = TimeRanges.daysOfMonth(2026, 9, now)
+        assertEquals(30, pastMonthDays.size)
+        assertEquals(dayStart(2026, 9, 1), pastMonthDays.first().startMillis)
+        assertEquals(dayStart(2026, 9, 30), pastMonthDays.last().startMillis)
+
+        val futureMonthDays = TimeRanges.daysOfMonth(2026, 11, now)
+        assertTrue(futureMonthDays.isEmpty())
+    }
 }

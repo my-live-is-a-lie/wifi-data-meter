@@ -168,6 +168,13 @@
 
     <!-- السجل -->
     <string name="history_screen_title">سجل الاستهلاك</string>
+    <string name="history_section_network">الشبكة</string>
+    <string name="history_section_plan">الباقة</string>
+    <string name="history_month_filter">الشهر</string>
+    <string name="history_year_filter">السنة</string>
+    <string name="history_show_filters">إظهار فلاتر السجل</string>
+    <string name="history_hide_filters">إخفاء فلاتر السجل</string>
+    <string name="history_reset_date">إعادة الضبط للشهر والسنة الحالية</string>
     <string name="history_empty_title">لا يوجد سجل بعد</string>
     <string name="history_empty_body">سيظهر الرسم البياني بعد تجميع بيانات الأيام السابقة.</string>
     <string name="history_selected_day">تفاصيل اليوم المحدد</string>

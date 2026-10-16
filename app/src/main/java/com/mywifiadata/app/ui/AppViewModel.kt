@@ -7,10 +7,16 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.mywifiadata.app.core.AppsSortOrder
 import com.mywifiadata.app.core.AppsUsageScope
+import com.mywifiadata.app.core.HistorySection
+import com.mywifiadata.app.core.HistoryYearMonth
 import com.mywifiadata.app.core.UsageNetwork
 import com.mywifiadata.app.core.appsCountOptions
 import com.mywifiadata.app.core.appsUsageRange
+import com.mywifiadata.app.core.availableHistoryMonths
+import com.mywifiadata.app.core.availableHistoryYears
 import com.mywifiadata.app.core.filterApps
+import com.mywifiadata.app.core.isCustomHistoryMonth
+import com.mywifiadata.app.core.resolveHistoryMonthForYear
 import com.mywifiadata.app.core.within
 import com.mywifiadata.app.core.AppLanguage
 import com.mywifiadata.app.core.historyApps
@@ -111,6 +117,11 @@ data class UiState(
     val isAppsLoading: Boolean = false,
     val appsPeriod: UsagePeriod = UsagePeriod.MONTH,
     val historyPeriod: UsagePeriod = UsagePeriod.MONTH,
+    val historySection: HistorySection = HistorySection.NETWORK,
+    val historyNetwork: UsageNetwork = UsageNetwork.WIFI,
+    val historyYear: Int = TimeRanges.currentYearMonth(now).year,
+    val historyMonth: Int = TimeRanges.currentYearMonth(now).month,
+    val historyRecordedMonths: List<HistoryYearMonth> = emptyList(),
     val selectedDayIndex: Int? = null,
     val selectedDayApps: List<AppUsage> = emptyList(),
     val isSelectedDayAppsLoading: Boolean = false,
@@ -192,6 +203,18 @@ data class UiState(
         get() = historyApps(selectedDayApps, historySearchActive, historySearchQuery, historyAppsSortOrder)
 
     val historyDays: Int get() = TimeRanges.daysOf(historyPeriod)
+
+    val currentHistoryYearMonth: HistoryYearMonth
+        get() = TimeRanges.currentYearMonth(now)
+
+    val isCustomHistoryDate: Boolean
+        get() = isCustomHistoryMonth(historyYear, historyMonth, currentHistoryYearMonth)
+
+    val availableHistoryYears: List<Int>
+        get() = availableHistoryYears(historyRecordedMonths)
+
+    val availableHistoryMonths: List<Int>
+        get() = availableHistoryMonths(historyRecordedMonths, historyYear)
 }
 
 /**
@@ -232,9 +255,11 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
     private var todayAppsLoadedRangeStartMillis: Long = 0L
     private var todayAppsJob: Job? = null
     private var selectedDayAppsJob: Job? = null
+    private var historyRequestId = 0L
     private var dailyLoadedAt: Long = 0L
-    private var dailyLoadedDays: Int = 0
-    private var monthPeakLoadedAt: Long = 0L
+    private var dailyLoadedNetwork: UsageNetwork? = null
+    private var dailyLoadedYear: Int = 0
+    private var dailyLoadedMonth: Int = 0
 
     init {
         viewModelScope.launch {
@@ -278,6 +303,8 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         val sample = buildSample(now, today)
 
         _uiState.update { state ->
+            val currentYm = TimeRanges.currentYearMonth(now)
+            val keepCustomDate = state.isCustomHistoryDate
             state.copy(
                 now = now,
                 isLoading = false,
@@ -288,6 +315,8 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
                 today = today,
                 cycle = cycle,
                 session = session,
+                historyYear = if (keepCustomDate) state.historyYear else currentYm.year,
+                historyMonth = if (keepCustomDate) state.historyMonth else currentYm.month,
                 samples = if (sample == null) state.samples else (state.samples + sample).takeLast(MAX_SAMPLES),
             )
         }
@@ -299,14 +328,13 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
             quota = settings.quotaBytes,
         )
 
-        val historyDays = TimeRanges.daysOf(_uiState.value.historyPeriod)
-        if (hasAccess && (force || now - dailyLoadedAt > DAILY_TTL_MILLIS || dailyLoadedDays != historyDays)) {
-            val daily = repository.dailyUsage(historyDays)
-            dailyLoadedAt = now
-            dailyLoadedDays = historyDays
-            _uiState.update { it.copy(daily = daily) }
+        val currentState = _uiState.value
+        val sameHistorySelection = dailyLoadedNetwork == currentState.historyNetwork &&
+            dailyLoadedYear == currentState.historyYear &&
+            dailyLoadedMonth == currentState.historyMonth
+        if (hasAccess && (force || now - dailyLoadedAt > DAILY_TTL_MILLIS || !sameHistorySelection)) {
+            loadHistory(now = now)
         }
-        loadMonthPeak(hasAccess, force, now)
 
         if (hasAccess && (force || now - appsLoadedAt > APPS_TTL_MILLIS)) {
             loadApps()
@@ -316,25 +344,49 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
     }
 
     /**
-     * يحمّل آخر 30 يومًا ويستخرج أعلى يوم استهلاكًا لعرضه في بطاقة «سجل
-     * الاستهلاك» كمرجع للمقارنة، حتى لو كانت الفترة المعروضة يومًا واحدًا
-     * (فلا يعود «أعلى يوم» مساويًا لاستهلاك اليوم نفسه).
-     *
-     * إن كانت الفترة المختارة شهرًا بالفعل نُعيد استخدام بياناتها بلا استعلام جديد.
+     * يحمّل إحصاءات أيام الشهر والسنة المحددين في شاشة السجل مع الأشهر والسنوات
+     * التي سُجّل فيها استهلاك فعلي للشبكة المختارة.
      */
-    private suspend fun loadMonthPeak(hasAccess: Boolean, force: Boolean, now: Long) {
-        if (!hasAccess) return
-        if (!force && now - monthPeakLoadedAt <= MONTH_PEAK_TTL_MILLIS) return
+    private suspend fun loadHistory(
+        now: Long = System.currentTimeMillis(),
+        adjustSelectionToRecorded: Boolean = false,
+    ) {
+        val requestId = ++historyRequestId
+        val selection = _uiState.value
+        val network = selection.historyNetwork
+        val recorded = repository.recordedHistoryMonths(network, now)
+        val currentYm = TimeRanges.currentYearMonth(now)
+        var targetYear = selection.historyYear
+        var targetMonth = selection.historyMonth
 
-        val loadedDays = dailyLoadedDays
-        val monthDaily = if (loadedDays >= MONTH_DAYS) {
-            _uiState.value.daily
-        } else {
-            repository.dailyUsage(MONTH_DAYS)
+        if (adjustSelectionToRecorded && isCustomHistoryMonth(targetYear, targetMonth, currentYm)) {
+            if (HistoryYearMonth(targetYear, targetMonth) !in recorded) {
+                targetYear = currentYm.year
+                targetMonth = currentYm.month
+            }
         }
-        monthPeakLoadedAt = now
+
+        val daily = repository.dailyUsageForMonth(targetYear, targetMonth, network, now)
+        val targetYm = HistoryYearMonth(targetYear, targetMonth)
+        val finalRecorded = if (daily.any { it.totals.totalBytes > 0L } && targetYm !in recorded) {
+            (recorded + targetYm).sorted()
+        } else {
+            recorded
+        }
+
+        if (requestId != historyRequestId || _uiState.value.historyNetwork != network) return
+        dailyLoadedAt = System.currentTimeMillis()
+        dailyLoadedNetwork = network
+        dailyLoadedYear = targetYear
+        dailyLoadedMonth = targetMonth
         _uiState.update { state ->
-            state.copy(monthPeak = monthDaily.maxByOrNull { it.totals.totalBytes })
+            state.copy(
+                historyYear = targetYear,
+                historyMonth = targetMonth,
+                historyRecordedMonths = finalRecorded,
+                daily = daily,
+                monthPeak = daily.maxByOrNull { it.totals.totalBytes },
+            )
         }
     }
 
@@ -508,9 +560,100 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         }
     }
 
+    fun setHistorySection(section: HistorySection) {
+        if (section == _uiState.value.historySection) return
+        _uiState.update {
+            it.copy(
+                historySection = section,
+                historySearchActive = if (section == HistorySection.NETWORK) it.historySearchActive else false,
+                historySearchQuery = if (section == HistorySection.NETWORK) it.historySearchQuery else "",
+            )
+        }
+    }
+
+    fun setHistoryNetwork(network: UsageNetwork) {
+        if (network == _uiState.value.historyNetwork) return
+        selectedDayAppsJob?.cancel()
+        _uiState.update {
+            it.copy(
+                historyNetwork = network,
+                selectedDayIndex = null,
+                selectedDayApps = emptyList(),
+                isSelectedDayAppsLoading = false,
+                historySearchActive = false,
+                historySearchQuery = "",
+            )
+        }
+        viewModelScope.launch {
+            loadHistory(adjustSelectionToRecorded = true)
+        }
+    }
+
+    fun setHistoryMonth(month: Int) {
+        val safeMonth = month.coerceIn(1, 12)
+        if (safeMonth == _uiState.value.historyMonth) return
+        selectedDayAppsJob?.cancel()
+        _uiState.update {
+            it.copy(
+                historyMonth = safeMonth,
+                selectedDayIndex = null,
+                selectedDayApps = emptyList(),
+                isSelectedDayAppsLoading = false,
+                historySearchActive = false,
+                historySearchQuery = "",
+            )
+        }
+        viewModelScope.launch {
+            loadHistory()
+        }
+    }
+
+    fun setHistoryYear(year: Int) {
+        if (year == _uiState.value.historyYear) return
+        selectedDayAppsJob?.cancel()
+        val targetMonth = resolveHistoryMonthForYear(
+            recordedMonths = _uiState.value.historyRecordedMonths,
+            targetYear = year,
+            currentSelectedMonth = _uiState.value.historyMonth,
+        )
+        _uiState.update {
+            it.copy(
+                historyYear = year,
+                historyMonth = targetMonth,
+                selectedDayIndex = null,
+                selectedDayApps = emptyList(),
+                isSelectedDayAppsLoading = false,
+                historySearchActive = false,
+                historySearchQuery = "",
+            )
+        }
+        viewModelScope.launch {
+            loadHistory()
+        }
+    }
+
+    fun resetHistoryDate() {
+        val currentYm = TimeRanges.currentYearMonth(System.currentTimeMillis())
+        if (_uiState.value.historyYear == currentYm.year && _uiState.value.historyMonth == currentYm.month) return
+        selectedDayAppsJob?.cancel()
+        _uiState.update {
+            it.copy(
+                historyYear = currentYm.year,
+                historyMonth = currentYm.month,
+                selectedDayIndex = null,
+                selectedDayApps = emptyList(),
+                isSelectedDayAppsLoading = false,
+                historySearchActive = false,
+                historySearchQuery = "",
+            )
+        }
+        viewModelScope.launch {
+            loadHistory()
+        }
+    }
+
     fun setHistoryPeriod(period: UsagePeriod) {
         if (period == _uiState.value.historyPeriod) return
-        val days = TimeRanges.daysOf(period)
         selectedDayAppsJob?.cancel()
         _uiState.update {
             it.copy(
@@ -519,15 +662,7 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
             )
         }
         viewModelScope.launch {
-            val daily = repository.dailyUsage(days)
-            if (_uiState.value.historyPeriod != period) return@launch
-            dailyLoadedDays = days
-            dailyLoadedAt = System.currentTimeMillis()
-            _uiState.update { it.copy(daily = daily) }
-            // عرض «اليوم» = يوم واحد فقط، فنفتح تفاصيله مباشرة ليرى المستخدم استهلاكه وأكثر التطبيقات.
-            if (period == UsagePeriod.TODAY && daily.isNotEmpty()) {
-                selectDay(daily.lastIndex)
-            }
+            loadHistory()
         }
     }
 
@@ -578,7 +713,9 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
     }
 
     fun selectDay(index: Int?) {
-        val day = index?.let { _uiState.value.daily.getOrNull(it) }
+        val stateSnapshot = _uiState.value
+        val day = index?.let { stateSnapshot.daily.getOrNull(it) }
+        val network = stateSnapshot.historyNetwork
         selectedDayAppsJob?.cancel()
         // Never search the previous day's rows while the new selection is still loading.
         _uiState.update {
@@ -591,10 +728,14 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         selectedDayAppsJob = viewModelScope.launch {
             val apps = repository.perAppUsage(
                 com.mywifiadata.app.core.TimeRange(day.startMillis, day.endMillis),
+                network,
             )
             _uiState.update { state ->
                 val currentDay = state.selectedDayIndex?.let { state.daily.getOrNull(it) }
-                if (currentDay?.startMillis == day.startMillis && currentDay.endMillis == day.endMillis) {
+                if (state.historyNetwork == network &&
+                    currentDay?.startMillis == day.startMillis &&
+                    currentDay.endMillis == day.endMillis
+                ) {
                     state.copy(selectedDayApps = apps, isSelectedDayAppsLoading = false)
                 } else state
             }
@@ -774,6 +915,10 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         todayAppsJob = null
         todayAppsLoadedAt = 0L
         todayAppsLoadedRangeStartMillis = 0L
+        dailyLoadedAt = 0L
+        dailyLoadedNetwork = null
+        dailyLoadedYear = 0
+        dailyLoadedMonth = 0
         LauncherIconVisibility.setVisible(repository.context, visible = true)
         stopTracking()
         repository.settingsStore.clearAll()
