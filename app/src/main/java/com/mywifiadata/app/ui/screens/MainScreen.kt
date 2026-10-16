@@ -26,10 +26,14 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -91,6 +95,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mywifiadata.app.R
+import com.mywifiadata.app.core.HistorySection
 import com.mywifiadata.app.core.NavigationPageChange
 import com.mywifiadata.app.core.navigationPageChange
 import com.mywifiadata.app.core.navigationPageEntrySide
@@ -101,6 +106,7 @@ import com.mywifiadata.app.monitor.MonitoringTileService
 import com.mywifiadata.app.ui.components.DragNavigationBar
 import com.mywifiadata.app.ui.components.DragNavigationItem
 import com.mywifiadata.app.ui.components.AppsUsageFilterBar
+import com.mywifiadata.app.ui.components.HistoryUsageFilterBar
 import com.mywifiadata.app.ui.AppViewModel
 import com.mywifiadata.app.ui.theme.AppButtonShape
 import com.mywifiadata.app.widget.UsageWidgetProvider
@@ -140,6 +146,8 @@ fun MainScreen(
     var languageMenuExpanded by rememberSaveable { mutableStateOf(false) }
     var appsFiltersExpanded by rememberSaveable { mutableStateOf(false) }
     var appsFiltersBeforeSearch by rememberSaveable { mutableStateOf(false) }
+    var historyFiltersExpanded by rememberSaveable { mutableStateOf(false) }
+    var historyFiltersBeforeSearch by rememberSaveable { mutableStateOf(false) }
     var isDashboardEditing by remember { mutableStateOf(false) }
     var dashboardLayoutDraft by remember { mutableStateOf(state.settings.dashboardLayout.normalized()) }
 
@@ -408,7 +416,29 @@ fun MainScreen(
         topBar = {
             if (currentTab != AppTab.DASHBOARD || !isDashboardEditing) {
                 TopAppBar(
-                    title = { Text(text = stringResource(currentTab.labelRes)) },
+                    title = {
+                        if (currentTab == AppTab.HISTORY && state.appDetail == null) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(end = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                Text(
+                                    text = stringResource(currentTab.labelRes),
+                                    maxLines = 1,
+                                )
+                                HistorySectionSelector(
+                                    section = state.historySection,
+                                    onSectionChange = viewModel::setHistorySection,
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                        } else {
+                            Text(text = stringResource(currentTab.labelRes))
+                        }
+                    },
                     actions = {
                         if (currentTab == AppTab.SETTINGS) {
                             Box {
@@ -486,7 +516,22 @@ fun MainScreen(
                                         else MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
-                        } else {
+                        } else if (currentTab == AppTab.HISTORY && state.appDetail == null) {
+                            if (state.historySection == HistorySection.NETWORK) {
+                                IconButton(onClick = { historyFiltersExpanded = !historyFiltersExpanded }) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Menu,
+                                        contentDescription = stringResource(
+                                            if (historyFiltersExpanded) R.string.history_hide_filters else R.string.history_show_filters,
+                                        ),
+                                        tint = if (historyFiltersExpanded) MaterialTheme.colorScheme.primary
+                                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            } else {
+                                Spacer(modifier = Modifier.size(48.dp))
+                            }
+                        } else if (state.appDetail == null) {
                             IconButton(onClick = { viewModel.refreshNow() }) {
                                 Icon(
                                     imageVector = Icons.Rounded.Refresh,
@@ -582,20 +627,58 @@ fun MainScreen(
                     }
                 }
 
-                AppTab.HISTORY -> HistoryScreen(
-                    state = state,
-                    isActive = pageTab == currentTab,
-                    listState = historyListState,
-                    searchListState = historySearchListState,
-                    onSearchActiveChange = viewModel::setHistorySearchActive,
-                    onSearchQueryChange = viewModel::setHistorySearchQuery,
-                    onReverseSortOrder = viewModel::reverseHistoryAppsSortOrder,
-                    onPeriodChange = { viewModel.setHistoryPeriod(it) },
-                    onSelectDay = { viewModel.selectDay(it) },
-                    onChartTypeChange = { viewModel.setHistoryLineChartEnabled(it) },
-                    onOpenUsageAccess = { SystemActions.openUsageAccessSettings(context) },
-                    onAppClick = { viewModel.openAppDetail(it) },
-                )
+                AppTab.HISTORY -> {
+                    val appDetail = state.appDetail
+                    if (appDetail != null) {
+                        AppDetailScreen(
+                            detail = appDetail,
+                            onBack = { viewModel.closeAppDetail() },
+                        )
+                    } else {
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            AnimatedVisibility(
+                                visible = historyFiltersExpanded &&
+                                    state.historySection == HistorySection.NETWORK &&
+                                    !state.historySearchActive,
+                            ) {
+                                HistoryUsageFilterBar(
+                                    network = state.historyNetwork,
+                                    selectedMonth = state.historyMonth,
+                                    selectedYear = state.historyYear,
+                                    availableMonths = state.availableHistoryMonths,
+                                    availableYears = state.availableHistoryYears,
+                                    onNetworkChange = viewModel::setHistoryNetwork,
+                                    onMonthChange = viewModel::setHistoryMonth,
+                                    onYearChange = viewModel::setHistoryYear,
+                                )
+                            }
+                            HistoryScreen(
+                                state = state,
+                                isActive = pageTab == currentTab,
+                                modifier = Modifier.weight(1f),
+                                listState = historyListState,
+                                searchListState = historySearchListState,
+                                onSearchActiveChange = { active ->
+                                    if (active && !state.historySearchActive) {
+                                        historyFiltersBeforeSearch = historyFiltersExpanded
+                                        historyFiltersExpanded = false
+                                    } else if (!active && state.historySearchActive) {
+                                        historyFiltersExpanded = historyFiltersBeforeSearch
+                                    }
+                                    viewModel.setHistorySearchActive(active)
+                                },
+                                onSearchQueryChange = viewModel::setHistorySearchQuery,
+                                onReverseSortOrder = viewModel::reverseHistoryAppsSortOrder,
+                                onPeriodChange = { viewModel.setHistoryPeriod(it) },
+                                onSelectDay = { viewModel.selectDay(it) },
+                                onResetHistoryDate = viewModel::resetHistoryDate,
+                                onChartTypeChange = { viewModel.setHistoryLineChartEnabled(it) },
+                                onOpenUsageAccess = { SystemActions.openUsageAccessSettings(context) },
+                                onAppClick = { viewModel.openAppDetail(it, state.historyNetwork) },
+                            )
+                        }
+                    }
+                }
 
                 AppTab.SETTINGS -> SettingsScreen(
                     state = state,
@@ -621,8 +704,9 @@ fun MainScreen(
         val isAppsSearchVisible = currentTab == AppTab.APPS && state.appsSearchActive && state.appDetail == null
         val isHistorySearchVisible = currentTab == AppTab.HISTORY && state.historySearchActive && state.hasUsageAccess &&
             state.selectedDayIndex?.let { state.daily.getOrNull(it) } != null && state.appDetail == null
+        val isHistoryPlanVisible = currentTab == AppTab.HISTORY && state.historySection == HistorySection.PLAN
         val pullRefreshEnabled = !isPageChanging && !isAppsSearchVisible && !isHistorySearchVisible &&
-            !(isDashboardEditing && currentTab == AppTab.DASHBOARD)
+            !isHistoryPlanVisible && !(isDashboardEditing && currentTab == AppTab.DASHBOARD)
         // Discard any partially pulled distance on entering/leaving search. Key only this
         // state, not the content: the editor, its animation and scroll states must survive.
         val pullRefreshState = key(pullRefreshEnabled) { rememberPullToRefreshState() }

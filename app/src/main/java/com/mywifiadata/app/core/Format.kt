@@ -125,6 +125,28 @@ object Format {
     /** "12 مارس 2026" */
     fun fullDate(millis: Long): String = pattern("d MMMM yyyy").format(Date(millis))
 
+    /** اسم الشهر منفردًا بلغة الجهاز، مثل "نوفمبر" أو "November". */
+    fun monthName(month: Int, year: Int = 2026): String {
+        val safeMonth = month.coerceIn(1, 12)
+        val millis = java.time.LocalDate.of(year, safeMonth, 15)
+            .atTime(12, 0)
+            .atZone(java.time.ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
+        return pattern("MMMM").format(Date(millis))
+    }
+
+    /** ترويسة الشهر والسنة في بطاقة السجل، مثل "نوفمبر ٢٠٢٦/١١". */
+    fun monthYearHeader(year: Int, month: Int): String {
+        val safeMonth = month.coerceIn(1, 12)
+        val millis = java.time.LocalDate.of(year, safeMonth, 15)
+            .atTime(12, 0)
+            .atZone(java.time.ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
+        return pattern("MMMM yyyy/MM").format(Date(millis))
+    }
+
     /** عدد الأيام بين تاريخين (بحد أدنى 1). */
     fun daysBetween(startMillis: Long, endMillis: Long): Int {
         val millis = (endMillis - startMillis).coerceAtLeast(0L)

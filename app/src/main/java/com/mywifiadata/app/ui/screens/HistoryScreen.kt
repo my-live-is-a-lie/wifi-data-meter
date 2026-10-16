@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.height
@@ -28,15 +29,17 @@ import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.ShowChart
 import androidx.compose.material.icons.rounded.TrendingUp
+import androidx.compose.material3.ButtonGroup
+import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
@@ -57,6 +60,8 @@ import androidx.compose.ui.unit.dp
 import com.mywifiadata.app.R
 import com.mywifiadata.app.core.AppsSortOrder
 import com.mywifiadata.app.core.Format
+import com.mywifiadata.app.core.HistorySection
+import com.mywifiadata.app.core.UsageNetwork
 import com.mywifiadata.app.core.UsagePeriod
 import com.mywifiadata.app.data.model.AppUsage
 import com.mywifiadata.app.data.model.DayUsage
@@ -75,9 +80,42 @@ import kotlinx.coroutines.launch
 import com.mywifiadata.app.ui.components.InfoRow
 import com.mywifiadata.app.ui.components.PermissionCard
 import com.mywifiadata.app.ui.components.SectionHeader
-import com.mywifiadata.app.ui.theme.AppButtonShape
 import com.mywifiadata.app.ui.theme.LocalDownloadColor
 import com.mywifiadata.app.ui.theme.LocalUploadColor
+
+/**
+ * أزرار التبديل بين «الشبكة» و«الباقة» بجانب عنوان شاشة السجل.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+internal fun HistorySectionSelector(
+    section: HistorySection,
+    onSectionChange: (HistorySection) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val networkLabel = stringResource(R.string.history_section_network)
+    val planLabel = stringResource(R.string.history_section_plan)
+
+    ButtonGroup(
+        overflowIndicator = { menuState ->
+            ButtonGroupDefaults.OverflowIndicator(menuState = menuState)
+        },
+        modifier = modifier,
+    ) {
+        toggleableItem(
+            checked = section == HistorySection.NETWORK,
+            label = networkLabel,
+            onCheckedChange = { onSectionChange(HistorySection.NETWORK) },
+            weight = 1f,
+        )
+        toggleableItem(
+            checked = section == HistorySection.PLAN,
+            label = planLabel,
+            onCheckedChange = { onSectionChange(HistorySection.PLAN) },
+            weight = 1f,
+        )
+    }
+}
 
 /**
  * شاشة السجلّ: مخطط استهلاك الأيام وتفاصيل اليوم المحدد.
@@ -86,13 +124,14 @@ import com.mywifiadata.app.ui.theme.LocalUploadColor
 @Composable
 fun HistoryScreen(
     state: UiState,
-    onPeriodChange: (UsagePeriod) -> Unit,
+    onPeriodChange: (UsagePeriod) -> Unit = {},
     onSelectDay: (Int?) -> Unit,
     onOpenUsageAccess: () -> Unit,
     onAppClick: (AppUsage) -> Unit,
     onSearchActiveChange: (Boolean) -> Unit,
     onSearchQueryChange: (String) -> Unit,
     onReverseSortOrder: () -> Unit,
+    onResetHistoryDate: () -> Unit = {},
     onChartTypeChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(16.dp),
@@ -100,6 +139,12 @@ fun HistoryScreen(
     searchListState: LazyListState = rememberLazyListState(),
     isActive: Boolean = true,
 ) {
+    if (state.historySection == HistorySection.PLAN) {
+        // صفحة الباقة فارغة حاليًا ريثما يُضاف محتواها مستقبلًا.
+        Box(modifier = modifier.fillMaxSize())
+        return
+    }
+
     val daily = state.daily
     val selectedDay = state.selectedDayIndex?.let { daily.getOrNull(it) }
     val searching = state.historySearchActive && selectedDay != null && state.hasUsageAccess
@@ -115,12 +160,6 @@ fun HistoryScreen(
             contentPadding = contentPadding,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (!searching) {
-                item(key = "history_period") {
-                    PeriodSelector(period = state.historyPeriod, onPeriodChange = onPeriodChange)
-                }
-            }
-
             if (!state.hasUsageAccess) {
                 item(key = "history_permission") {
                     PermissionCard(
@@ -136,7 +175,12 @@ fun HistoryScreen(
             } else {
                 if (!searching) {
                     item(key = "history_chart") {
-                        ChartCard(state = state, onSelectDay = onSelectDay, onChartTypeChange = onChartTypeChange)
+                        ChartCard(
+                            state = state,
+                            onSelectDay = onSelectDay,
+                            onResetHistoryDate = onResetHistoryDate,
+                            onChartTypeChange = onChartTypeChange,
+                        )
                     }
 
                     if (selectedDay != null) {
@@ -231,7 +275,8 @@ fun HistoryScreen(
             // Reuse the same edge gesture, but keep its state and targets local to this day.
             // Use the rendered row count (normally top ten), not all selectedDayApps.
             key(
-                selectedDay.startMillis, selectedDay.endMillis, state.historyPeriod,
+                selectedDay.startMillis, selectedDay.endMillis, state.historyNetwork,
+                state.historyYear, state.historyMonth,
                 state.historyAppsSortOrder, apps.map { it.uid },
             ) {
                 AppsFastScroller(listState, apps.size, headerKey = "history_apps_search")
@@ -245,11 +290,14 @@ fun HistoryScreen(
 private fun ChartCard(
     state: UiState,
     onSelectDay: (Int?) -> Unit,
+    onResetHistoryDate: () -> Unit,
     onChartTypeChange: (Boolean) -> Unit,
 ) {
     // فهرس اليوم الذي يشير إليه المؤشر: يوم السحب الحالي، وإلا اليوم المحدد،
     // وإلا أحدث يوم في الفترة (نهاية القائمة في هذا الترتيب).
-    var scrubIndex by remember { mutableStateOf<Int?>(null) }
+    var scrubIndex by remember(state.historyNetwork, state.historyYear, state.historyMonth) {
+        mutableStateOf<Int?>(null)
+    }
     val lastIndex = state.daily.lastIndex
     val selectedIndex = state.selectedDayIndex?.takeIf { it in state.daily.indices }
     val thumbIndex = (scrubIndex ?: selectedIndex ?: lastIndex).coerceAtLeast(0)
@@ -269,10 +317,34 @@ private fun ChartCard(
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             SectionHeader(
-                title = if (state.historyDays <= 1) {
-                    stringResource(R.string.history_today_title)
-                } else {
-                    stringResource(R.string.history_days_shown, state.historyDays)
+                title = Format.monthYearHeader(state.historyYear, state.historyMonth),
+                trailing = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        if (state.isCustomHistoryDate) {
+                            IconButton(
+                                onClick = onResetHistoryDate,
+                                modifier = Modifier.size(32.dp),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Refresh,
+                                    contentDescription = stringResource(R.string.history_reset_date),
+                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                        }
+                        Text(
+                            text = stringResource(
+                                if (state.historyNetwork == UsageNetwork.WIFI) R.string.apps_network_wifi
+                                else R.string.apps_network_mobile,
+                            ),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
                 },
             )
             Spacer(modifier = Modifier.height(16.dp))

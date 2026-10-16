@@ -156,6 +156,13 @@
     <string name="app_detail_back">Back to the app list</string>
 
     <string name="history_screen_title">Usage history</string>
+    <string name="history_section_network">Network</string>
+    <string name="history_section_plan">Plan</string>
+    <string name="history_month_filter">Month</string>
+    <string name="history_year_filter">Year</string>
+    <string name="history_show_filters">Show history filters</string>
+    <string name="history_hide_filters">Hide history filters</string>
+    <string name="history_reset_date">Reset to current month and year</string>
     <string name="history_empty_title">No history yet</string>
     <string name="history_empty_body">The chart appears after a few days of collected data.</string>
     <string name="history_selected_day">Selected day</string>
