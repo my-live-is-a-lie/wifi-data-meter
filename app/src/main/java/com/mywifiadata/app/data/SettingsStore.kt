@@ -4,6 +4,7 @@ import android.content.Context
 import com.mywifiadata.app.core.AppLanguage
 import com.mywifiadata.app.core.SamplingIntervals
 import com.mywifiadata.app.data.model.AccentColor
+import com.mywifiadata.app.data.model.AppLayoutDirection
 import com.mywifiadata.app.data.model.AppSettings
 import com.mywifiadata.app.data.model.DashboardLayout
 import com.mywifiadata.app.data.model.SpeedTestRecord
@@ -92,6 +93,9 @@ class SettingsStore(context: Context) {
         themeMode = prefs.getString(KEY_THEME_MODE, null)
             ?.let { stored -> ThemeMode.entries.firstOrNull { it.name == stored } }
             ?: ThemeMode.SYSTEM,
+        layoutDirection = prefs.getString(KEY_LAYOUT_DIRECTION, null)
+            ?.let { stored -> AppLayoutDirection.entries.firstOrNull { it.name == stored } }
+            ?: AppLayoutDirection.AUTO,
         sessionStartMillis = prefs.getLong(KEY_SESSION_START, System.currentTimeMillis()),
         sessionBaseline = TrafficTotals(
             rxBytes = prefs.getLong(KEY_SESSION_RX, 0L),
@@ -160,6 +164,7 @@ class SettingsStore(context: Context) {
             .putBoolean(KEY_APPS_LINE_CHART, settings.appsLineChartEnabled)
             .putString(KEY_APP_SEARCH_HISTORY, AppSearchHistory.encode(settings.appSearchHistory))
             .putString(KEY_THEME_MODE, settings.themeMode.name)
+            .putString(KEY_LAYOUT_DIRECTION, settings.layoutDirection.name)
             .putLong(KEY_SESSION_START, settings.sessionStartMillis)
             .putLong(KEY_SESSION_RX, settings.sessionBaseline.rxBytes)
             .putLong(KEY_SESSION_TX, settings.sessionBaseline.txBytes)
@@ -201,6 +206,7 @@ class SettingsStore(context: Context) {
         private const val KEY_ALERT_CYCLE = "alert_cycle"
         private const val KEY_ALERT_LEVEL = "alert_level"
         private const val KEY_THEME_MODE = "theme_mode"
+        private const val KEY_LAYOUT_DIRECTION = "layout_direction"
         private const val KEY_SPEED_DOWNLOAD = "speed_test_download"
         private const val KEY_SPEED_UPLOAD = "speed_test_upload"
         private const val KEY_SPEED_TIME = "speed_test_time"

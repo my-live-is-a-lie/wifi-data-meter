@@ -57,6 +57,7 @@ import androidx.compose.material.icons.rounded.Call
 import androidx.compose.material.icons.rounded.CameraAlt
 import androidx.compose.material.icons.rounded.Chat
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.East
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.Info
@@ -68,11 +69,13 @@ import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material.icons.rounded.WbSunny
+import androidx.compose.material.icons.rounded.West
 import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -114,6 +117,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.res.painterResource
@@ -131,6 +135,7 @@ import com.mywifiadata.app.core.Format
 import com.mywifiadata.app.core.SamplingIntervalUnit
 import com.mywifiadata.app.core.SamplingIntervals
 import com.mywifiadata.app.data.model.AccentColor
+import com.mywifiadata.app.data.model.AppLayoutDirection
 import com.mywifiadata.app.data.model.ThemeMode
 import com.mywifiadata.app.ui.UiState
 import com.mywifiadata.app.ui.components.ExpressiveCard
@@ -167,6 +172,7 @@ fun SettingsScreen(
     onOpenUsageAccess: () -> Unit,
     onOpenWifiSettings: () -> Unit,
     onClearData: () -> Unit,
+    onLayoutDirectionChange: (AppLayoutDirection) -> Unit = {},
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(16.dp),
 ) {
@@ -298,6 +304,10 @@ fun SettingsScreen(
                         subtitle = stringResource(R.string.settings_dynamic_color_desc),
                         checked = settings.dynamicColorEnabled,
                         onCheckedChange = onDynamicColorChange,
+                    )
+                    LayoutDirectionSelector(
+                        layoutDirection = settings.layoutDirection,
+                        onLayoutDirectionChange = onLayoutDirectionChange,
                     )
                 }
             }
@@ -2139,6 +2149,137 @@ private fun AccentColor.labelResource(): Int = when (this) {
     AccentColor.RED -> R.string.accent_color_red
     AccentColor.PINK -> R.string.accent_color_pink
     AccentColor.PURPLE -> R.string.accent_color_purple
+}
+
+/**
+ * سطر «اتجاه العرض» يعرض الاتجاه النشط ويفتح قائمة منسدلة في اليسار
+ * بخيارَي (من اليمين لليسار) و(من اليسار لليمين) بنفس أسلوب «لون التمييز».
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun LayoutDirectionSelector(
+    layoutDirection: AppLayoutDirection,
+    onLayoutDirectionChange: (AppLayoutDirection) -> Unit,
+) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val contentLayoutDirection = LocalLayoutDirection.current
+    val effectiveDirection = when (layoutDirection) {
+        AppLayoutDirection.RTL -> AppLayoutDirection.RTL
+        AppLayoutDirection.LTR -> AppLayoutDirection.LTR
+        AppLayoutDirection.AUTO -> if (contentLayoutDirection == LayoutDirection.Rtl) {
+            AppLayoutDirection.RTL
+        } else {
+            AppLayoutDirection.LTR
+        }
+    }
+    val options = remember { listOf(AppLayoutDirection.RTL, AppLayoutDirection.LTR) }
+    val currentLabel = stringResource(effectiveDirection.labelResource())
+    val currentIcon = effectiveDirection.directionIcon()
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(role = Role.Button) { expanded = true }
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.SwapHoriz,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp),
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.settings_layout_direction),
+                    style = MaterialTheme.typography.bodyLargeEmphasized,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = currentIcon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = currentLabel,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Icon(
+                imageVector = Icons.Rounded.ExpandMore,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.rotate(if (expanded) 180f else 0f),
+            )
+        }
+
+        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+            ) {
+                CompositionLocalProvider(LocalLayoutDirection provides contentLayoutDirection) {
+                    options.forEach { option ->
+                        val label = stringResource(option.labelResource())
+                        val selected = effectiveDirection == option
+                        DropdownMenuItem(
+                            text = { Text(text = label, maxLines = 1) },
+                            onClick = {
+                                expanded = false
+                                onLayoutDirectionChange(option)
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = option.directionIcon(),
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            },
+                            trailingIcon = if (selected) {
+                                {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Check,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.size(20.dp),
+                                    )
+                                }
+                            } else {
+                                null
+                            },
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun AppLayoutDirection.labelResource(): Int = when (this) {
+    AppLayoutDirection.LTR -> R.string.layout_direction_ltr
+    AppLayoutDirection.RTL, AppLayoutDirection.AUTO -> R.string.layout_direction_rtl
+}
+
+private fun AppLayoutDirection.directionIcon(): ImageVector = when (this) {
+    AppLayoutDirection.LTR -> Icons.Rounded.East
+    AppLayoutDirection.RTL, AppLayoutDirection.AUTO -> Icons.Rounded.West
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

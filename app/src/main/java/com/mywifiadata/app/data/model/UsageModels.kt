@@ -131,6 +131,13 @@ data class SpeedTestRecord(
  */
 enum class ThemeMode { SYSTEM, LIGHT, DARK, BLACK }
 
+/** اتجاه عرض الواجهة: تلقائي حسب لغة التطبيق أو اختيار يدوي (من اليمين لليسار / من اليسار لليمين). */
+enum class AppLayoutDirection {
+    AUTO,
+    RTL,
+    LTR,
+}
+
 /** لون التمييز المختار من لوحة الألوان الجاهزة. */
 enum class AccentColor {
     /** ألوان السمة الافتراضية (ألوان النظام إن كانت مفعّلة). */
@@ -177,6 +184,7 @@ data class AppSettings(
     val appsLineChartEnabled: Boolean = false,
     val appSearchHistory: List<AppSearchSelection> = emptyList(),
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    val layoutDirection: AppLayoutDirection = AppLayoutDirection.AUTO,
     val sessionStartMillis: Long = System.currentTimeMillis(),
     val sessionBaseline: TrafficTotals = TrafficTotals.Empty,
     val alertCycleStartMillis: Long = 0L,
