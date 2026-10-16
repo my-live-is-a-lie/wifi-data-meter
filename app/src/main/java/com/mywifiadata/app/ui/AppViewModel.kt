@@ -30,6 +30,7 @@ import com.mywifiadata.app.core.UsagePeriod
 import com.mywifiadata.app.data.AppSearchHistory
 import com.mywifiadata.app.data.UsageRepository
 import com.mywifiadata.app.data.model.AccentColor
+import com.mywifiadata.app.data.model.AppLayoutDirection
 import com.mywifiadata.app.data.model.AppSettings
 import com.mywifiadata.app.data.model.AppUsage
 import com.mywifiadata.app.data.model.AppsFilter
@@ -906,6 +907,10 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
 
     fun setThemeMode(mode: ThemeMode) {
         repository.settingsStore.update { it.copy(themeMode = mode) }
+    }
+
+    fun setLayoutDirection(direction: AppLayoutDirection) {
+        repository.settingsStore.update { it.copy(layoutDirection = direction) }
     }
 
     fun clearData() {

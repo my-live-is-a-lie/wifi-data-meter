@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,6 +33,7 @@ import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ButtonGroupDefaults
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
@@ -40,6 +42,7 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.ToggleButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
@@ -414,9 +417,11 @@ internal fun PeriodSelector(
     onPeriodChange: (UsagePeriod) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val todayLabel = stringResource(R.string.label_today)
-    val weekLabel = stringResource(R.string.label_week)
-    val monthLabel = stringResource(R.string.label_month)
+    val options = listOf(
+        UsagePeriod.TODAY to stringResource(R.string.label_today),
+        UsagePeriod.WEEK to stringResource(R.string.label_week),
+        UsagePeriod.MONTH to stringResource(R.string.label_month),
+    )
 
     ButtonGroup(
         overflowIndicator = { menuState ->
@@ -424,24 +429,40 @@ internal fun PeriodSelector(
         },
         modifier = modifier.fillMaxWidth(),
     ) {
-        toggleableItem(
-            checked = period == UsagePeriod.TODAY,
-            label = todayLabel,
-            onCheckedChange = { onPeriodChange(UsagePeriod.TODAY) },
-            weight = 1f,
-        )
-        toggleableItem(
-            checked = period == UsagePeriod.WEEK,
-            label = weekLabel,
-            onCheckedChange = { onPeriodChange(UsagePeriod.WEEK) },
-            weight = 1f,
-        )
-        toggleableItem(
-            checked = period == UsagePeriod.MONTH,
-            label = monthLabel,
-            onCheckedChange = { onPeriodChange(UsagePeriod.MONTH) },
-            weight = 1f,
-        )
+        options.forEach { (itemPeriod, label) ->
+            val checked = period == itemPeriod
+            customItem(
+                buttonGroupContent = {
+                    val interactionSource = remember { MutableInteractionSource() }
+                    ToggleButton(
+                        checked = checked,
+                        onCheckedChange = { onPeriodChange(itemPeriod) },
+                        modifier = Modifier
+                            .weight(1f)
+                            .animateWidth(interactionSource = interactionSource),
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp),
+                        interactionSource = interactionSource,
+                    ) {
+                        Text(
+                            text = label,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                },
+                menuContent = { menuState ->
+                    DropdownMenuItem(
+                        text = { Text(label) },
+                        onClick = {
+                            onPeriodChange(itemPeriod)
+                            menuState.dismiss()
+                        },
+                    )
+                },
+            )
+        }
     }
 }
 

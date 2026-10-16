@@ -8,6 +8,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,12 +35,14 @@ import androidx.compose.material.icons.rounded.ShowChart
 import androidx.compose.material.icons.rounded.TrendingUp
 import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ButtonGroupDefaults
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.ToggleButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
@@ -56,6 +59,8 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mywifiadata.app.R
 import com.mywifiadata.app.core.AppsSortOrder
@@ -93,8 +98,10 @@ internal fun HistorySectionSelector(
     onSectionChange: (HistorySection) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val networkLabel = stringResource(R.string.history_section_network)
-    val planLabel = stringResource(R.string.history_section_plan)
+    val options = listOf(
+        HistorySection.NETWORK to stringResource(R.string.history_section_network),
+        HistorySection.PLAN to stringResource(R.string.history_section_plan),
+    )
 
     ButtonGroup(
         overflowIndicator = { menuState ->
@@ -102,18 +109,40 @@ internal fun HistorySectionSelector(
         },
         modifier = modifier,
     ) {
-        toggleableItem(
-            checked = section == HistorySection.NETWORK,
-            label = networkLabel,
-            onCheckedChange = { onSectionChange(HistorySection.NETWORK) },
-            weight = 1f,
-        )
-        toggleableItem(
-            checked = section == HistorySection.PLAN,
-            label = planLabel,
-            onCheckedChange = { onSectionChange(HistorySection.PLAN) },
-            weight = 1f,
-        )
+        options.forEach { (itemSection, label) ->
+            val checked = section == itemSection
+            customItem(
+                buttonGroupContent = {
+                    val interactionSource = remember { MutableInteractionSource() }
+                    ToggleButton(
+                        checked = checked,
+                        onCheckedChange = { onSectionChange(itemSection) },
+                        modifier = Modifier
+                            .weight(1f)
+                            .animateWidth(interactionSource = interactionSource),
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp),
+                        interactionSource = interactionSource,
+                    ) {
+                        Text(
+                            text = label,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                },
+                menuContent = { menuState ->
+                    DropdownMenuItem(
+                        text = { Text(label) },
+                        onClick = {
+                            onSectionChange(itemSection)
+                            menuState.dismiss()
+                        },
+                    )
+                },
+            )
+        }
     }
 }
 

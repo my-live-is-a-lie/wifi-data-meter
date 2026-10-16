@@ -208,6 +208,9 @@
     <string name="settings_section_appearance">المظهر</string>
     <string name="settings_accent_color">لون التمييز</string>
     <string name="settings_accent_color_system_active">ألوان النظام</string>
+    <string name="settings_layout_direction">اتجاه العرض</string>
+    <string name="layout_direction_rtl">من اليمين لليسار</string>
+    <string name="layout_direction_ltr">من اليسار لليمين</string>
     <string name="accent_color_default">افتراضي</string>
     <string name="accent_color_indigo">نيلي</string>
     <string name="accent_color_blue">أزرق</string>

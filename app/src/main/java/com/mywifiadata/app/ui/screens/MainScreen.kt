@@ -697,6 +697,7 @@ fun MainScreen(
                     onOpenUsageAccess = { SystemActions.openUsageAccessSettings(context) },
                     onOpenWifiSettings = { SystemActions.openWifiSettings(context) },
                     onClearData = { viewModel.clearData() },
+                    onLayoutDirectionChange = { viewModel.setLayoutDirection(it) },
                 )
             }
         }

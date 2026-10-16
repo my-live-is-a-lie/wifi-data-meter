@@ -195,6 +195,9 @@
     <string name="settings_section_appearance">Appearance</string>
     <string name="settings_accent_color">Accent color</string>
     <string name="settings_accent_color_system_active">System colors</string>
+    <string name="settings_layout_direction">Display direction</string>
+    <string name="layout_direction_rtl">Right to left</string>
+    <string name="layout_direction_ltr">Left to right</string>
     <string name="accent_color_default">Default</string>
     <string name="accent_color_indigo">Indigo</string>
     <string name="accent_color_blue">Blue</string>
