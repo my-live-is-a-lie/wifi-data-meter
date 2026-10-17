@@ -1,6 +1,9 @@
 package com.mywifiadata.app.data
 
 import com.mywifiadata.app.data.model.AppSettings
+import com.mywifiadata.app.data.model.PlanCapacityUnit
+import com.mywifiadata.app.data.model.PlanDraft
+import com.mywifiadata.app.data.model.PlanDurationUnit
 import com.mywifiadata.app.data.model.TrafficTotals
 import com.mywifiadata.app.ui.UiState
 import org.junit.Assert.assertEquals
@@ -69,5 +72,43 @@ class UsageModelsTest {
         assertEquals(state.cycle.totalBytes / state.elapsedDays, state.averagePerDay)
         assertTrue(state.projectedBytes >= state.cycle.totalBytes)
         assertTrue(state.daysLeft in 0..31)
+    }
+
+    @Test
+    fun `plan draft converts capacity units and pending or active plan days`() {
+        val gbDraft = PlanDraft(capacityValue = 80.0, capacityUnit = PlanCapacityUnit.GB)
+        val mbDraft = PlanDraft(capacityValue = 500.0, capacityUnit = PlanCapacityUnit.MB)
+        val tbDraft = PlanDraft(capacityValue = 1.5, capacityUnit = PlanCapacityUnit.TB)
+
+        assertEquals(80_000_000_000L, gbDraft.quotaBytes)
+        assertEquals(500_000_000L, mbDraft.quotaBytes)
+        assertEquals(1_500_000_000_000L, tbDraft.quotaBytes)
+
+        val now = 1_700_000_000_000L
+        val pendingState = UiState(
+            now = now,
+            settings = AppSettings(
+                quotaBytes = 80_000_000_000L,
+                planDurationValue = 28,
+                planDurationUnit = PlanDurationUnit.DAY,
+                planPendingActivation = true,
+            ),
+        )
+        assertEquals(28, pendingState.cycleDays)
+        assertEquals(28, pendingState.daysLeft)
+
+        val activatedTwelveDaysAgo = now - 12L * 86_400_000L
+        val activeState = UiState(
+            now = now,
+            settings = AppSettings(
+                quotaBytes = 80_000_000_000L,
+                planDurationValue = 28,
+                planDurationUnit = PlanDurationUnit.DAY,
+                planPendingActivation = false,
+                planActivatedAtMillis = activatedTwelveDaysAgo,
+            ),
+        )
+        assertEquals(28, activeState.cycleDays)
+        assertEquals(16, activeState.daysLeft)
     }
 }

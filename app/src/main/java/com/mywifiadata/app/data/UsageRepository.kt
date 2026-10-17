@@ -5,8 +5,10 @@ import com.mywifiadata.app.core.HistoryYearMonth
 import com.mywifiadata.app.core.UsageNetwork
 import com.mywifiadata.app.core.TimeRange
 import com.mywifiadata.app.core.TimeRanges
+import com.mywifiadata.app.data.model.AppSettings
 import com.mywifiadata.app.data.model.AppUsage
 import com.mywifiadata.app.data.model.DayUsage
+import com.mywifiadata.app.data.model.PlanNetworkType
 import com.mywifiadata.app.data.model.TrafficTotals
 import com.mywifiadata.app.data.model.WifiStatus
 import kotlinx.coroutines.currentCoroutineContext
@@ -65,6 +67,27 @@ class UsageRepository(
         cycleStartDay: Int,
         now: Long = System.currentTimeMillis(),
     ): TrafficTotals = deviceTotals(TimeRanges.cycleRange(cycleStartDay, now))
+
+    suspend fun planTotals(
+        settings: AppSettings,
+        now: Long = System.currentTimeMillis(),
+    ): TrafficTotals {
+        if (settings.planPendingActivation) return TrafficTotals.Empty
+        val range = if (settings.planActivatedAtMillis > 0L) {
+            val endMillis = settings.planActivatedAtMillis + settings.planTotalDays.toLong() * 86_400_000L
+            TimeRange(
+                startMillis = settings.planActivatedAtMillis,
+                endMillis = maxOf(settings.planActivatedAtMillis, minOf(now, endMillis)),
+            )
+        } else {
+            TimeRanges.cycleRange(settings.cycleStartDay, now)
+        }
+        return when (settings.planNetworkType) {
+            PlanNetworkType.WIFI -> deviceTotals(range, UsageNetwork.WIFI)
+            PlanNetworkType.MOBILE -> deviceTotals(range, UsageNetwork.MOBILE)
+            PlanNetworkType.BOTH -> deviceTotals(range, UsageNetwork.WIFI) + deviceTotals(range, UsageNetwork.MOBILE)
+        }
+    }
 
     /** استهلاك التطبيقات مرتّبًا من الأكثر استهلاكًا. */
     suspend fun perAppUsage(

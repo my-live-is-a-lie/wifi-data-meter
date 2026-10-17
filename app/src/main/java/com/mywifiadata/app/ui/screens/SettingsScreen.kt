@@ -1,5 +1,11 @@
 package com.mywifiadata.app.ui.screens
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
@@ -19,6 +25,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -51,12 +58,14 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowDownward
+import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Bluetooth
 import androidx.compose.material.icons.rounded.Call
 import androidx.compose.material.icons.rounded.CameraAlt
 import androidx.compose.material.icons.rounded.Chat
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.East
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.GridView
@@ -92,10 +101,13 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Switch
 import androidx.compose.material3.rememberSliderState
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -116,10 +128,14 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
@@ -136,6 +152,11 @@ import com.mywifiadata.app.core.SamplingIntervalUnit
 import com.mywifiadata.app.core.SamplingIntervals
 import com.mywifiadata.app.data.model.AccentColor
 import com.mywifiadata.app.data.model.AppLayoutDirection
+import com.mywifiadata.app.data.model.AppSettings
+import com.mywifiadata.app.data.model.PlanCapacityUnit
+import com.mywifiadata.app.data.model.PlanDraft
+import com.mywifiadata.app.data.model.PlanDurationUnit
+import com.mywifiadata.app.data.model.PlanNetworkType
 import com.mywifiadata.app.data.model.ThemeMode
 import com.mywifiadata.app.ui.UiState
 import com.mywifiadata.app.ui.components.ExpressiveCard
@@ -144,6 +165,8 @@ import com.mywifiadata.app.ui.components.SectionHeader
 import com.mywifiadata.app.ui.components.SettingSwitchRow
 import com.mywifiadata.app.ui.theme.AppButtonShape
 import com.mywifiadata.app.ui.theme.swatchColor
+import java.io.File
+import java.io.FileOutputStream
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -173,6 +196,8 @@ fun SettingsScreen(
     onOpenWifiSettings: () -> Unit,
     onClearData: () -> Unit,
     onLayoutDirectionChange: (AppLayoutDirection) -> Unit = {},
+    onSavePlan: (PlanDraft) -> Unit = { draft -> onQuotaChange(draft.quotaBytes) },
+    onActivatePlan: () -> Unit = {},
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(16.dp),
 ) {
@@ -183,6 +208,9 @@ fun SettingsScreen(
     var moreExpanded by rememberSaveable { mutableStateOf(false) }
     val settings = state.settings
     val quickSettingsTileReady = settings.quickSettingsTileEnabled && settings.quickSettingsTileAdded
+    val planLogoBitmap = remember(settings.planLogoPath) {
+        loadPlanLogoBitmap(settings.planLogoPath)
+    }
 
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
@@ -194,40 +222,114 @@ fun SettingsScreen(
                 Column(modifier = Modifier.fillMaxWidth()) {
                     SectionHeader(
                         title = stringResource(R.string.settings_section_quota),
-                        supportingText = stringResource(R.string.settings_quota_hint),
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    InfoRow(
-                        icon = Icons.Rounded.MonetizationOn,
-                        label = stringResource(R.string.label_quota),
-                        value = if (state.hasQuota) {
-                            Format.bytes(settings.quotaBytes)
-                        } else {
-                            stringResource(R.string.quota_not_set)
-                        },
-                    )
-                    InfoRow(
-                        icon = Icons.Rounded.Timer,
-                        label = stringResource(R.string.settings_cycle_day),
-                        value = "${settings.cycleStartDay}",
-                    )
-                    InfoRow(
-                        icon = Icons.Rounded.Timer,
-                        label = stringResource(R.string.label_remaining),
-                        value = if (state.hasQuota) Format.bytes(state.remainingBytes) else "—",
-                    )
-                    InfoRow(
-                        icon = Icons.Rounded.Info,
-                        label = stringResource(R.string.label_days),
-                        value = "${state.daysLeft}",
-                    )
+                    if (settings.planName.isNotBlank() || planLogoBitmap != null) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            if (settings.planName.isNotBlank()) {
+                                Text(
+                                    text = settings.planName,
+                                    style = MaterialTheme.typography.titleMediumEmphasized,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.weight(1f),
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            } else {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                            if (planLogoBitmap != null) {
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Image(
+                                    bitmap = planLogoBitmap,
+                                    contentDescription = stringResource(R.string.plan_logo_label),
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clip(RoundedCornerShape(6.dp)),
+                                )
+                            }
+                        }
+                    }
                     Spacer(modifier = Modifier.height(12.dp))
-                    FilledTonalButton(
-                        onClick = { showQuotaDialog = true },
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = AppButtonShape,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Top,
                     ) {
-                        Text(text = stringResource(R.string.quota_set_action))
+                        QuotaMetricColumn(
+                            label = stringResource(R.string.label_quota),
+                            value = if (state.hasQuota) {
+                                Format.bytes(settings.quotaBytes)
+                            } else {
+                                "—"
+                            },
+                            horizontalAlignment = Alignment.Start,
+                            modifier = Modifier.weight(1f),
+                        )
+                        QuotaMetricColumn(
+                            label = stringResource(R.string.label_remaining),
+                            value = if (state.hasQuota) Format.bytes(state.remainingBytes) else "—",
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.weight(1f),
+                        )
+                        QuotaMetricColumn(
+                            label = stringResource(R.string.quota_remaining_time),
+                            value = if (state.hasQuota) {
+                                stringResource(R.string.quota_days_of_total, state.daysLeft, state.cycleDays)
+                            } else {
+                                "—"
+                            },
+                            horizontalAlignment = Alignment.End,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(14.dp))
+                    if (state.hasQuota && settings.planPendingActivation) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Button(
+                                onClick = onActivatePlan,
+                                modifier = Modifier.weight(1f),
+                                shape = AppButtonShape,
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.quota_activate_action),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            FilledTonalButton(
+                                onClick = { showQuotaDialog = true },
+                                modifier = Modifier.weight(1f),
+                                shape = AppButtonShape,
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.quota_update_action),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                    } else {
+                        FilledTonalButton(
+                            onClick = { showQuotaDialog = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = AppButtonShape,
+                        ) {
+                            Text(
+                                text = stringResource(
+                                    if (state.hasQuota) R.string.quota_update_action else R.string.quota_set_action,
+                                ),
+                            )
+                        }
                     }
                 }
             }
@@ -451,12 +553,10 @@ fun SettingsScreen(
 
     if (showQuotaDialog) {
         QuotaDialog(
-            quotaBytes = settings.quotaBytes,
-            cycleStartDay = settings.cycleStartDay,
+            settings = settings,
             onDismiss = { showQuotaDialog = false },
-            onConfirm = { gigabytes, cycleDay ->
-                onQuotaChange(Format.gigabytesToBytes(gigabytes))
-                onCycleDayChange(cycleDay)
+            onConfirm = { draft ->
+                onSavePlan(draft)
                 showQuotaDialog = false
             },
         )
@@ -2300,83 +2400,283 @@ private fun AlertThresholdSlider(value: Int, onValueChange: (Int) -> Unit) {
     )
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun QuotaMetricColumn(
+    label: String,
+    value: String,
+    horizontalAlignment: Alignment.Horizontal,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = horizontalAlignment,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleMediumEmphasized,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
 @Composable
 private fun QuotaDialog(
-    quotaBytes: Long,
-    cycleStartDay: Int,
+    settings: AppSettings,
     onDismiss: () -> Unit,
-    onConfirm: (Double, Int) -> Unit,
+    onConfirm: (PlanDraft) -> Unit,
 ) {
-    val initialGigabytes = if (quotaBytes > 0L) {
-        String.format(java.util.Locale.US, "%.0f", Format.bytesToGigabytes(quotaBytes))
-    } else {
-        ""
+    val context = LocalContext.current
+    val hasActiveQuota = settings.quotaBytes > 0L
+    val isEditLocked = hasActiveQuota && settings.planPreventEdit
+
+    val initialCapacityValue = remember(settings.quotaBytes, settings.planCapacityUnit) {
+        if (settings.quotaBytes > 0L) {
+            val raw = settings.quotaBytes.toDouble() / settings.planCapacityUnit.bytesFactor.toDouble()
+            if (raw == raw.toLong().toDouble()) {
+                raw.toLong().toString()
+            } else {
+                String.format(java.util.Locale.US, "%.2f", raw).trimEnd('0').trimEnd('.')
+            }
+        } else {
+            ""
+        }
     }
-    var gigabytesText by rememberSaveable(quotaBytes) { mutableStateOf(initialGigabytes) }
-    var cycleDay by rememberSaveable(cycleStartDay) { mutableStateOf(cycleStartDay) }
-    val parsed = gigabytesText.toDoubleOrNull()
+
+    var planName by rememberSaveable(settings.planName) { mutableStateOf(settings.planName) }
+    var logoPath by rememberSaveable(settings.planLogoPath) { mutableStateOf(settings.planLogoPath) }
+    var capacityText by rememberSaveable(initialCapacityValue) { mutableStateOf(initialCapacityValue) }
+    var capacityUnit by rememberSaveable(settings.planCapacityUnit) { mutableStateOf(settings.planCapacityUnit) }
+    var durationText by rememberSaveable(settings.planDurationValue) {
+        mutableStateOf(settings.planDurationValue.toString())
+    }
+    var durationUnit by rememberSaveable(settings.planDurationUnit) { mutableStateOf(settings.planDurationUnit) }
+    var networkType by rememberSaveable(settings.planNetworkType) { mutableStateOf(settings.planNetworkType) }
+    var preventEdit by rememberSaveable(settings.planPreventEdit) { mutableStateOf(settings.planPreventEdit) }
+
+    val logoBitmap = remember(logoPath) { loadPlanLogoBitmap(logoPath) }
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent(),
+    ) { uri: Uri? ->
+        if (uri != null) {
+            savePickedPlanLogo(context, uri)?.let { savedPath ->
+                logoPath = savedPath
+            }
+        }
+    }
+
+    val parsedCapacity = capacityText.toDoubleOrNull()
+    val parsedDuration = durationText.toIntOrNull()
+    val canSave = isEditLocked || (
+        (capacityText.isBlank() || (parsedCapacity != null && parsedCapacity >= 0.0)) &&
+            (parsedDuration != null && parsedDuration >= 1)
+        )
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        icon = { Icon(imageVector = Icons.Rounded.MonetizationOn, contentDescription = null) },
-        title = { Text(text = stringResource(R.string.settings_quota_size)) },
+        title = {
+            Text(
+                text = stringResource(
+                    if (hasActiveQuota) R.string.quota_dialog_title_update else R.string.quota_dialog_title_add,
+                ),
+                style = MaterialTheme.typography.headlineSmall,
+            )
+        },
         text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                OutlinedTextField(
-                    value = gigabytesText,
-                    onValueChange = { newValue -> gigabytesText = newValue.filter { it.isDigit() || it == '.' } },
-                    label = { Text(text = stringResource(R.string.unit_gb)) },
-                    supportingText = { Text(text = stringResource(R.string.settings_quota_hint)) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = stringResource(R.string.settings_cycle_day),
-                    style = MaterialTheme.typography.bodyMediumEmphasized,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Spacer(modifier = Modifier.height(4.dp))
+                    verticalAlignment = Alignment.Bottom,
+                ) {
+                    TextField(
+                        value = planName,
+                        onValueChange = { planName = it },
+                        placeholder = { Text(text = stringResource(R.string.plan_name_label)) },
+                        singleLine = true,
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            disabledContainerColor = Color.Transparent,
+                        ),
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = stringResource(R.string.plan_logo_label),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Box(modifier = Modifier.size(48.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .matchParentSize()
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(4.dp))
+                                    .clickable(role = Role.Button) { imagePickerLauncher.launch("image/*") },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                if (logoBitmap != null) {
+                                    Image(
+                                        bitmap = logoBitmap,
+                                        contentDescription = stringResource(R.string.plan_logo_label),
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize(),
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Add,
+                                        contentDescription = stringResource(R.string.plan_logo_label),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                            if (logoBitmap != null) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .offset(x = 6.dp, y = (-6).dp)
+                                        .size(20.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.errorContainer)
+                                        .clickable(role = Role.Button) { logoPath = "" },
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Close,
+                                        contentDescription = stringResource(R.string.plan_logo_clear),
+                                        tint = MaterialTheme.colorScheme.onErrorContainer,
+                                        modifier = Modifier.size(14.dp),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center,
                 ) {
-                    IconButton(
-                        onClick = { cycleDay = (cycleDay - 1).coerceAtLeast(1) },
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Remove,
-                            contentDescription = stringResource(R.string.cd_decrease),
-                        )
-                    }
-                    Text(
-                        text = "$cycleDay",
-                        style = MaterialTheme.typography.titleLargeEmphasized,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(horizontal = 16.dp),
+                    OutlinedTextField(
+                        value = capacityText,
+                        onValueChange = { newValue ->
+                            capacityText = newValue.filter { it.isDigit() || it == '.' }
+                        },
+                        label = { Text(text = stringResource(R.string.plan_capacity_label)) },
+                        enabled = !isEditLocked,
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f),
                     )
-                    IconButton(
-                        onClick = { cycleDay = (cycleDay + 1).coerceAtMost(28) },
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Add,
-                            contentDescription = stringResource(R.string.cd_increase),
-                        )
-                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    PlanDropdownPill(
+                        selectedLabel = stringResource(capacityUnit.labelResource()),
+                        options = PlanCapacityUnit.entries,
+                        optionLabel = { stringResource(it.labelResource()) },
+                        selectedOption = capacityUnit,
+                        onSelect = { capacityUnit = it },
+                        enabled = !isEditLocked,
+                    )
                 }
-                Text(
-                    text = stringResource(R.string.settings_cycle_day_hint),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    OutlinedTextField(
+                        value = durationText,
+                        onValueChange = { newValue ->
+                            durationText = newValue.filter { it.isDigit() }
+                        },
+                        label = { Text(text = stringResource(R.string.plan_duration_label)) },
+                        enabled = !isEditLocked,
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    PlanDropdownPill(
+                        selectedLabel = stringResource(durationUnit.labelResource()),
+                        options = PlanDurationUnit.entries,
+                        optionLabel = { stringResource(it.labelResource()) },
+                        selectedOption = durationUnit,
+                        onSelect = { durationUnit = it },
+                        enabled = !isEditLocked,
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text = stringResource(R.string.plan_type_label),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    PlanDropdownPill(
+                        selectedLabel = stringResource(networkType.labelResource()),
+                        options = PlanNetworkType.entries,
+                        optionLabel = { stringResource(it.labelResource()) },
+                        selectedOption = networkType,
+                        onSelect = { networkType = it },
+                        enabled = !isEditLocked,
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text = stringResource(R.string.plan_prevent_edit_label),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Switch(
+                        checked = preventEdit,
+                        onCheckedChange = { preventEdit = it },
+                        enabled = !isEditLocked,
+                    )
+                }
             }
         },
         confirmButton = {
             Button(
-                onClick = { onConfirm(parsed ?: 0.0, cycleDay) },
-                enabled = gigabytesText.isBlank() || (parsed != null && parsed >= 0.0),
+                onClick = {
+                    onConfirm(
+                        PlanDraft(
+                            name = planName,
+                            logoPath = logoPath,
+                            capacityValue = parsedCapacity ?: 0.0,
+                            capacityUnit = capacityUnit,
+                            durationValue = (parsedDuration ?: 28).coerceAtLeast(1),
+                            durationUnit = durationUnit,
+                            networkType = networkType,
+                            preventEdit = preventEdit,
+                        ),
+                    )
+                },
+                enabled = canSave,
                 shape = AppButtonShape,
             ) {
                 Text(text = stringResource(R.string.action_save))
@@ -2389,3 +2689,126 @@ private fun QuotaDialog(
         },
     )
 }
+
+@Composable
+private fun <T> PlanDropdownPill(
+    selectedLabel: String,
+    options: List<T>,
+    optionLabel: @Composable (T) -> String,
+    selectedOption: T,
+    onSelect: (T) -> Unit,
+    enabled: Boolean = true,
+) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    Box {
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(50))
+                .border(
+                    width = 1.dp,
+                    color = if (enabled) {
+                        MaterialTheme.colorScheme.outline
+                    } else {
+                        MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
+                    },
+                    shape = RoundedCornerShape(50),
+                )
+                .clickable(enabled = enabled, role = Role.Button) { expanded = true }
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                text = selectedLabel,
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (enabled) {
+                    MaterialTheme.colorScheme.onSurface
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                },
+                maxLines = 1,
+            )
+            Icon(
+                imageVector = Icons.Rounded.ArrowDropDown,
+                contentDescription = null,
+                tint = if (enabled) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                },
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        DropdownMenu(
+            expanded = expanded && enabled,
+            onDismissRequest = { expanded = false },
+        ) {
+            options.forEach { option ->
+                val label = optionLabel(option)
+                DropdownMenuItem(
+                    text = { Text(text = label, maxLines = 1) },
+                    onClick = {
+                        expanded = false
+                        onSelect(option)
+                    },
+                    trailingIcon = if (option == selectedOption) {
+                        { Icon(imageVector = Icons.Rounded.Check, contentDescription = null) }
+                    } else {
+                        null
+                    },
+                )
+            }
+        }
+    }
+}
+
+private fun PlanCapacityUnit.labelResource(): Int = when (this) {
+    PlanCapacityUnit.MB -> R.string.plan_unit_mb
+    PlanCapacityUnit.GB -> R.string.plan_unit_gb
+    PlanCapacityUnit.TB -> R.string.plan_unit_tb
+}
+
+private fun PlanDurationUnit.labelResource(): Int = when (this) {
+    PlanDurationUnit.DAY -> R.string.plan_duration_day
+    PlanDurationUnit.WEEK -> R.string.plan_duration_week
+    PlanDurationUnit.MONTH -> R.string.plan_duration_month
+    PlanDurationUnit.YEAR -> R.string.plan_duration_year
+}
+
+private fun PlanNetworkType.labelResource(): Int = when (this) {
+    PlanNetworkType.WIFI -> R.string.plan_network_wifi
+    PlanNetworkType.MOBILE -> R.string.plan_network_mobile
+    PlanNetworkType.BOTH -> R.string.plan_network_both
+}
+
+private fun loadPlanLogoBitmap(path: String): ImageBitmap? {
+    if (path.isBlank()) return null
+    return runCatching {
+        val file = File(path)
+        if (!file.exists()) return null
+        BitmapFactory.decodeFile(file.absolutePath)?.asImageBitmap()
+    }.getOrNull()
+}
+
+private fun savePickedPlanLogo(context: Context, uri: Uri): String? = runCatching {
+    val input = context.contentResolver.openInputStream(uri) ?: return null
+    val bitmap = input.use { BitmapFactory.decodeStream(it) } ?: return null
+    val maxSide = 256
+    val scaled = if (bitmap.width > maxSide || bitmap.height > maxSide) {
+        val ratio = minOf(maxSide.toFloat() / bitmap.width, maxSide.toFloat() / bitmap.height)
+        val width = (bitmap.width * ratio).roundToInt().coerceAtLeast(1)
+        val height = (bitmap.height * ratio).roundToInt().coerceAtLeast(1)
+        Bitmap.createScaledBitmap(bitmap, width, height, true)
+    } else {
+        bitmap
+    }
+    val dir = File(context.filesDir, "plan_logos").apply { mkdirs() }
+    val outFile = File(dir, "plan_logo_${System.currentTimeMillis()}.png")
+    FileOutputStream(outFile).use { out ->
+        scaled.compress(Bitmap.CompressFormat.PNG, 90, out)
+    }
+    dir.listFiles()?.forEach { existing ->
+        if (existing != outFile) existing.delete()
+    }
+    outFile.absolutePath
+}.getOrNull()
