@@ -36,6 +36,7 @@ import com.mywifiadata.app.data.model.AppUsage
 import com.mywifiadata.app.data.model.AppsFilter
 import com.mywifiadata.app.data.model.DayUsage
 import com.mywifiadata.app.data.model.DashboardLayout
+import com.mywifiadata.app.data.model.PlanDraft
 import com.mywifiadata.app.data.model.SpeedSample
 import com.mywifiadata.app.data.model.SpeedTestRecord
 import com.mywifiadata.app.data.model.ThemeMode
@@ -160,12 +161,34 @@ data class UiState(
 
     val remainingBytes: Long get() = (settings.quotaBytes - cycle.totalBytes).coerceAtLeast(0L)
 
-    val cycleDays: Int get() = TimeRanges.daysBetween(cycleStartMillis, cycleEndMillis)
+    val cycleDays: Int
+        get() = if (settings.planPendingActivation || settings.planActivatedAtMillis > 0L) {
+            settings.planTotalDays
+        } else {
+            TimeRanges.daysBetween(cycleStartMillis, cycleEndMillis)
+        }
 
     val elapsedDays: Int
-        get() = TimeRanges.daysBetween(TimeRanges.cycleRange(settings.cycleStartDay, now).startMillis, now)
+        get() = when {
+            settings.planPendingActivation -> 1
+            settings.planActivatedAtMillis > 0L -> {
+                val endMillis = settings.planActivatedAtMillis + settings.planTotalDays.toLong() * 86_400_000L
+                TimeRanges.daysBetween(settings.planActivatedAtMillis, minOf(now, endMillis))
+            }
+            else -> TimeRanges.daysBetween(TimeRanges.cycleRange(settings.cycleStartDay, now).startMillis, now)
+        }
 
-    val daysLeft: Int get() = TimeRanges.daysLeftInCycle(settings.cycleStartDay, now)
+    val daysLeft: Int
+        get() = when {
+            settings.planPendingActivation -> settings.planTotalDays
+            settings.planActivatedAtMillis > 0L -> {
+                val totalDays = settings.planTotalDays
+                val endMillis = settings.planActivatedAtMillis + totalDays.toLong() * 86_400_000L
+                val remainingMillis = (endMillis - now).coerceAtLeast(0L)
+                kotlin.math.ceil(remainingMillis.toDouble() / 86_400_000.0).toInt().coerceIn(0, totalDays)
+            }
+            else -> TimeRanges.daysLeftInCycle(settings.cycleStartDay, now)
+        }
 
     private val cycleStartMillis: Long get() = TimeRanges.cycleRange(settings.cycleStartDay, now).startMillis
 
@@ -289,7 +312,7 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         val wifi = repository.wifiStatus()
         val today = if (hasAccess) repository.todayTotals(now) else TrafficTotals.Empty
         val cycle = if (hasAccess) {
-            repository.cycleTotals(settings.cycleStartDay, now)
+            repository.planTotals(settings, now)
         } else {
             TrafficTotals.Empty
         }
@@ -840,6 +863,60 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
 
     fun setQuotaBytes(bytes: Long) {
         repository.settingsStore.update { it.copy(quotaBytes = bytes.coerceAtLeast(0L)) }
+        refreshNow()
+    }
+
+    fun savePlan(draft: PlanDraft) {
+        val current = repository.settingsStore.current
+        val isLockedUpdate = current.quotaBytes > 0L && current.planPreventEdit
+        if (isLockedUpdate) {
+            repository.settingsStore.update {
+                it.copy(
+                    planName = draft.name.trim(),
+                    planLogoPath = draft.logoPath,
+                )
+            }
+            return
+        }
+        val newQuotaBytes = draft.quotaBytes
+        val safeDuration = draft.durationValue.coerceAtLeast(1)
+        val isNewOrChangedPlan = current.quotaBytes <= 0L ||
+            current.quotaBytes != newQuotaBytes ||
+            current.planDurationValue != safeDuration ||
+            current.planDurationUnit != draft.durationUnit ||
+            current.planNetworkType != draft.networkType
+        repository.settingsStore.update {
+            it.copy(
+                planName = draft.name.trim(),
+                planLogoPath = draft.logoPath,
+                quotaBytes = newQuotaBytes,
+                planCapacityUnit = draft.capacityUnit,
+                planDurationValue = safeDuration,
+                planDurationUnit = draft.durationUnit,
+                planNetworkType = draft.networkType,
+                planPreventEdit = if (newQuotaBytes > 0L) draft.preventEdit else false,
+                planPendingActivation = when {
+                    newQuotaBytes <= 0L -> false
+                    isNewOrChangedPlan -> true
+                    else -> it.planPendingActivation
+                },
+                planActivatedAtMillis = when {
+                    newQuotaBytes <= 0L || isNewOrChangedPlan -> 0L
+                    else -> it.planActivatedAtMillis
+                },
+            )
+        }
+        refreshNow()
+    }
+
+    fun activatePlan() {
+        val now = System.currentTimeMillis()
+        repository.settingsStore.update {
+            it.copy(
+                planPendingActivation = false,
+                planActivatedAtMillis = now,
+            )
+        }
         refreshNow()
     }
 

@@ -7,6 +7,9 @@ import com.mywifiadata.app.data.model.AccentColor
 import com.mywifiadata.app.data.model.AppLayoutDirection
 import com.mywifiadata.app.data.model.AppSettings
 import com.mywifiadata.app.data.model.DashboardLayout
+import com.mywifiadata.app.data.model.PlanCapacityUnit
+import com.mywifiadata.app.data.model.PlanDurationUnit
+import com.mywifiadata.app.data.model.PlanNetworkType
 import com.mywifiadata.app.data.model.SpeedTestRecord
 import com.mywifiadata.app.data.model.ThemeMode
 import com.mywifiadata.app.data.model.TrafficTotals
@@ -65,6 +68,21 @@ class SettingsStore(context: Context) {
     private fun read(): AppSettings = AppSettings(
         quotaBytes = prefs.getLong(KEY_QUOTA_BYTES, 0L),
         cycleStartDay = prefs.getInt(KEY_CYCLE_DAY, 1),
+        planName = prefs.getString(KEY_PLAN_NAME, "") ?: "",
+        planLogoPath = prefs.getString(KEY_PLAN_LOGO_PATH, "") ?: "",
+        planCapacityUnit = prefs.getString(KEY_PLAN_CAPACITY_UNIT, null)
+            ?.let { stored -> PlanCapacityUnit.entries.firstOrNull { it.name == stored } }
+            ?: PlanCapacityUnit.GB,
+        planDurationValue = prefs.getInt(KEY_PLAN_DURATION_VALUE, 28).coerceAtLeast(1),
+        planDurationUnit = prefs.getString(KEY_PLAN_DURATION_UNIT, null)
+            ?.let { stored -> PlanDurationUnit.entries.firstOrNull { it.name == stored } }
+            ?: PlanDurationUnit.DAY,
+        planNetworkType = prefs.getString(KEY_PLAN_NETWORK_TYPE, null)
+            ?.let { stored -> PlanNetworkType.entries.firstOrNull { it.name == stored } }
+            ?: PlanNetworkType.WIFI,
+        planPreventEdit = prefs.getBoolean(KEY_PLAN_PREVENT_EDIT, false),
+        planPendingActivation = prefs.getBoolean(KEY_PLAN_PENDING_ACTIVATION, false),
+        planActivatedAtMillis = prefs.getLong(KEY_PLAN_ACTIVATED_AT, 0L),
         notificationsEnabled = prefs.getBoolean(KEY_NOTIFICATIONS, true),
         alertThresholdPercent = prefs.getInt(KEY_THRESHOLD, 80),
         sampleIntervalIndex = if (prefs.contains(KEY_INTERVAL_INDEX)) {
@@ -146,6 +164,15 @@ class SettingsStore(context: Context) {
         prefs.edit()
             .putLong(KEY_QUOTA_BYTES, settings.quotaBytes)
             .putInt(KEY_CYCLE_DAY, settings.cycleStartDay)
+            .putString(KEY_PLAN_NAME, settings.planName)
+            .putString(KEY_PLAN_LOGO_PATH, settings.planLogoPath)
+            .putString(KEY_PLAN_CAPACITY_UNIT, settings.planCapacityUnit.name)
+            .putInt(KEY_PLAN_DURATION_VALUE, settings.planDurationValue.coerceAtLeast(1))
+            .putString(KEY_PLAN_DURATION_UNIT, settings.planDurationUnit.name)
+            .putString(KEY_PLAN_NETWORK_TYPE, settings.planNetworkType.name)
+            .putBoolean(KEY_PLAN_PREVENT_EDIT, settings.planPreventEdit)
+            .putBoolean(KEY_PLAN_PENDING_ACTIVATION, settings.planPendingActivation)
+            .putLong(KEY_PLAN_ACTIVATED_AT, settings.planActivatedAtMillis)
             .putBoolean(KEY_NOTIFICATIONS, settings.notificationsEnabled)
             .putInt(KEY_THRESHOLD, settings.alertThresholdPercent)
             .putInt(KEY_INTERVAL_INDEX, intervalIndex)
@@ -184,6 +211,15 @@ class SettingsStore(context: Context) {
 
         private const val KEY_QUOTA_BYTES = "quota_bytes"
         private const val KEY_CYCLE_DAY = "cycle_day"
+        private const val KEY_PLAN_NAME = "plan_name"
+        private const val KEY_PLAN_LOGO_PATH = "plan_logo_path"
+        private const val KEY_PLAN_CAPACITY_UNIT = "plan_capacity_unit"
+        private const val KEY_PLAN_DURATION_VALUE = "plan_duration_value"
+        private const val KEY_PLAN_DURATION_UNIT = "plan_duration_unit"
+        private const val KEY_PLAN_NETWORK_TYPE = "plan_network_type"
+        private const val KEY_PLAN_PREVENT_EDIT = "plan_prevent_edit"
+        private const val KEY_PLAN_PENDING_ACTIVATION = "plan_pending_activation"
+        private const val KEY_PLAN_ACTIVATED_AT = "plan_activated_at"
         private const val KEY_NOTIFICATIONS = "notifications"
         private const val KEY_THRESHOLD = "alert_threshold"
         private const val KEY_INTERVAL_INDEX = "sample_interval_index"

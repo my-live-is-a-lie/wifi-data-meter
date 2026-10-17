@@ -698,6 +698,8 @@ fun MainScreen(
                     onOpenWifiSettings = { SystemActions.openWifiSettings(context) },
                     onClearData = { viewModel.clearData() },
                     onLayoutDirectionChange = { viewModel.setLayoutDirection(it) },
+                    onSavePlan = { viewModel.savePlan(it) },
+                    onActivatePlan = { viewModel.activatePlan() },
                 )
             }
         }

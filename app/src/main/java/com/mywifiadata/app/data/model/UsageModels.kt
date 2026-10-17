@@ -138,6 +138,43 @@ enum class AppLayoutDirection {
     LTR,
 }
 
+/** وحدة قياس سعة الباقة (ميجابايت / جيجابايت / تيرابايت). */
+enum class PlanCapacityUnit(val bytesFactor: Long) {
+    MB(1_000_000L),
+    GB(1_000_000_000L),
+    TB(1_000_000_000_000L),
+}
+
+/** وحدة مدة الباقة (يوم / أسبوع / شهر / سنة). */
+enum class PlanDurationUnit(val daysPerUnit: Int) {
+    DAY(1),
+    WEEK(7),
+    MONTH(30),
+    YEAR(365),
+}
+
+/** نوع شبكة الباقة (واي فاي / بيانات الهاتف / كلاهما). */
+enum class PlanNetworkType {
+    WIFI,
+    MOBILE,
+    BOTH,
+}
+
+/** بيانات الباقة المُدخلة من نافذة إضافة/تحديث الباقة. */
+data class PlanDraft(
+    val name: String = "",
+    val logoPath: String = "",
+    val capacityValue: Double = 0.0,
+    val capacityUnit: PlanCapacityUnit = PlanCapacityUnit.GB,
+    val durationValue: Int = 28,
+    val durationUnit: PlanDurationUnit = PlanDurationUnit.DAY,
+    val networkType: PlanNetworkType = PlanNetworkType.WIFI,
+    val preventEdit: Boolean = false,
+) {
+    val quotaBytes: Long
+        get() = (capacityValue.coerceAtLeast(0.0) * capacityUnit.bytesFactor.toDouble()).toLong()
+}
+
 /** لون التمييز المختار من لوحة الألوان الجاهزة. */
 enum class AccentColor {
     /** ألوان السمة الافتراضية (ألوان النظام إن كانت مفعّلة). */
@@ -158,6 +195,15 @@ enum class AccentColor {
 data class AppSettings(
     val quotaBytes: Long = 0L,
     val cycleStartDay: Int = 1,
+    val planName: String = "",
+    val planLogoPath: String = "",
+    val planCapacityUnit: PlanCapacityUnit = PlanCapacityUnit.GB,
+    val planDurationValue: Int = 28,
+    val planDurationUnit: PlanDurationUnit = PlanDurationUnit.DAY,
+    val planNetworkType: PlanNetworkType = PlanNetworkType.WIFI,
+    val planPreventEdit: Boolean = false,
+    val planPendingActivation: Boolean = false,
+    val planActivatedAtMillis: Long = 0L,
     val notificationsEnabled: Boolean = true,
     val alertThresholdPercent: Int = 80,
     /** فهرس خيار المدة في [SamplingIntervals]؛ يحفظ الوحدة حتى مع تساوي المدد. */
@@ -193,4 +239,7 @@ data class AppSettings(
     val speedTestHistory: List<SpeedTestRecord> = emptyList(),
     /** آخر نتيجة اختبار سرعة محفوظة؛ تبقى منفصلة لتوافق التخزين القديم وملخص البطاقة. */
     val lastSpeedTest: SpeedTestRecord? = null,
-)
+) {
+    val planTotalDays: Int
+        get() = (planDurationValue.coerceAtLeast(1) * planDurationUnit.daysPerUnit).coerceAtLeast(1)
+}
