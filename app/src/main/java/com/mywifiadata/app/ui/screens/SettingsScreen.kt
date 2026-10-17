@@ -13,12 +13,15 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
@@ -29,6 +32,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -132,6 +136,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -150,6 +155,7 @@ import com.mywifiadata.app.R
 import com.mywifiadata.app.core.Format
 import com.mywifiadata.app.core.SamplingIntervalUnit
 import com.mywifiadata.app.core.SamplingIntervals
+import com.mywifiadata.app.core.UsageNetwork
 import com.mywifiadata.app.data.model.AccentColor
 import com.mywifiadata.app.data.model.AppLayoutDirection
 import com.mywifiadata.app.data.model.AppSettings
@@ -197,20 +203,19 @@ fun SettingsScreen(
     onClearData: () -> Unit,
     onLayoutDirectionChange: (AppLayoutDirection) -> Unit = {},
     onSavePlan: (PlanDraft) -> Unit = { draft -> onQuotaChange(draft.quotaBytes) },
-    onActivatePlan: () -> Unit = {},
+    onActivatePlan: (UsageNetwork) -> Unit = {},
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(16.dp),
 ) {
     var showQuotaDialog by rememberSaveable { mutableStateOf(false) }
+    var selectedPlanNetwork by rememberSaveable { mutableStateOf(UsageNetwork.WIFI) }
+    var planSwipeDirection by rememberSaveable { mutableStateOf(1) }
     var showClearDialog by rememberSaveable { mutableStateOf(false) }
     var showHideAppIconDialog by rememberSaveable { mutableStateOf(false) }
     var hideAppIconFailed by rememberSaveable { mutableStateOf(false) }
     var moreExpanded by rememberSaveable { mutableStateOf(false) }
     val settings = state.settings
     val quickSettingsTileReady = settings.quickSettingsTileEnabled && settings.quickSettingsTileAdded
-    val planLogoBitmap = remember(settings.planLogoPath) {
-        loadPlanLogoBitmap(settings.planLogoPath)
-    }
 
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
@@ -218,119 +223,209 @@ fun SettingsScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            ExpressiveCard {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    SectionHeader(
-                        title = stringResource(R.string.settings_section_quota),
+            ExpressiveCard(
+                modifier = Modifier.pointerInput(selectedPlanNetwork) {
+                    var accumulatedDrag = 0f
+                    detectHorizontalDragGestures(
+                        onHorizontalDrag = { change, dragAmount ->
+                            change.consume()
+                            accumulatedDrag += dragAmount
+                        },
+                        onDragEnd = {
+                            val threshold = (size.width * 0.12f).coerceAtLeast(36f)
+                            when {
+                                accumulatedDrag < -threshold -> {
+                                    planSwipeDirection = -1
+                                    selectedPlanNetwork = if (selectedPlanNetwork == UsageNetwork.WIFI) {
+                                        UsageNetwork.MOBILE
+                                    } else {
+                                        UsageNetwork.WIFI
+                                    }
+                                }
+                                accumulatedDrag > threshold -> {
+                                    planSwipeDirection = 1
+                                    selectedPlanNetwork = if (selectedPlanNetwork == UsageNetwork.WIFI) {
+                                        UsageNetwork.MOBILE
+                                    } else {
+                                        UsageNetwork.WIFI
+                                    }
+                                }
+                            }
+                            accumulatedDrag = 0f
+                        },
+                        onDragCancel = { accumulatedDrag = 0f },
                     )
-                    if (settings.planName.isNotBlank() || planLogoBitmap != null) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                        ) {
-                            if (settings.planName.isNotBlank()) {
-                                Text(
-                                    text = settings.planName,
-                                    style = MaterialTheme.typography.titleMediumEmphasized,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.weight(1f),
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            } else {
-                                Spacer(modifier = Modifier.weight(1f))
-                            }
-                            if (planLogoBitmap != null) {
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Image(
-                                    bitmap = planLogoBitmap,
-                                    contentDescription = stringResource(R.string.plan_logo_label),
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier
-                                        .size(44.dp)
-                                        .clip(RoundedCornerShape(6.dp)),
-                                )
-                            }
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
+                },
+            ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.Top,
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        QuotaMetricColumn(
-                            label = stringResource(R.string.label_quota),
-                            value = if (state.hasQuota) {
-                                Format.bytes(settings.quotaBytes)
-                            } else {
-                                "—"
-                            },
-                            horizontalAlignment = Alignment.Start,
-                            modifier = Modifier.weight(1f),
+                        Text(
+                            text = stringResource(R.string.settings_section_quota),
+                            style = MaterialTheme.typography.titleMediumEmphasized,
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
-                        QuotaMetricColumn(
-                            label = stringResource(R.string.label_remaining),
-                            value = if (state.hasQuota) Format.bytes(state.remainingBytes) else "—",
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.weight(1f),
-                        )
-                        QuotaMetricColumn(
-                            label = stringResource(R.string.quota_remaining_time),
-                            value = if (state.hasQuota) {
-                                stringResource(R.string.quota_days_of_total, state.daysLeft, state.cycleDays)
-                            } else {
-                                "—"
-                            },
-                            horizontalAlignment = Alignment.End,
-                            modifier = Modifier.weight(1f),
+                        Text(
+                            text = stringResource(
+                                if (selectedPlanNetwork == UsageNetwork.WIFI) {
+                                    R.string.plan_card_network_wifi
+                                } else {
+                                    R.string.plan_card_network_mobile
+                                },
+                            ),
+                            style = MaterialTheme.typography.titleMediumEmphasized,
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
                     }
-                    Spacer(modifier = Modifier.height(14.dp))
-                    if (state.hasQuota && settings.planPendingActivation) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Button(
-                                onClick = onActivatePlan,
-                                modifier = Modifier.weight(1f),
-                                shape = AppButtonShape,
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.quota_activate_action),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                            FilledTonalButton(
-                                onClick = { showQuotaDialog = true },
-                                modifier = Modifier.weight(1f),
-                                shape = AppButtonShape,
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.quota_update_action),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
+
+                    AnimatedContent(
+                        targetState = selectedPlanNetwork,
+                        transitionSpec = {
+                            val dir = planSwipeDirection
+                            (slideInHorizontally(tween(240, easing = FastOutSlowInEasing)) { width -> -dir * width / 3 } +
+                                fadeIn(tween(200))) togetherWith
+                                (slideOutHorizontally(tween(240, easing = FastOutSlowInEasing)) { width -> dir * width / 3 } +
+                                    fadeOut(tween(180)))
+                        },
+                        label = "plan-card-network-page",
+                    ) { pageNetwork ->
+                        val plan = state.planFor(pageNetwork)
+                        val hasPlanQuota = plan.hasQuota
+                        val remainingBytes = state.planRemainingBytes(pageNetwork)
+                        val daysLeft = state.planDaysLeft(pageNetwork)
+                        val totalDays = state.planTotalDays(pageNetwork)
+                        val planLogoBitmap = remember(plan.logoPath) {
+                            loadPlanLogoBitmap(plan.logoPath)
                         }
-                    } else {
-                        FilledTonalButton(
-                            onClick = { showQuotaDialog = true },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = AppButtonShape,
-                        ) {
-                            Text(
-                                text = stringResource(
-                                    if (state.hasQuota) R.string.quota_update_action else R.string.quota_set_action,
-                                ),
-                            )
+
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            if (plan.name.isNotBlank() || planLogoBitmap != null) {
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                ) {
+                                    if (plan.name.isNotBlank()) {
+                                        Text(
+                                            text = plan.name,
+                                            style = MaterialTheme.typography.titleMediumEmphasized,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.weight(1f),
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    } else {
+                                        Spacer(modifier = Modifier.weight(1f))
+                                    }
+                                    if (planLogoBitmap != null) {
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Image(
+                                            bitmap = planLogoBitmap,
+                                            contentDescription = stringResource(R.string.plan_logo_label),
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier
+                                                .size(44.dp)
+                                                .clip(RoundedCornerShape(6.dp)),
+                                        )
+                                    }
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.Top,
+                            ) {
+                                QuotaMetricColumn(
+                                    label = stringResource(R.string.label_quota),
+                                    value = if (hasPlanQuota) {
+                                        Format.bytes(plan.quotaBytes)
+                                    } else {
+                                        "—"
+                                    },
+                                    horizontalAlignment = Alignment.Start,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                QuotaMetricColumn(
+                                    label = stringResource(R.string.label_remaining),
+                                    value = if (hasPlanQuota) Format.bytes(remainingBytes) else "—",
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                QuotaMetricColumn(
+                                    label = stringResource(R.string.quota_remaining_time),
+                                    value = if (hasPlanQuota) {
+                                        stringResource(R.string.quota_days_of_total, daysLeft, totalDays)
+                                    } else {
+                                        "—"
+                                    },
+                                    horizontalAlignment = Alignment.End,
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(14.dp))
+                            if (hasPlanQuota && plan.pendingActivation) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Button(
+                                        onClick = { onActivatePlan(pageNetwork) },
+                                        modifier = Modifier.weight(1f),
+                                        shape = AppButtonShape,
+                                    ) {
+                                        Text(
+                                            text = stringResource(R.string.quota_activate_action),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    }
+                                    FilledTonalButton(
+                                        onClick = { showQuotaDialog = true },
+                                        modifier = Modifier.weight(1f),
+                                        shape = AppButtonShape,
+                                    ) {
+                                        Text(
+                                            text = stringResource(R.string.quota_update_action),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    }
+                                }
+                            } else {
+                                FilledTonalButton(
+                                    onClick = { showQuotaDialog = true },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = AppButtonShape,
+                                ) {
+                                    Text(
+                                        text = stringResource(
+                                            if (hasPlanQuota) R.string.quota_update_action else R.string.quota_set_action,
+                                        ),
+                                    )
+                                }
+                            }
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    PlanCardPageIndicator(
+                        selectedNetwork = selectedPlanNetwork,
+                        onToggle = {
+                            planSwipeDirection = if (selectedPlanNetwork == UsageNetwork.WIFI) -1 else 1
+                            selectedPlanNetwork = if (selectedPlanNetwork == UsageNetwork.WIFI) {
+                                UsageNetwork.MOBILE
+                            } else {
+                                UsageNetwork.WIFI
+                            }
+                        },
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                    )
                 }
             }
         }
@@ -554,9 +649,14 @@ fun SettingsScreen(
     if (showQuotaDialog) {
         QuotaDialog(
             settings = settings,
+            initialNetwork = selectedPlanNetwork,
             onDismiss = { showQuotaDialog = false },
             onConfirm = { draft ->
                 onSavePlan(draft)
+                selectedPlanNetwork = when (draft.networkType) {
+                    PlanNetworkType.MOBILE -> UsageNetwork.MOBILE
+                    PlanNetworkType.WIFI, PlanNetworkType.BOTH -> UsageNetwork.WIFI
+                }
                 showQuotaDialog = false
             },
         )
@@ -2430,19 +2530,67 @@ private fun QuotaMetricColumn(
     }
 }
 
+/**
+ * شريط صغير وقصير شفاف أسفل بطاقة الباقة بداخله شرطة قصيرة تتحرك يمينًا ويسارًا
+ * لتوضيح البطاقة النشطة (wifi / بيانات الهاتف).
+ */
+@Composable
+private fun PlanCardPageIndicator(
+    selectedNetwork: UsageNetwork,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val thumbOffset by animateDpAsState(
+        targetValue = if (selectedNetwork == UsageNetwork.WIFI) 14.dp else 1.dp,
+        animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
+        label = "plan-card-indicator-offset",
+    )
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+        Box(
+            modifier = modifier
+                .width(28.dp)
+                .height(7.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f))
+                .clickable(role = Role.Button, onClick = onToggle),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            Box(
+                modifier = Modifier
+                    .offset(x = thumbOffset)
+                    .width(13.dp)
+                    .height(5.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary),
+            )
+        }
+    }
+}
+
 @Composable
 private fun QuotaDialog(
     settings: AppSettings,
+    initialNetwork: UsageNetwork = UsageNetwork.WIFI,
     onDismiss: () -> Unit,
     onConfirm: (PlanDraft) -> Unit,
 ) {
     val context = LocalContext.current
-    val hasActiveQuota = settings.quotaBytes > 0L
-    val isEditLocked = hasActiveQuota && settings.planPreventEdit
+    val initialNetworkType = when (initialNetwork) {
+        UsageNetwork.WIFI -> PlanNetworkType.WIFI
+        UsageNetwork.MOBILE -> PlanNetworkType.MOBILE
+    }
+    var networkType by rememberSaveable(initialNetworkType) { mutableStateOf(initialNetworkType) }
+    val activePlanNetwork = when (networkType) {
+        PlanNetworkType.MOBILE -> UsageNetwork.MOBILE
+        PlanNetworkType.WIFI, PlanNetworkType.BOTH -> UsageNetwork.WIFI
+    }
+    val activePlan = settings.planFor(activePlanNetwork)
+    val hasActiveQuota = activePlan.hasQuota
+    val isEditLocked = hasActiveQuota && activePlan.preventEdit
 
-    val initialCapacityValue = remember(settings.quotaBytes, settings.planCapacityUnit) {
-        if (settings.quotaBytes > 0L) {
-            val raw = settings.quotaBytes.toDouble() / settings.planCapacityUnit.bytesFactor.toDouble()
+    val initialCapacityValue = remember(activePlan.quotaBytes, activePlan.capacityUnit) {
+        if (activePlan.quotaBytes > 0L) {
+            val raw = activePlan.quotaBytes.toDouble() / activePlan.capacityUnit.bytesFactor.toDouble()
             if (raw == raw.toLong().toDouble()) {
                 raw.toLong().toString()
             } else {
@@ -2453,23 +2601,30 @@ private fun QuotaDialog(
         }
     }
 
-    var planName by rememberSaveable(settings.planName) { mutableStateOf(settings.planName) }
-    var logoPath by rememberSaveable(settings.planLogoPath) { mutableStateOf(settings.planLogoPath) }
-    var capacityText by rememberSaveable(initialCapacityValue) { mutableStateOf(initialCapacityValue) }
-    var capacityUnit by rememberSaveable(settings.planCapacityUnit) { mutableStateOf(settings.planCapacityUnit) }
-    var durationText by rememberSaveable(settings.planDurationValue) {
-        mutableStateOf(settings.planDurationValue.toString())
+    var planName by rememberSaveable(activePlanNetwork, activePlan.name) { mutableStateOf(activePlan.name) }
+    var logoPath by rememberSaveable(activePlanNetwork, activePlan.logoPath) { mutableStateOf(activePlan.logoPath) }
+    var capacityText by rememberSaveable(activePlanNetwork, initialCapacityValue) {
+        mutableStateOf(initialCapacityValue)
     }
-    var durationUnit by rememberSaveable(settings.planDurationUnit) { mutableStateOf(settings.planDurationUnit) }
-    var networkType by rememberSaveable(settings.planNetworkType) { mutableStateOf(settings.planNetworkType) }
-    var preventEdit by rememberSaveable(settings.planPreventEdit) { mutableStateOf(settings.planPreventEdit) }
+    var capacityUnit by rememberSaveable(activePlanNetwork, activePlan.capacityUnit) {
+        mutableStateOf(activePlan.capacityUnit)
+    }
+    var durationText by rememberSaveable(activePlanNetwork, activePlan.durationValue) {
+        mutableStateOf(activePlan.durationValue.toString())
+    }
+    var durationUnit by rememberSaveable(activePlanNetwork, activePlan.durationUnit) {
+        mutableStateOf(activePlan.durationUnit)
+    }
+    var preventEdit by rememberSaveable(activePlanNetwork, activePlan.preventEdit) {
+        mutableStateOf(activePlan.preventEdit)
+    }
 
     val logoBitmap = remember(logoPath) { loadPlanLogoBitmap(logoPath) }
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent(),
     ) { uri: Uri? ->
         if (uri != null) {
-            savePickedPlanLogo(context, uri)?.let { savedPath ->
+            savePickedPlanLogo(context, uri, activePlanNetwork)?.let { savedPath ->
                 logoPath = savedPath
             }
         }
@@ -2790,7 +2945,11 @@ private fun loadPlanLogoBitmap(path: String): ImageBitmap? {
     }.getOrNull()
 }
 
-private fun savePickedPlanLogo(context: Context, uri: Uri): String? = runCatching {
+private fun savePickedPlanLogo(
+    context: Context,
+    uri: Uri,
+    network: UsageNetwork = UsageNetwork.WIFI,
+): String? = runCatching {
     val input = context.contentResolver.openInputStream(uri) ?: return null
     val bitmap = input.use { BitmapFactory.decodeStream(it) } ?: return null
     val maxSide = 256
@@ -2803,12 +2962,13 @@ private fun savePickedPlanLogo(context: Context, uri: Uri): String? = runCatchin
         bitmap
     }
     val dir = File(context.filesDir, "plan_logos").apply { mkdirs() }
-    val outFile = File(dir, "plan_logo_${System.currentTimeMillis()}.png")
+    val prefix = "plan_logo_${network.name.lowercase()}_"
+    val outFile = File(dir, "$prefix${System.currentTimeMillis()}.png")
     FileOutputStream(outFile).use { out ->
         scaled.compress(Bitmap.CompressFormat.PNG, 90, out)
     }
     dir.listFiles()?.forEach { existing ->
-        if (existing != outFile) existing.delete()
+        if (existing != outFile && existing.name.startsWith(prefix)) existing.delete()
     }
     outFile.absolutePath
 }.getOrNull()

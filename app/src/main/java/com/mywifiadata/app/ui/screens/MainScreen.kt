@@ -699,7 +699,7 @@ fun MainScreen(
                     onClearData = { viewModel.clearData() },
                     onLayoutDirectionChange = { viewModel.setLayoutDirection(it) },
                     onSavePlan = { viewModel.savePlan(it) },
-                    onActivatePlan = { viewModel.activatePlan() },
+                    onActivatePlan = { viewModel.activatePlan(it) },
                 )
             }
         }

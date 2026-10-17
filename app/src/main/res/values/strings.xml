@@ -118,6 +118,8 @@
     <string name="plan_network_wifi">Wi-Fi</string>
     <string name="plan_network_mobile">بيانات الهاتف</string>
     <string name="plan_network_both">كلاهما</string>
+    <string name="plan_card_network_wifi">wifi</string>
+    <string name="plan_card_network_mobile">بيانات الهاتف</string>
     <string name="quota_remaining_of">متبقٍ %1$s من %2$s</string>
     <string name="quota_used_of">استُهلك %1$s</string>
     <string name="quota_exceeded">تجاوزت الباقة بمقدار %1$s</string>

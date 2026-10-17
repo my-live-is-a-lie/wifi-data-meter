@@ -1,6 +1,8 @@
 package com.mywifiadata.app.data
 
+import com.mywifiadata.app.core.UsageNetwork
 import com.mywifiadata.app.data.model.AppSettings
+import com.mywifiadata.app.data.model.DataPlan
 import com.mywifiadata.app.data.model.PlanCapacityUnit
 import com.mywifiadata.app.data.model.PlanDraft
 import com.mywifiadata.app.data.model.PlanDurationUnit
@@ -110,5 +112,39 @@ class UsageModelsTest {
         )
         assertEquals(28, activeState.cycleDays)
         assertEquals(16, activeState.daysLeft)
+    }
+
+    @Test
+    fun `wifi and mobile plans track remaining bytes and days independently`() {
+        val now = 1_700_000_000_000L
+        val state = UiState(
+            now = now,
+            settings = AppSettings(
+                planName = "فودافون كاش",
+                quotaBytes = 80_000_000_000L,
+                planDurationValue = 28,
+                planDurationUnit = PlanDurationUnit.DAY,
+                planPendingActivation = false,
+                planActivatedAtMillis = now,
+                mobilePlan = DataPlan(
+                    name = "باقة الموبايل",
+                    quotaBytes = 20_000_000_000L,
+                    durationValue = 14,
+                    durationUnit = PlanDurationUnit.DAY,
+                    pendingActivation = false,
+                    activatedAtMillis = now - 4L * 86_400_000L,
+                ),
+            ),
+            cycle = TrafficTotals(rxBytes = 250_000_000L, txBytes = 0L),
+            mobileCycle = TrafficTotals(rxBytes = 5_000_000_000L, txBytes = 0L),
+        )
+
+        assertEquals(79_750_000_000L, state.planRemainingBytes(UsageNetwork.WIFI))
+        assertEquals(28, state.planDaysLeft(UsageNetwork.WIFI))
+        assertEquals(28, state.planTotalDays(UsageNetwork.WIFI))
+
+        assertEquals(15_000_000_000L, state.planRemainingBytes(UsageNetwork.MOBILE))
+        assertEquals(10, state.planDaysLeft(UsageNetwork.MOBILE))
+        assertEquals(14, state.planTotalDays(UsageNetwork.MOBILE))
     }
 }
