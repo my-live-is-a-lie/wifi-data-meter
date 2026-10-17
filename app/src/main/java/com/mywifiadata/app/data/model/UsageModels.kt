@@ -2,6 +2,7 @@ package com.mywifiadata.app.data.model
 
 import com.mywifiadata.app.core.AppLanguage
 import com.mywifiadata.app.core.SamplingIntervals
+import com.mywifiadata.app.core.UsageNetwork
 
 /** إجماليات المرور (تنزيل/رفع). */
 data class TrafficTotals(
@@ -160,6 +161,35 @@ enum class PlanNetworkType {
     BOTH,
 }
 
+/** بيانات باقة واحدة (للواي فاي أو بيانات الهاتف). */
+data class DataPlan(
+    val name: String = "",
+    val logoPath: String = "",
+    val quotaBytes: Long = 0L,
+    val capacityUnit: PlanCapacityUnit = PlanCapacityUnit.GB,
+    val durationValue: Int = 28,
+    val durationUnit: PlanDurationUnit = PlanDurationUnit.DAY,
+    val preventEdit: Boolean = false,
+    val pendingActivation: Boolean = false,
+    val activatedAtMillis: Long = 0L,
+) {
+    val hasQuota: Boolean get() = quotaBytes > 0L
+
+    val totalDays: Int
+        get() = (durationValue.coerceAtLeast(1) * durationUnit.daysPerUnit).coerceAtLeast(1)
+
+    fun daysLeft(now: Long): Int = when {
+        !hasQuota -> 0
+        pendingActivation -> totalDays
+        activatedAtMillis > 0L -> {
+            val endMillis = activatedAtMillis + totalDays.toLong() * 86_400_000L
+            val remainingMillis = (endMillis - now).coerceAtLeast(0L)
+            kotlin.math.ceil(remainingMillis.toDouble() / 86_400_000.0).toInt().coerceIn(0, totalDays)
+        }
+        else -> totalDays
+    }
+}
+
 /** بيانات الباقة المُدخلة من نافذة إضافة/تحديث الباقة. */
 data class PlanDraft(
     val name: String = "",
@@ -204,6 +234,7 @@ data class AppSettings(
     val planPreventEdit: Boolean = false,
     val planPendingActivation: Boolean = false,
     val planActivatedAtMillis: Long = 0L,
+    val mobilePlan: DataPlan = DataPlan(),
     val notificationsEnabled: Boolean = true,
     val alertThresholdPercent: Int = 80,
     /** فهرس خيار المدة في [SamplingIntervals]؛ يحفظ الوحدة حتى مع تساوي المدد. */
@@ -242,4 +273,37 @@ data class AppSettings(
 ) {
     val planTotalDays: Int
         get() = (planDurationValue.coerceAtLeast(1) * planDurationUnit.daysPerUnit).coerceAtLeast(1)
+
+    val wifiPlan: DataPlan
+        get() = DataPlan(
+            name = planName,
+            logoPath = planLogoPath,
+            quotaBytes = quotaBytes,
+            capacityUnit = planCapacityUnit,
+            durationValue = planDurationValue,
+            durationUnit = planDurationUnit,
+            preventEdit = planPreventEdit,
+            pendingActivation = planPendingActivation,
+            activatedAtMillis = planActivatedAtMillis,
+        )
+
+    fun planFor(network: UsageNetwork): DataPlan = when (network) {
+        UsageNetwork.WIFI -> wifiPlan
+        UsageNetwork.MOBILE -> mobilePlan
+    }
+
+    fun withPlanFor(network: UsageNetwork, plan: DataPlan): AppSettings = when (network) {
+        UsageNetwork.WIFI -> copy(
+            planName = plan.name,
+            planLogoPath = plan.logoPath,
+            quotaBytes = plan.quotaBytes,
+            planCapacityUnit = plan.capacityUnit,
+            planDurationValue = plan.durationValue,
+            planDurationUnit = plan.durationUnit,
+            planPreventEdit = plan.preventEdit,
+            planPendingActivation = plan.pendingActivation,
+            planActivatedAtMillis = plan.activatedAtMillis,
+        )
+        UsageNetwork.MOBILE -> copy(mobilePlan = plan)
+    }
 }

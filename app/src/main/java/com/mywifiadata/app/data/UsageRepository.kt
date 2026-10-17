@@ -89,6 +89,24 @@ class UsageRepository(
         }
     }
 
+    suspend fun mobilePlanTotals(
+        settings: AppSettings,
+        now: Long = System.currentTimeMillis(),
+    ): TrafficTotals {
+        val plan = settings.mobilePlan
+        if (!plan.hasQuota || plan.pendingActivation) return TrafficTotals.Empty
+        val range = if (plan.activatedAtMillis > 0L) {
+            val endMillis = plan.activatedAtMillis + plan.totalDays.toLong() * 86_400_000L
+            TimeRange(
+                startMillis = plan.activatedAtMillis,
+                endMillis = maxOf(plan.activatedAtMillis, minOf(now, endMillis)),
+            )
+        } else {
+            TimeRanges.cycleRange(settings.cycleStartDay, now)
+        }
+        return deviceTotals(range, UsageNetwork.MOBILE)
+    }
+
     /** استهلاك التطبيقات مرتّبًا من الأكثر استهلاكًا. */
     suspend fun perAppUsage(
         range: TimeRange,

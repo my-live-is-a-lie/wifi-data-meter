@@ -7,6 +7,7 @@ import com.mywifiadata.app.data.model.AccentColor
 import com.mywifiadata.app.data.model.AppLayoutDirection
 import com.mywifiadata.app.data.model.AppSettings
 import com.mywifiadata.app.data.model.DashboardLayout
+import com.mywifiadata.app.data.model.DataPlan
 import com.mywifiadata.app.data.model.PlanCapacityUnit
 import com.mywifiadata.app.data.model.PlanDurationUnit
 import com.mywifiadata.app.data.model.PlanNetworkType
@@ -83,6 +84,21 @@ class SettingsStore(context: Context) {
         planPreventEdit = prefs.getBoolean(KEY_PLAN_PREVENT_EDIT, false),
         planPendingActivation = prefs.getBoolean(KEY_PLAN_PENDING_ACTIVATION, false),
         planActivatedAtMillis = prefs.getLong(KEY_PLAN_ACTIVATED_AT, 0L),
+        mobilePlan = DataPlan(
+            name = prefs.getString(KEY_MOBILE_PLAN_NAME, "") ?: "",
+            logoPath = prefs.getString(KEY_MOBILE_PLAN_LOGO_PATH, "") ?: "",
+            quotaBytes = prefs.getLong(KEY_MOBILE_QUOTA_BYTES, 0L),
+            capacityUnit = prefs.getString(KEY_MOBILE_PLAN_CAPACITY_UNIT, null)
+                ?.let { stored -> PlanCapacityUnit.entries.firstOrNull { it.name == stored } }
+                ?: PlanCapacityUnit.GB,
+            durationValue = prefs.getInt(KEY_MOBILE_PLAN_DURATION_VALUE, 28).coerceAtLeast(1),
+            durationUnit = prefs.getString(KEY_MOBILE_PLAN_DURATION_UNIT, null)
+                ?.let { stored -> PlanDurationUnit.entries.firstOrNull { it.name == stored } }
+                ?: PlanDurationUnit.DAY,
+            preventEdit = prefs.getBoolean(KEY_MOBILE_PLAN_PREVENT_EDIT, false),
+            pendingActivation = prefs.getBoolean(KEY_MOBILE_PLAN_PENDING_ACTIVATION, false),
+            activatedAtMillis = prefs.getLong(KEY_MOBILE_PLAN_ACTIVATED_AT, 0L),
+        ),
         notificationsEnabled = prefs.getBoolean(KEY_NOTIFICATIONS, true),
         alertThresholdPercent = prefs.getInt(KEY_THRESHOLD, 80),
         sampleIntervalIndex = if (prefs.contains(KEY_INTERVAL_INDEX)) {
@@ -173,6 +189,15 @@ class SettingsStore(context: Context) {
             .putBoolean(KEY_PLAN_PREVENT_EDIT, settings.planPreventEdit)
             .putBoolean(KEY_PLAN_PENDING_ACTIVATION, settings.planPendingActivation)
             .putLong(KEY_PLAN_ACTIVATED_AT, settings.planActivatedAtMillis)
+            .putString(KEY_MOBILE_PLAN_NAME, settings.mobilePlan.name)
+            .putString(KEY_MOBILE_PLAN_LOGO_PATH, settings.mobilePlan.logoPath)
+            .putLong(KEY_MOBILE_QUOTA_BYTES, settings.mobilePlan.quotaBytes)
+            .putString(KEY_MOBILE_PLAN_CAPACITY_UNIT, settings.mobilePlan.capacityUnit.name)
+            .putInt(KEY_MOBILE_PLAN_DURATION_VALUE, settings.mobilePlan.durationValue.coerceAtLeast(1))
+            .putString(KEY_MOBILE_PLAN_DURATION_UNIT, settings.mobilePlan.durationUnit.name)
+            .putBoolean(KEY_MOBILE_PLAN_PREVENT_EDIT, settings.mobilePlan.preventEdit)
+            .putBoolean(KEY_MOBILE_PLAN_PENDING_ACTIVATION, settings.mobilePlan.pendingActivation)
+            .putLong(KEY_MOBILE_PLAN_ACTIVATED_AT, settings.mobilePlan.activatedAtMillis)
             .putBoolean(KEY_NOTIFICATIONS, settings.notificationsEnabled)
             .putInt(KEY_THRESHOLD, settings.alertThresholdPercent)
             .putInt(KEY_INTERVAL_INDEX, intervalIndex)
@@ -220,6 +245,15 @@ class SettingsStore(context: Context) {
         private const val KEY_PLAN_PREVENT_EDIT = "plan_prevent_edit"
         private const val KEY_PLAN_PENDING_ACTIVATION = "plan_pending_activation"
         private const val KEY_PLAN_ACTIVATED_AT = "plan_activated_at"
+        private const val KEY_MOBILE_PLAN_NAME = "mobile_plan_name"
+        private const val KEY_MOBILE_PLAN_LOGO_PATH = "mobile_plan_logo_path"
+        private const val KEY_MOBILE_QUOTA_BYTES = "mobile_quota_bytes"
+        private const val KEY_MOBILE_PLAN_CAPACITY_UNIT = "mobile_plan_capacity_unit"
+        private const val KEY_MOBILE_PLAN_DURATION_VALUE = "mobile_plan_duration_value"
+        private const val KEY_MOBILE_PLAN_DURATION_UNIT = "mobile_plan_duration_unit"
+        private const val KEY_MOBILE_PLAN_PREVENT_EDIT = "mobile_plan_prevent_edit"
+        private const val KEY_MOBILE_PLAN_PENDING_ACTIVATION = "mobile_plan_pending_activation"
+        private const val KEY_MOBILE_PLAN_ACTIVATED_AT = "mobile_plan_activated_at"
         private const val KEY_NOTIFICATIONS = "notifications"
         private const val KEY_THRESHOLD = "alert_threshold"
         private const val KEY_INTERVAL_INDEX = "sample_interval_index"
