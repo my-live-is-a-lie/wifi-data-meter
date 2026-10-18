@@ -69,6 +69,7 @@ class SettingsStore(context: Context) {
     private fun read(): AppSettings = AppSettings(
         quotaBytes = prefs.getLong(KEY_QUOTA_BYTES, 0L),
         cycleStartDay = prefs.getInt(KEY_CYCLE_DAY, 1),
+        planId = prefs.getString(KEY_PLAN_ID, "wifi-active")?.ifBlank { "wifi-active" } ?: "wifi-active",
         planName = prefs.getString(KEY_PLAN_NAME, "") ?: "",
         planLogoPath = prefs.getString(KEY_PLAN_LOGO_PATH, "") ?: "",
         planCapacityUnit = prefs.getString(KEY_PLAN_CAPACITY_UNIT, null)
@@ -84,7 +85,11 @@ class SettingsStore(context: Context) {
         planPreventEdit = prefs.getBoolean(KEY_PLAN_PREVENT_EDIT, false),
         planPendingActivation = prefs.getBoolean(KEY_PLAN_PENDING_ACTIVATION, false),
         planActivatedAtMillis = prefs.getLong(KEY_PLAN_ACTIVATED_AT, 0L),
+        planAdditionalPlans = PlanStorageCodec.decodeAdditionalPlans(
+            prefs.getString(KEY_PLAN_ADDITIONAL_PLANS, null),
+        ),
         mobilePlan = DataPlan(
+            id = prefs.getString(KEY_MOBILE_PLAN_ID, "mobile-active")?.ifBlank { "mobile-active" } ?: "mobile-active",
             name = prefs.getString(KEY_MOBILE_PLAN_NAME, "") ?: "",
             logoPath = prefs.getString(KEY_MOBILE_PLAN_LOGO_PATH, "") ?: "",
             quotaBytes = prefs.getLong(KEY_MOBILE_QUOTA_BYTES, 0L),
@@ -98,6 +103,15 @@ class SettingsStore(context: Context) {
             preventEdit = prefs.getBoolean(KEY_MOBILE_PLAN_PREVENT_EDIT, false),
             pendingActivation = prefs.getBoolean(KEY_MOBILE_PLAN_PENDING_ACTIVATION, false),
             activatedAtMillis = prefs.getLong(KEY_MOBILE_PLAN_ACTIVATED_AT, 0L),
+            additionalPlans = PlanStorageCodec.decodeAdditionalPlans(
+                prefs.getString(KEY_MOBILE_PLAN_ADDITIONAL_PLANS, null),
+            ),
+        ),
+        savedWifiPlans = PlanStorageCodec.decodeSavedPlans(
+            prefs.getString(KEY_SAVED_WIFI_PLANS, null),
+        ),
+        savedMobilePlans = PlanStorageCodec.decodeSavedPlans(
+            prefs.getString(KEY_SAVED_MOBILE_PLANS, null),
         ),
         notificationsEnabled = prefs.getBoolean(KEY_NOTIFICATIONS, true),
         alertThresholdPercent = prefs.getInt(KEY_THRESHOLD, 80),
@@ -180,6 +194,7 @@ class SettingsStore(context: Context) {
         prefs.edit()
             .putLong(KEY_QUOTA_BYTES, settings.quotaBytes)
             .putInt(KEY_CYCLE_DAY, settings.cycleStartDay)
+            .putString(KEY_PLAN_ID, settings.planId)
             .putString(KEY_PLAN_NAME, settings.planName)
             .putString(KEY_PLAN_LOGO_PATH, settings.planLogoPath)
             .putString(KEY_PLAN_CAPACITY_UNIT, settings.planCapacityUnit.name)
@@ -189,6 +204,11 @@ class SettingsStore(context: Context) {
             .putBoolean(KEY_PLAN_PREVENT_EDIT, settings.planPreventEdit)
             .putBoolean(KEY_PLAN_PENDING_ACTIVATION, settings.planPendingActivation)
             .putLong(KEY_PLAN_ACTIVATED_AT, settings.planActivatedAtMillis)
+            .putString(
+                KEY_PLAN_ADDITIONAL_PLANS,
+                PlanStorageCodec.encodeAdditionalPlans(settings.planAdditionalPlans),
+            )
+            .putString(KEY_MOBILE_PLAN_ID, settings.mobilePlan.id)
             .putString(KEY_MOBILE_PLAN_NAME, settings.mobilePlan.name)
             .putString(KEY_MOBILE_PLAN_LOGO_PATH, settings.mobilePlan.logoPath)
             .putLong(KEY_MOBILE_QUOTA_BYTES, settings.mobilePlan.quotaBytes)
@@ -198,6 +218,12 @@ class SettingsStore(context: Context) {
             .putBoolean(KEY_MOBILE_PLAN_PREVENT_EDIT, settings.mobilePlan.preventEdit)
             .putBoolean(KEY_MOBILE_PLAN_PENDING_ACTIVATION, settings.mobilePlan.pendingActivation)
             .putLong(KEY_MOBILE_PLAN_ACTIVATED_AT, settings.mobilePlan.activatedAtMillis)
+            .putString(
+                KEY_MOBILE_PLAN_ADDITIONAL_PLANS,
+                PlanStorageCodec.encodeAdditionalPlans(settings.mobilePlan.additionalPlans),
+            )
+            .putString(KEY_SAVED_WIFI_PLANS, PlanStorageCodec.encodeSavedPlans(settings.savedWifiPlans))
+            .putString(KEY_SAVED_MOBILE_PLANS, PlanStorageCodec.encodeSavedPlans(settings.savedMobilePlans))
             .putBoolean(KEY_NOTIFICATIONS, settings.notificationsEnabled)
             .putInt(KEY_THRESHOLD, settings.alertThresholdPercent)
             .putInt(KEY_INTERVAL_INDEX, intervalIndex)
@@ -236,6 +262,7 @@ class SettingsStore(context: Context) {
 
         private const val KEY_QUOTA_BYTES = "quota_bytes"
         private const val KEY_CYCLE_DAY = "cycle_day"
+        private const val KEY_PLAN_ID = "plan_id"
         private const val KEY_PLAN_NAME = "plan_name"
         private const val KEY_PLAN_LOGO_PATH = "plan_logo_path"
         private const val KEY_PLAN_CAPACITY_UNIT = "plan_capacity_unit"
@@ -245,6 +272,8 @@ class SettingsStore(context: Context) {
         private const val KEY_PLAN_PREVENT_EDIT = "plan_prevent_edit"
         private const val KEY_PLAN_PENDING_ACTIVATION = "plan_pending_activation"
         private const val KEY_PLAN_ACTIVATED_AT = "plan_activated_at"
+        private const val KEY_PLAN_ADDITIONAL_PLANS = "plan_additional_plans"
+        private const val KEY_MOBILE_PLAN_ID = "mobile_plan_id"
         private const val KEY_MOBILE_PLAN_NAME = "mobile_plan_name"
         private const val KEY_MOBILE_PLAN_LOGO_PATH = "mobile_plan_logo_path"
         private const val KEY_MOBILE_QUOTA_BYTES = "mobile_quota_bytes"
@@ -254,6 +283,9 @@ class SettingsStore(context: Context) {
         private const val KEY_MOBILE_PLAN_PREVENT_EDIT = "mobile_plan_prevent_edit"
         private const val KEY_MOBILE_PLAN_PENDING_ACTIVATION = "mobile_plan_pending_activation"
         private const val KEY_MOBILE_PLAN_ACTIVATED_AT = "mobile_plan_activated_at"
+        private const val KEY_MOBILE_PLAN_ADDITIONAL_PLANS = "mobile_plan_additional_plans"
+        private const val KEY_SAVED_WIFI_PLANS = "saved_wifi_plans"
+        private const val KEY_SAVED_MOBILE_PLANS = "saved_mobile_plans"
         private const val KEY_NOTIFICATIONS = "notifications"
         private const val KEY_THRESHOLD = "alert_threshold"
         private const val KEY_INTERVAL_INDEX = "sample_interval_index"

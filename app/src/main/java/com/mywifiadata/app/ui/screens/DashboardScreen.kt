@@ -1153,7 +1153,7 @@ private fun FullUsageCard(
 ) {
     val hasQuota = state.hasQuota
     val progress = usageCardProgress(state)
-    val traffic = if (hasQuota) state.cycle else state.today
+    val traffic = if (hasQuota) state.activeCycle else state.today
     val downloadColor = LocalDownloadColor.current
     val uploadColor = LocalUploadColor.current
     val usageValue = if (hasQuota) {
@@ -1162,7 +1162,7 @@ private fun FullUsageCard(
         Format.bytes(state.today.totalBytes)
     }
     val usageLabel = stringResource(if (hasQuota) R.string.label_used else R.string.label_today)
-    val usedValue = Format.bytes(if (hasQuota) state.cycle.totalBytes else state.today.totalBytes)
+    val usedValue = Format.bytes(if (hasQuota) state.activeCycle.totalBytes else state.today.totalBytes)
     val gaugeStartColor = if (state.quotaExceeded) {
         MaterialTheme.colorScheme.error
     } else {
@@ -1288,8 +1288,8 @@ private fun FullUsageCard(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 QuotaBar(
-                    progress = if (state.cycle.totalBytes > 0L) {
-                        state.today.totalBytes.toFloat() / state.cycle.totalBytes.toFloat()
+                    progress = if (state.activeCycle.totalBytes > 0L) {
+                        state.today.totalBytes.toFloat() / state.activeCycle.totalBytes.toFloat()
                     } else {
                         0f
                     },
@@ -1526,8 +1526,8 @@ private fun Modifier.scaleCarouselContent(scale: Float): Modifier = layout { mea
 
 private fun usageCardProgress(state: UiState): Float = when {
     state.hasQuota -> state.quotaProgress
-    state.cycle.totalBytes > 0L -> {
-        state.today.totalBytes.toFloat() / state.cycle.totalBytes.toFloat()
+    state.activeCycle.totalBytes > 0L -> {
+        state.today.totalBytes.toFloat() / state.activeCycle.totalBytes.toFloat()
     }
     else -> 0f
 }

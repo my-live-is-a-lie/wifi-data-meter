@@ -7,6 +7,7 @@ import android.net.wifi.ScanResult
 import android.net.wifi.WifiInfo
 import android.net.wifi.WifiManager
 import android.os.Build
+import android.telephony.TelephonyManager
 import com.mywifiadata.app.data.model.WifiBand
 import com.mywifiadata.app.data.model.WifiStatus
 import java.net.Inet4Address
@@ -24,19 +25,31 @@ class WifiNetworkReader(context: Context) {
         appContext.getSystemService(ConnectivityManager::class.java)
     private val wifiManager: WifiManager? =
         appContext.getSystemService(WifiManager::class.java)
+    private val telephonyManager: TelephonyManager? =
+        appContext.getSystemService(TelephonyManager::class.java)
 
     fun read(): WifiStatus {
         val manager = connectivityManager ?: return WifiStatus()
+        val isWifiToggleOn = runCatching { wifiManager?.isWifiEnabled == true }.getOrDefault(false)
+        val isMobileToggleOn = runCatching { telephonyManager?.isDataEnabled == true }.getOrDefault(false)
         val activeNetwork = runCatching { manager.activeNetwork }.getOrNull()
-            ?: return WifiStatus()
+            ?: return WifiStatus(
+                isWifiConnected = false,
+                isMobileConnected = !isWifiToggleOn && isMobileToggleOn,
+            )
         val capabilities = runCatching { manager.getNetworkCapabilities(activeNetwork) }.getOrNull()
         val linkProperties = runCatching { manager.getLinkProperties(activeNetwork) }.getOrNull()
 
         val isWifi = capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
+        val isCellular = capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true
         val isOnline = capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
 
         if (!isWifi) {
-            return WifiStatus(isWifiConnected = false, isOnline = isOnline)
+            return WifiStatus(
+                isWifiConnected = false,
+                isMobileConnected = isCellular || (!isWifiToggleOn && isMobileToggleOn),
+                isOnline = isOnline,
+            )
         }
 
         val wifiInfo = currentWifiInfo(capabilities)
