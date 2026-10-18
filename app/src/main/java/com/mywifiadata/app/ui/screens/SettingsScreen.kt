@@ -137,6 +137,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
@@ -469,7 +470,7 @@ fun SettingsScreen(
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Box(
                                     modifier = Modifier
-                                        .align(Alignment.End)
+                                        .align(Alignment.CenterHorizontally)
                                         .size(32.dp)
                                         .clip(CircleShape)
                                         .clickable(role = Role.Button) {
@@ -3101,6 +3102,57 @@ private fun AdditionalPlansSection(
     onRequestDelete: (AdditionalPlan) -> Unit,
     onReorder: (Int, Int) -> Unit,
 ) {
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    val spacingPx = with(density) { 10.dp.toPx() }
+    fun itemHeightDp(plan: AdditionalPlan?) = if (plan?.name?.isNotBlank() == true) 88.dp else 66.dp
+    val step0To1Px = with(density) { itemHeightDp(additionalPlans.getOrNull(1)).toPx() + spacingPx }
+    val step1To0Px = with(density) { itemHeightDp(additionalPlans.getOrNull(0)).toPx() + spacingPx }
+
+    var draggingIndex by remember { mutableStateOf<Int?>(null) }
+    var isSettlingSwap by remember { mutableStateOf(false) }
+    val dragOffsetY = remember { Animatable(0f) }
+    val otherOffsetY = remember { Animatable(0f) }
+    var currentOtherTarget by remember { mutableStateOf(0f) }
+
+    fun animateSwapByTap(index: Int) {
+        if (additionalPlans.size <= 1 || isSettlingSwap || draggingIndex != null) return
+        val targetIndex = if (index == 0) 1 else 0
+        val dragTarget = if (index == 0) step0To1Px else -step1To0Px
+        val otherTarget = if (index == 0) -step1To0Px else step0To1Px
+        draggingIndex = index
+        isSettlingSwap = true
+        currentOtherTarget = otherTarget
+        scope.launch {
+            val job1 = launch {
+                dragOffsetY.animateTo(
+                    targetValue = dragTarget,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioNoBouncy,
+                        stiffness = Spring.StiffnessMediumLow,
+                    ),
+                )
+            }
+            val job2 = launch {
+                otherOffsetY.animateTo(
+                    targetValue = otherTarget,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioNoBouncy,
+                        stiffness = Spring.StiffnessMediumLow,
+                    ),
+                )
+            }
+            job1.join()
+            job2.join()
+            onReorder(index, targetIndex)
+            dragOffsetY.snapTo(0f)
+            otherOffsetY.snapTo(0f)
+            currentOtherTarget = 0f
+            draggingIndex = null
+            isSettlingSwap = false
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -3141,15 +3193,121 @@ private fun AdditionalPlansSection(
         val showReorder = additionalPlans.size > 1
         additionalPlans.forEachIndexed { index, item ->
             key(item.id) {
+                val isDraggingThis = draggingIndex == index
+                val visualOffsetY = when (draggingIndex) {
+                    null -> 0f
+                    index -> dragOffsetY.value
+                    else -> otherOffsetY.value
+                }
+                val dragTargetStepPx = if (index == 0) step0To1Px else step1To0Px
+                val otherTargetStepPx = if (index == 0) -step1To0Px else step0To1Px
                 AdditionalPlanRow(
                     plan = item,
                     showReorderHandle = showReorder,
+                    isDragging = isDraggingThis && !isSettlingSwap,
+                    visualOffsetY = visualOffsetY,
                     onEditClick = { onEditClick(item) },
                     onRequestDelete = { onRequestDelete(item) },
-                    onSwapOrder = {
-                        if (additionalPlans.size > 1) {
-                            val targetIndex = if (index == 0) 1 else 0
-                            onReorder(index, targetIndex)
+                    onTapSwapOrder = { animateSwapByTap(index) },
+                    onVerticalDragStart = {
+                        if (showReorder && !isSettlingSwap) {
+                            draggingIndex = index
+                            currentOtherTarget = 0f
+                            scope.launch {
+                                dragOffsetY.snapTo(0f)
+                                otherOffsetY.snapTo(0f)
+                            }
+                        }
+                    },
+                    onVerticalDragDelta = { dy ->
+                        if (showReorder && !isSettlingSwap && draggingIndex == index) {
+                            val minDrag = if (index == 0) -dragTargetStepPx * 0.18f else -dragTargetStepPx * 1.12f
+                            val maxDrag = if (index == 0) dragTargetStepPx * 1.12f else dragTargetStepPx * 0.18f
+                            val nextDrag = (dragOffsetY.value + dy).coerceIn(minDrag, maxDrag)
+                            scope.launch { dragOffsetY.snapTo(nextDrag) }
+                            val willSwap = (index == 0 && nextDrag > dragTargetStepPx * 0.45f) ||
+                                (index == 1 && nextDrag < -dragTargetStepPx * 0.45f)
+                            val desiredOther = if (willSwap) otherTargetStepPx else 0f
+                            if (desiredOther != currentOtherTarget) {
+                                currentOtherTarget = desiredOther
+                                scope.launch {
+                                    otherOffsetY.animateTo(
+                                        targetValue = desiredOther,
+                                        animationSpec = spring(
+                                            dampingRatio = Spring.DampingRatioNoBouncy,
+                                            stiffness = Spring.StiffnessMediumLow,
+                                        ),
+                                    )
+                                }
+                            }
+                        }
+                    },
+                    onVerticalDragEnd = {
+                        if (showReorder && !isSettlingSwap && draggingIndex == index) {
+                            val currentDrag = dragOffsetY.value
+                            val willSwap = (index == 0 && currentDrag > dragTargetStepPx * 0.45f) ||
+                                (index == 1 && currentDrag < -dragTargetStepPx * 0.45f)
+                            isSettlingSwap = true
+                            if (willSwap) {
+                                val targetIndex = if (index == 0) 1 else 0
+                                val finalDrag = if (index == 0) dragTargetStepPx else -dragTargetStepPx
+                                val finalOther = otherTargetStepPx
+                                currentOtherTarget = finalOther
+                                scope.launch {
+                                    val job1 = launch {
+                                        dragOffsetY.animateTo(
+                                            targetValue = finalDrag,
+                                            animationSpec = spring(
+                                                dampingRatio = Spring.DampingRatioNoBouncy,
+                                                stiffness = Spring.StiffnessMedium,
+                                            ),
+                                        )
+                                    }
+                                    val job2 = launch {
+                                        otherOffsetY.animateTo(
+                                            targetValue = finalOther,
+                                            animationSpec = spring(
+                                                dampingRatio = Spring.DampingRatioNoBouncy,
+                                                stiffness = Spring.StiffnessMedium,
+                                            ),
+                                        )
+                                    }
+                                    job1.join()
+                                    job2.join()
+                                    onReorder(index, targetIndex)
+                                    dragOffsetY.snapTo(0f)
+                                    otherOffsetY.snapTo(0f)
+                                    currentOtherTarget = 0f
+                                    draggingIndex = null
+                                    isSettlingSwap = false
+                                }
+                            } else {
+                                currentOtherTarget = 0f
+                                scope.launch {
+                                    val job1 = launch {
+                                        dragOffsetY.animateTo(
+                                            targetValue = 0f,
+                                            animationSpec = spring(
+                                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                                stiffness = Spring.StiffnessMedium,
+                                            ),
+                                        )
+                                    }
+                                    val job2 = launch {
+                                        otherOffsetY.animateTo(
+                                            targetValue = 0f,
+                                            animationSpec = spring(
+                                                dampingRatio = Spring.DampingRatioNoBouncy,
+                                                stiffness = Spring.StiffnessMedium,
+                                            ),
+                                        )
+                                    }
+                                    job1.join()
+                                    job2.join()
+                                    draggingIndex = null
+                                    isSettlingSwap = false
+                                }
+                            }
                         }
                     },
                 )
@@ -3163,9 +3321,14 @@ private fun AdditionalPlansSection(
 private fun AdditionalPlanRow(
     plan: AdditionalPlan,
     showReorderHandle: Boolean,
+    isDragging: Boolean,
+    visualOffsetY: Float,
     onEditClick: () -> Unit,
     onRequestDelete: () -> Unit,
-    onSwapOrder: () -> Unit,
+    onTapSwapOrder: () -> Unit,
+    onVerticalDragStart: () -> Unit,
+    onVerticalDragDelta: (Float) -> Unit,
+    onVerticalDragEnd: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
@@ -3177,6 +3340,16 @@ private fun AdditionalPlanRow(
     val durationLabel = "${plan.durationValue} ${stringResource(plan.durationUnit.labelResource())}"
     val capacityLabel = Format.bytes(plan.quotaBytes)
     val deleteRed = Color(0xFFEF5350)
+    val hasPlanName = plan.name.isNotBlank()
+    val rowHeight = if (hasPlanName) 88.dp else 66.dp
+    val dragScale by animateFloatAsState(
+        targetValue = if (isDragging) 1.02f else 1f,
+        animationSpec = tween(durationMillis = 120),
+        label = "additionalPlanDragScale",
+    )
+    val currentOnVerticalDragStart by rememberUpdatedState(onVerticalDragStart)
+    val currentOnVerticalDragDelta by rememberUpdatedState(onVerticalDragDelta)
+    val currentOnVerticalDragEnd by rememberUpdatedState(onVerticalDragEnd)
 
     // نستخدم تخطيط LTR فيزيائي ثابت حتى يكون الشريط الأحمر دائمًا في أقصى اليسار
     // ويكون السحب لليمين دائمًا لتوسيع الشريط الأحمر وحذف الباقة الإضافية.
@@ -3187,170 +3360,161 @@ private fun AdditionalPlanRow(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(66.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                .pointerInput(plan.id) {
-                    detectHorizontalDragGestures(
-                        onHorizontalDrag = { change, dragAmount ->
-                            change.consume()
-                            val next = (offsetX.value + dragAmount).coerceIn(0f, maxRevealPx * 1.15f)
-                            scope.launch { offsetX.snapTo(next) }
-                        },
-                        onDragEnd = {
-                            val triggered = offsetX.value >= deleteThresholdPx
-                            scope.launch {
-                                offsetX.animateTo(
-                                    targetValue = 0f,
-                                    animationSpec = spring(
-                                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                                        stiffness = Spring.StiffnessMediumLow,
-                                    ),
-                                )
-                            }
-                            if (triggered) {
-                                onRequestDelete()
-                            }
-                        },
-                        onDragCancel = {
-                            scope.launch {
-                                offsetX.animateTo(
-                                    targetValue = 0f,
-                                    animationSpec = spring(
-                                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                                        stiffness = Spring.StiffnessMediumLow,
-                                    ),
-                                )
-                            }
-                        },
-                    )
-                },
+                .height(rowHeight)
+                .zIndex(if (isDragging || visualOffsetY != 0f) 1f else 0f),
         ) {
-            // الشريط الأحمر في أقصى اليسار: رفيع في الحالة العادية، ويتوسع لليمين عند السحب،
-            // وعند الضغط عليه مرة واحدة يتحرك قليلًا لليمين ليظهر جزء من سلة المهملات ثم يعود بتأثير مطاطي.
+            // الطبقة المرئية للبطاقة تتحرك مع إصبع المستخدم عبر graphicsLayer
             Box(
                 modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .width(redBarWidthDp)
-                    .fillMaxHeight()
-                    .background(deleteRed)
-                    .clickable(role = Role.Button) {
-                        if (offsetX.value >= deleteThresholdPx * 0.7f) {
-                            scope.launch {
-                                offsetX.animateTo(
-                                    targetValue = 0f,
-                                    animationSpec = spring(
-                                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                                        stiffness = Spring.StiffnessLow,
-                                    ),
-                                )
+                    .fillMaxSize()
+                    .pointerInput(plan.id) {
+                        detectHorizontalDragGestures(
+                            onHorizontalDrag = { change, dragAmount ->
+                                change.consume()
+                                val next = (offsetX.value + dragAmount).coerceIn(0f, maxRevealPx * 1.15f)
+                                scope.launch { offsetX.snapTo(next) }
+                            },
+                            onDragEnd = {
+                                val triggered = offsetX.value >= deleteThresholdPx
+                                scope.launch {
+                                    offsetX.animateTo(
+                                        targetValue = 0f,
+                                        animationSpec = spring(
+                                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                                            stiffness = Spring.StiffnessMediumLow,
+                                        ),
+                                    )
+                                }
+                                if (triggered) {
+                                    onRequestDelete()
+                                }
+                            },
+                            onDragCancel = {
+                                scope.launch {
+                                    offsetX.animateTo(
+                                        targetValue = 0f,
+                                        animationSpec = spring(
+                                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                                            stiffness = Spring.StiffnessMediumLow,
+                                        ),
+                                    )
+                                }
+                            },
+                        )
+                    }
+                    .graphicsLayer {
+                        translationY = visualOffsetY
+                        scaleX = dragScale
+                        scaleY = dragScale
+                        shadowElevation = if (isDragging) 8.dp.toPx() else 0f
+                        shape = RoundedCornerShape(16.dp)
+                        clip = true
+                    }
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+            ) {
+                // الشريط الأحمر في أقصى اليسار: رفيع في الحالة العادية، ويتوسع لليمين عند السحب،
+                // وعند الضغط عليه مرة واحدة يتحرك قليلًا لليمين ليظهر جزء من سلة المهملات ثم يعود بتأثير مطاطي.
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .width(redBarWidthDp)
+                        .fillMaxHeight()
+                        .background(deleteRed)
+                        .clickable(role = Role.Button) {
+                            if (offsetX.value >= deleteThresholdPx * 0.7f) {
+                                scope.launch {
+                                    offsetX.animateTo(
+                                        targetValue = 0f,
+                                        animationSpec = spring(
+                                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                                            stiffness = Spring.StiffnessLow,
+                                        ),
+                                    )
+                                }
+                                onRequestDelete()
+                            } else {
+                                scope.launch {
+                                    offsetX.animateTo(
+                                        targetValue = peekRevealPx,
+                                        animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing),
+                                    )
+                                    offsetX.animateTo(
+                                        targetValue = 0f,
+                                        animationSpec = spring(
+                                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                                            stiffness = Spring.StiffnessLow,
+                                        ),
+                                    )
+                                }
                             }
-                            onRequestDelete()
-                        } else {
-                            scope.launch {
-                                offsetX.animateTo(
-                                    targetValue = peekRevealPx,
-                                    animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing),
-                                )
-                                offsetX.animateTo(
-                                    targetValue = 0f,
-                                    animationSpec = spring(
-                                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                                        stiffness = Spring.StiffnessLow,
-                                    ),
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (redBarWidthDp > 18.dp) {
+                        val revealAlpha = ((offsetX.value / peekRevealPx).coerceIn(0f, 1f))
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                            modifier = Modifier.graphicsLayer { alpha = revealAlpha },
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Delete,
+                                contentDescription = stringResource(R.string.plans_action_delete),
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp),
+                            )
+                            if (redBarWidthDp > 48.dp) {
+                                Text(
+                                    text = stringResource(R.string.plans_action_delete),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color.White,
+                                    maxLines = 1,
                                 )
                             }
                         }
-                    },
-                contentAlignment = Alignment.Center,
-            ) {
-                if (redBarWidthDp > 18.dp) {
-                    val revealAlpha = ((offsetX.value / peekRevealPx).coerceIn(0f, 1f))
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
-                        modifier = Modifier.graphicsLayer { alpha = revealAlpha },
+                    }
+                }
+
+                // محتوى صف الباقة الإضافية يتحرك لليمين مع توسع الشريط الأحمر
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(start = redBarWidthDp + 6.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(
+                        onClick = onEditClick,
+                        modifier = Modifier.size(34.dp),
                     ) {
                         Icon(
-                            imageVector = Icons.Rounded.Delete,
-                            contentDescription = stringResource(R.string.plans_action_delete),
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp),
+                            imageVector = Icons.Rounded.Edit,
+                            contentDescription = stringResource(R.string.plans_action_edit),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(19.dp),
                         )
-                        if (redBarWidthDp > 48.dp) {
-                            Text(
-                                text = stringResource(R.string.plans_action_delete),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color.White,
-                                maxLines = 1,
+                    }
+
+                    if (showReorderHandle) {
+                        Box(
+                            modifier = Modifier.size(32.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.DragHandle,
+                                contentDescription = stringResource(R.string.additional_plan_reorder_cd),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp),
                             )
                         }
                     }
-                }
-            }
 
-            // محتوى صف الباقة الإضافية يتحرك لليمين مع توسع الشريط الأحمر
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(start = redBarWidthDp + 6.dp, end = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(
-                    onClick = onEditClick,
-                    modifier = Modifier.size(34.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Edit,
-                        contentDescription = stringResource(R.string.plans_action_edit),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(19.dp),
-                    )
-                }
+                    Spacer(modifier = Modifier.width(6.dp))
 
-                if (showReorderHandle) {
-                    var dragAccumulatedY by remember { mutableStateOf(0f) }
-                    Box(
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(CircleShape)
-                            .clickable(role = Role.Button, onClick = onSwapOrder)
-                            .pointerInput(plan.id) {
-                                detectVerticalDragGestures(
-                                    onVerticalDrag = { change, dragAmount ->
-                                        change.consume()
-                                        dragAccumulatedY += dragAmount
-                                        if (abs(dragAccumulatedY) > 24f) {
-                                            dragAccumulatedY = 0f
-                                            onSwapOrder()
-                                        }
-                                    },
-                                    onDragEnd = { dragAccumulatedY = 0f },
-                                    onDragCancel = { dragAccumulatedY = 0f },
-                                )
-                            },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.DragHandle,
-                            contentDescription = stringResource(R.string.additional_plan_reorder_cd),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.width(6.dp))
-
-                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
+                    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                         Row(
+                            modifier = Modifier.weight(1f),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
                             if (logoBitmap != null) {
                                 Image(
@@ -3358,34 +3522,71 @@ private fun AdditionalPlanRow(
                                     contentDescription = stringResource(R.string.plan_logo_label),
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier
-                                        .size(36.dp)
+                                        .size(38.dp)
                                         .clip(RoundedCornerShape(6.dp)),
                                 )
                             }
-                            if (plan.name.isNotBlank()) {
-                                Text(
-                                    text = plan.name,
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
+
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.Center,
+                            ) {
+                                if (hasPlanName) {
+                                    Text(
+                                        text = plan.name,
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.fillMaxWidth(),
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceEvenly,
+                                ) {
+                                    QuotaMetricColumn(
+                                        label = stringResource(R.string.plan_capacity_label),
+                                        value = capacityLabel,
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    QuotaMetricColumn(
+                                        label = stringResource(R.string.plan_duration_label),
+                                        value = durationLabel,
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                }
                             }
                         }
-
-                        QuotaMetricColumn(
-                            label = stringResource(R.string.plan_capacity_label),
-                            value = capacityLabel,
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                        )
-
-                        QuotaMetricColumn(
-                            label = stringResource(R.string.plan_duration_label),
-                            value = durationLabel,
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                        )
                     }
                 }
+            }
+
+            // منطقة لمس ثابتة لزر (=) خارج graphicsLayer حتى تتبع البطاقة حركة الإصبع بسلاسة تامة دون اهتزاز الإحداثيات
+            if (showReorderHandle) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(start = redBarWidthDp + 40.dp)
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .clickable(role = Role.Button, onClick = onTapSwapOrder)
+                        .pointerInput(plan.id) {
+                            detectVerticalDragGestures(
+                                onDragStart = { currentOnVerticalDragStart() },
+                                onVerticalDrag = { change, dragAmount ->
+                                    change.consume()
+                                    currentOnVerticalDragDelta(dragAmount)
+                                },
+                                onDragEnd = { currentOnVerticalDragEnd() },
+                                onDragCancel = { currentOnVerticalDragEnd() },
+                            )
+                        },
+                )
             }
         }
     }
