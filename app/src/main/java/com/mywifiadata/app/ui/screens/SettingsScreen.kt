@@ -2758,13 +2758,20 @@ private fun QuotaMetricColumn(
             overflow = TextOverflow.Ellipsis,
         )
         Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = value,
-            style = MaterialTheme.typography.titleMediumEmphasized,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        val valueDirection = if (value.endsWith("B")) {
+            LayoutDirection.Ltr
+        } else {
+            LocalLayoutDirection.current
+        }
+        CompositionLocalProvider(LocalLayoutDirection provides valueDirection) {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleMediumEmphasized,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
@@ -3931,11 +3938,6 @@ private fun PlansListDialog(
                 }
 
                 if (activePlan.hasQuota) {
-                    Text(
-                        text = stringResource(R.string.plans_active_section),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
                     PlanListItemCard(
                         plan = activePlan,
                         isActivePlan = true,
@@ -3952,11 +3954,6 @@ private fun PlansListDialog(
                 }
 
                 if (savedPlans.isNotEmpty()) {
-                    Text(
-                        text = stringResource(R.string.plans_saved_section),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                     savedPlans.forEach { saved ->
                         key(saved.id) {
                             PlanListItemCard(
@@ -4080,7 +4077,8 @@ private fun PlanListItemCard(
 ) {
     val logoBitmap = remember(plan.logoPath) { loadPlanLogoBitmap(plan.logoPath) }
     val durationText = "${plan.durationValue} ${stringResource(plan.durationUnit.labelResource())}"
-    val titleText = plan.name.ifBlank { stringResource(R.string.label_quota) }
+    val capacityText = Format.bytes(plan.quotaBytes)
+    val hasPlanName = plan.name.isNotBlank()
 
     Column(
         modifier = Modifier
@@ -4126,18 +4124,51 @@ private fun PlanListItemCard(
                     )
                 }
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = titleText,
-                        style = MaterialTheme.typography.titleMediumEmphasized,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = "${Format.bytes(plan.quotaBytes)} • $durationText",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    if (hasPlanName) {
+                        Text(
+                            text = plan.name,
+                            style = MaterialTheme.typography.titleMediumEmphasized,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        val infoStyle = if (hasPlanName) {
+                            MaterialTheme.typography.bodySmall
+                        } else {
+                            MaterialTheme.typography.titleSmall
+                        }
+                        val infoColor = if (hasPlanName) {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        }
+                        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                            Text(
+                                text = capacityText,
+                                style = infoStyle,
+                                color = infoColor,
+                                maxLines = 1,
+                            )
+                        }
+                        Text(
+                            text = "•",
+                            style = infoStyle,
+                            color = infoColor,
+                            maxLines = 1,
+                        )
+                        Text(
+                            text = durationText,
+                            style = infoStyle,
+                            color = infoColor,
+                            maxLines = 1,
+                        )
+                    }
                 }
             }
 
