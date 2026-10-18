@@ -18,14 +18,17 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -33,6 +36,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -69,8 +73,13 @@ import androidx.compose.material.icons.rounded.Call
 import androidx.compose.material.icons.rounded.CameraAlt
 import androidx.compose.material.icons.rounded.Chat
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.ChevronLeft
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.DragHandle
 import androidx.compose.material.icons.rounded.East
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.Info
@@ -117,8 +126,10 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshotFlow
@@ -141,6 +152,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
@@ -148,6 +160,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -157,8 +170,12 @@ import com.mywifiadata.app.core.SamplingIntervalUnit
 import com.mywifiadata.app.core.SamplingIntervals
 import com.mywifiadata.app.core.UsageNetwork
 import com.mywifiadata.app.data.model.AccentColor
+import com.mywifiadata.app.data.model.AdditionalPlan
+import com.mywifiadata.app.data.model.AdditionalPlanDraft
 import com.mywifiadata.app.data.model.AppLayoutDirection
 import com.mywifiadata.app.data.model.AppSettings
+import com.mywifiadata.app.data.model.DataPlan
+import com.mywifiadata.app.data.model.MAX_ADDITIONAL_PLANS
 import com.mywifiadata.app.data.model.PlanCapacityUnit
 import com.mywifiadata.app.data.model.PlanDraft
 import com.mywifiadata.app.data.model.PlanDurationUnit
@@ -178,6 +195,7 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
 
 /**
  * شاشة الإعدادات: الباقة، التنبيهات، المراقبة، البيانات، والمزيد.
@@ -204,12 +222,30 @@ fun SettingsScreen(
     onLayoutDirectionChange: (AppLayoutDirection) -> Unit = {},
     onSavePlan: (PlanDraft) -> Unit = { draft -> onQuotaChange(draft.quotaBytes) },
     onActivatePlan: (UsageNetwork) -> Unit = {},
+    onAddPlanToSavedList: (PlanDraft) -> Unit = {},
+    onUpdateSavedPlan: (UsageNetwork, String, PlanDraft) -> Unit = { _, _, _ -> },
+    onSwitchToSavedPlan: (UsageNetwork, String) -> Unit = { _, _ -> },
+    onDeletePlan: (UsageNetwork, String) -> Unit = { _, _ -> },
+    onAddAdditionalPlan: (UsageNetwork, AdditionalPlanDraft) -> Unit = { _, _ -> },
+    onUpdateAdditionalPlan: (UsageNetwork, String, AdditionalPlanDraft) -> Unit = { _, _, _ -> },
+    onDeleteAdditionalPlan: (UsageNetwork, String) -> Unit = { _, _ -> },
+    onReorderAdditionalPlans: (UsageNetwork, Int, Int) -> Unit = { _, _, _ -> },
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(16.dp),
 ) {
     var showQuotaDialog by rememberSaveable { mutableStateOf(false) }
-    var selectedPlanNetwork by rememberSaveable { mutableStateOf(UsageNetwork.WIFI) }
+    var showPlansListDialog by rememberSaveable { mutableStateOf(false) }
+    var showAddSavedPlanDialog by rememberSaveable { mutableStateOf(false) }
+    var editingSavedPlanId by rememberSaveable { mutableStateOf<String?>(null) }
+    var showAddAdditionalPlanDialog by rememberSaveable { mutableStateOf(false) }
+    var editingAdditionalPlanId by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingDeleteAdditionalPlanId by rememberSaveable { mutableStateOf<String?>(null) }
+    var additionalPlansExpanded by rememberSaveable { mutableStateOf(false) }
+    var selectedPlanNetwork by rememberSaveable { mutableStateOf(state.activePlanNetwork) }
     var planSwipeDirection by rememberSaveable { mutableStateOf(1) }
+    LaunchedEffect(state.activePlanNetwork) {
+        selectedPlanNetwork = state.activePlanNetwork
+    }
     var showClearDialog by rememberSaveable { mutableStateOf(false) }
     var showHideAppIconDialog by rememberSaveable { mutableStateOf(false) }
     var hideAppIconFailed by rememberSaveable { mutableStateOf(false) }
@@ -410,6 +446,53 @@ fun SettingsScreen(
                                     )
                                 }
                             }
+
+                            AnimatedVisibility(
+                                visible = additionalPlansExpanded && plan.additionalPlans.isNotEmpty(),
+                            ) {
+                                AdditionalPlansSection(
+                                    additionalPlans = plan.additionalPlans,
+                                    onAddClick = { showAddAdditionalPlanDialog = true },
+                                    onEditClick = { item -> editingAdditionalPlanId = item.id },
+                                    onRequestDelete = { item -> pendingDeleteAdditionalPlanId = item.id },
+                                    onReorder = { fromIdx, toIdx ->
+                                        onReorderAdditionalPlans(pageNetwork, fromIdx, toIdx)
+                                    },
+                                )
+                            }
+
+                            if (plan.additionalPlans.isNotEmpty()) {
+                                val expandChevronRotation by animateFloatAsState(
+                                    targetValue = if (additionalPlansExpanded) 180f else 0f,
+                                    label = "additionalPlansChevron",
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.End)
+                                        .size(32.dp)
+                                        .clip(CircleShape)
+                                        .clickable(role = Role.Button) {
+                                            additionalPlansExpanded = !additionalPlansExpanded
+                                        },
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.ExpandMore,
+                                        contentDescription = stringResource(
+                                            if (additionalPlansExpanded) {
+                                                R.string.additional_plans_collapse_cd
+                                            } else {
+                                                R.string.additional_plans_expand_cd
+                                            },
+                                        ),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier
+                                            .size(22.dp)
+                                            .rotate(expandChevronRotation),
+                                    )
+                                }
+                            }
                         }
                     }
 
@@ -425,6 +508,32 @@ fun SettingsScreen(
                             }
                         },
                         modifier = Modifier.align(Alignment.CenterHorizontally),
+                    )
+                }
+            }
+        }
+
+        item {
+            val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+            ExpressiveCard(
+                modifier = Modifier.clickable(role = Role.Button) { showPlansListDialog = true },
+                contentPadding = PaddingValues(horizontal = 18.dp, vertical = 14.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = stringResource(R.string.plans_button_title),
+                        style = MaterialTheme.typography.titleMediumEmphasized,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Icon(
+                        imageVector = if (isRtl) Icons.Rounded.ChevronLeft else Icons.Rounded.ChevronRight,
+                        contentDescription = stringResource(R.string.plans_button_title),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(22.dp),
                     )
                 }
             }
@@ -658,6 +767,134 @@ fun SettingsScreen(
                     PlanNetworkType.WIFI, PlanNetworkType.BOTH -> UsageNetwork.WIFI
                 }
                 showQuotaDialog = false
+            },
+        )
+    }
+
+    if (showAddSavedPlanDialog) {
+        QuotaDialog(
+            settings = settings,
+            initialNetwork = selectedPlanNetwork,
+            isAddingNewPlan = true,
+            onDismiss = { showAddSavedPlanDialog = false },
+            onConfirm = { draft ->
+                onAddPlanToSavedList(draft)
+                selectedPlanNetwork = when (draft.networkType) {
+                    PlanNetworkType.MOBILE -> UsageNetwork.MOBILE
+                    PlanNetworkType.WIFI, PlanNetworkType.BOTH -> UsageNetwork.WIFI
+                }
+                showAddSavedPlanDialog = false
+            },
+        )
+    }
+
+    val editingSavedPlan = editingSavedPlanId?.let { id ->
+        settings.savedPlansFor(selectedPlanNetwork).firstOrNull { it.id == id }
+    }
+    if (editingSavedPlan != null) {
+        QuotaDialog(
+            settings = settings,
+            initialNetwork = selectedPlanNetwork,
+            initialPlanOverride = editingSavedPlan,
+            lockNetworkType = true,
+            onDismiss = { editingSavedPlanId = null },
+            onConfirm = { draft ->
+                onUpdateSavedPlan(selectedPlanNetwork, editingSavedPlan.id, draft)
+                editingSavedPlanId = null
+            },
+        )
+    }
+
+    if (showPlansListDialog) {
+        PlansListDialog(
+            network = selectedPlanNetwork,
+            activePlan = state.planFor(selectedPlanNetwork),
+            savedPlans = settings.savedPlansFor(selectedPlanNetwork),
+            onDismiss = { showPlansListDialog = false },
+            onActivateCurrentPlan = { onActivatePlan(selectedPlanNetwork) },
+            onEditActivePlan = {
+                showPlansListDialog = false
+                showQuotaDialog = true
+            },
+            onAddAdditionalPlanToActive = {
+                showPlansListDialog = false
+                showAddAdditionalPlanDialog = true
+            },
+            onSwitchToSavedPlan = { planId ->
+                onSwitchToSavedPlan(selectedPlanNetwork, planId)
+            },
+            onEditSavedPlan = { planId ->
+                editingSavedPlanId = planId
+            },
+            onDeletePlan = { planId ->
+                onDeletePlan(selectedPlanNetwork, planId)
+            },
+            onAddNewPlan = {
+                showAddSavedPlanDialog = true
+            },
+        )
+    }
+
+    if (showAddAdditionalPlanDialog) {
+        AdditionalPlanDialog(
+            network = selectedPlanNetwork,
+            initialPlan = null,
+            onDismiss = { showAddAdditionalPlanDialog = false },
+            onConfirm = { draft ->
+                onAddAdditionalPlan(selectedPlanNetwork, draft)
+                additionalPlansExpanded = true
+                showAddAdditionalPlanDialog = false
+            },
+        )
+    }
+
+    val editingAdditionalPlan = editingAdditionalPlanId?.let { id ->
+        state.planFor(selectedPlanNetwork).additionalPlans.firstOrNull { it.id == id }
+    }
+    if (editingAdditionalPlan != null) {
+        AdditionalPlanDialog(
+            network = selectedPlanNetwork,
+            initialPlan = editingAdditionalPlan,
+            onDismiss = { editingAdditionalPlanId = null },
+            onConfirm = { draft ->
+                onUpdateAdditionalPlan(selectedPlanNetwork, editingAdditionalPlan.id, draft)
+                editingAdditionalPlanId = null
+            },
+        )
+    }
+
+    val pendingDeleteAdditionalPlan = pendingDeleteAdditionalPlanId?.let { id ->
+        state.planFor(selectedPlanNetwork).additionalPlans.firstOrNull { it.id == id }
+    }
+    if (pendingDeleteAdditionalPlan != null) {
+        AlertDialog(
+            onDismissRequest = { pendingDeleteAdditionalPlanId = null },
+            icon = { Icon(imageVector = Icons.Rounded.Delete, contentDescription = null) },
+            title = { Text(text = stringResource(R.string.additional_plan_delete_confirm_title)) },
+            text = { Text(text = stringResource(R.string.additional_plan_delete_confirm_body)) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val id = pendingDeleteAdditionalPlan.id
+                        pendingDeleteAdditionalPlanId = null
+                        onDeleteAdditionalPlan(selectedPlanNetwork, id)
+                    },
+                    shape = AppButtonShape,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError,
+                    ),
+                ) {
+                    Text(text = stringResource(R.string.plans_action_delete))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { pendingDeleteAdditionalPlanId = null },
+                    shape = AppButtonShape,
+                ) {
+                    Text(text = stringResource(R.string.action_cancel))
+                }
             },
         )
     }
@@ -2571,6 +2808,9 @@ private fun PlanCardPageIndicator(
 private fun QuotaDialog(
     settings: AppSettings,
     initialNetwork: UsageNetwork = UsageNetwork.WIFI,
+    initialPlanOverride: DataPlan? = null,
+    isAddingNewPlan: Boolean = false,
+    lockNetworkType: Boolean = false,
     onDismiss: () -> Unit,
     onConfirm: (PlanDraft) -> Unit,
 ) {
@@ -2584,9 +2824,14 @@ private fun QuotaDialog(
         PlanNetworkType.MOBILE -> UsageNetwork.MOBILE
         PlanNetworkType.WIFI, PlanNetworkType.BOTH -> UsageNetwork.WIFI
     }
-    val activePlan = settings.planFor(activePlanNetwork)
-    val hasActiveQuota = activePlan.hasQuota
+    val activePlan = when {
+        initialPlanOverride != null -> initialPlanOverride
+        isAddingNewPlan -> DataPlan()
+        else -> settings.planFor(activePlanNetwork)
+    }
+    val hasActiveQuota = !isAddingNewPlan && activePlan.hasQuota
     val isEditLocked = hasActiveQuota && activePlan.preventEdit
+    val stateKey = initialPlanOverride?.id ?: if (isAddingNewPlan) "new-${activePlanNetwork.name}" else activePlanNetwork.name
 
     val initialCapacityValue = remember(activePlan.quotaBytes, activePlan.capacityUnit) {
         if (activePlan.quotaBytes > 0L) {
@@ -2601,21 +2846,21 @@ private fun QuotaDialog(
         }
     }
 
-    var planName by rememberSaveable(activePlanNetwork, activePlan.name) { mutableStateOf(activePlan.name) }
-    var logoPath by rememberSaveable(activePlanNetwork, activePlan.logoPath) { mutableStateOf(activePlan.logoPath) }
-    var capacityText by rememberSaveable(activePlanNetwork, initialCapacityValue) {
+    var planName by rememberSaveable(stateKey, activePlan.name) { mutableStateOf(activePlan.name) }
+    var logoPath by rememberSaveable(stateKey, activePlan.logoPath) { mutableStateOf(activePlan.logoPath) }
+    var capacityText by rememberSaveable(stateKey, initialCapacityValue) {
         mutableStateOf(initialCapacityValue)
     }
-    var capacityUnit by rememberSaveable(activePlanNetwork, activePlan.capacityUnit) {
+    var capacityUnit by rememberSaveable(stateKey, activePlan.capacityUnit) {
         mutableStateOf(activePlan.capacityUnit)
     }
-    var durationText by rememberSaveable(activePlanNetwork, activePlan.durationValue) {
+    var durationText by rememberSaveable(stateKey, activePlan.durationValue) {
         mutableStateOf(activePlan.durationValue.toString())
     }
-    var durationUnit by rememberSaveable(activePlanNetwork, activePlan.durationUnit) {
+    var durationUnit by rememberSaveable(stateKey, activePlan.durationUnit) {
         mutableStateOf(activePlan.durationUnit)
     }
-    var preventEdit by rememberSaveable(activePlanNetwork, activePlan.preventEdit) {
+    var preventEdit by rememberSaveable(stateKey, activePlan.preventEdit) {
         mutableStateOf(activePlan.preventEdit)
     }
 
@@ -2633,7 +2878,7 @@ private fun QuotaDialog(
     val parsedCapacity = capacityText.toDoubleOrNull()
     val parsedDuration = durationText.toIntOrNull()
     val canSave = isEditLocked || (
-        (capacityText.isBlank() || (parsedCapacity != null && parsedCapacity >= 0.0)) &&
+        (if (isAddingNewPlan) parsedCapacity != null && parsedCapacity > 0.0 else capacityText.isBlank() || (parsedCapacity != null && parsedCapacity >= 0.0)) &&
             (parsedDuration != null && parsedDuration >= 1)
         )
 
@@ -2777,24 +3022,26 @@ private fun QuotaDialog(
                     )
                 }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Text(
-                        text = stringResource(R.string.plan_type_label),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    PlanDropdownPill(
-                        selectedLabel = stringResource(networkType.labelResource()),
-                        options = PlanNetworkType.entries,
-                        optionLabel = { stringResource(it.labelResource()) },
-                        selectedOption = networkType,
-                        onSelect = { networkType = it },
-                        enabled = !isEditLocked,
-                    )
+                if (!lockNetworkType) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.plan_type_label),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        PlanDropdownPill(
+                            selectedLabel = stringResource(networkType.labelResource()),
+                            options = PlanNetworkType.entries,
+                            optionLabel = { stringResource(it.labelResource()) },
+                            selectedOption = networkType,
+                            onSelect = { networkType = it },
+                            enabled = !isEditLocked,
+                        )
+                    }
                 }
 
                 Row(
@@ -2843,6 +3090,956 @@ private fun QuotaDialog(
             }
         },
     )
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun AdditionalPlansSection(
+    additionalPlans: List<AdditionalPlan>,
+    onAddClick: () -> Unit,
+    onEditClick: (AdditionalPlan) -> Unit,
+    onRequestDelete: (AdditionalPlan) -> Unit,
+    onReorder: (Int, Int) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.additional_plans_title),
+                style = MaterialTheme.typography.titleMediumEmphasized,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            if (additionalPlans.size < MAX_ADDITIONAL_PLANS) {
+                FilledTonalButton(
+                    onClick = onAddClick,
+                    shape = RoundedCornerShape(50),
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 6.dp),
+                    modifier = Modifier.height(34.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.plans_action_add),
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+            }
+        }
+
+        val showReorder = additionalPlans.size > 1
+        additionalPlans.forEachIndexed { index, item ->
+            key(item.id) {
+                AdditionalPlanRow(
+                    plan = item,
+                    showReorderHandle = showReorder,
+                    onEditClick = { onEditClick(item) },
+                    onRequestDelete = { onRequestDelete(item) },
+                    onSwapOrder = {
+                        if (additionalPlans.size > 1) {
+                            val targetIndex = if (index == 0) 1 else 0
+                            onReorder(index, targetIndex)
+                        }
+                    },
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun AdditionalPlanRow(
+    plan: AdditionalPlan,
+    showReorderHandle: Boolean,
+    onEditClick: () -> Unit,
+    onRequestDelete: () -> Unit,
+    onSwapOrder: () -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    val maxRevealPx = with(density) { 96.dp.toPx() }
+    val deleteThresholdPx = with(density) { 64.dp.toPx() }
+    val peekRevealPx = with(density) { 44.dp.toPx() }
+    val offsetX = remember { Animatable(0f) }
+    val logoBitmap = remember(plan.logoPath) { loadPlanLogoBitmap(plan.logoPath) }
+    val durationLabel = "${plan.durationValue} ${stringResource(plan.durationUnit.labelResource())}"
+    val capacityLabel = Format.bytes(plan.quotaBytes)
+    val deleteRed = Color(0xFFEF5350)
+
+    // نستخدم تخطيط LTR فيزيائي ثابت حتى يكون الشريط الأحمر دائمًا في أقصى اليسار
+    // ويكون السحب لليمين دائمًا لتوسيع الشريط الأحمر وحذف الباقة الإضافية.
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+        val currentOffsetDp = with(density) { offsetX.value.coerceAtLeast(0f).toDp() }
+        val redBarWidthDp = 10.dp + currentOffsetDp
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(66.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .pointerInput(plan.id) {
+                    detectHorizontalDragGestures(
+                        onHorizontalDrag = { change, dragAmount ->
+                            change.consume()
+                            val next = (offsetX.value + dragAmount).coerceIn(0f, maxRevealPx * 1.15f)
+                            scope.launch { offsetX.snapTo(next) }
+                        },
+                        onDragEnd = {
+                            val triggered = offsetX.value >= deleteThresholdPx
+                            scope.launch {
+                                offsetX.animateTo(
+                                    targetValue = 0f,
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                                        stiffness = Spring.StiffnessMediumLow,
+                                    ),
+                                )
+                            }
+                            if (triggered) {
+                                onRequestDelete()
+                            }
+                        },
+                        onDragCancel = {
+                            scope.launch {
+                                offsetX.animateTo(
+                                    targetValue = 0f,
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                                        stiffness = Spring.StiffnessMediumLow,
+                                    ),
+                                )
+                            }
+                        },
+                    )
+                },
+        ) {
+            // الشريط الأحمر في أقصى اليسار: رفيع في الحالة العادية، ويتوسع لليمين عند السحب،
+            // وعند الضغط عليه مرة واحدة يتحرك قليلًا لليمين ليظهر جزء من سلة المهملات ثم يعود بتأثير مطاطي.
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .width(redBarWidthDp)
+                    .fillMaxHeight()
+                    .background(deleteRed)
+                    .clickable(role = Role.Button) {
+                        if (offsetX.value >= deleteThresholdPx * 0.7f) {
+                            scope.launch {
+                                offsetX.animateTo(
+                                    targetValue = 0f,
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                                        stiffness = Spring.StiffnessLow,
+                                    ),
+                                )
+                            }
+                            onRequestDelete()
+                        } else {
+                            scope.launch {
+                                offsetX.animateTo(
+                                    targetValue = peekRevealPx,
+                                    animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing),
+                                )
+                                offsetX.animateTo(
+                                    targetValue = 0f,
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                                        stiffness = Spring.StiffnessLow,
+                                    ),
+                                )
+                            }
+                        }
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                if (redBarWidthDp > 18.dp) {
+                    val revealAlpha = ((offsetX.value / peekRevealPx).coerceIn(0f, 1f))
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                        modifier = Modifier.graphicsLayer { alpha = revealAlpha },
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Delete,
+                            contentDescription = stringResource(R.string.plans_action_delete),
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        if (redBarWidthDp > 48.dp) {
+                            Text(
+                                text = stringResource(R.string.plans_action_delete),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White,
+                                maxLines = 1,
+                            )
+                        }
+                    }
+                }
+            }
+
+            // محتوى صف الباقة الإضافية يتحرك لليمين مع توسع الشريط الأحمر
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(start = redBarWidthDp + 6.dp, end = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(
+                    onClick = onEditClick,
+                    modifier = Modifier.size(34.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Edit,
+                        contentDescription = stringResource(R.string.plans_action_edit),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(19.dp),
+                    )
+                }
+
+                if (showReorderHandle) {
+                    var dragAccumulatedY by remember { mutableStateOf(0f) }
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .clickable(role = Role.Button, onClick = onSwapOrder)
+                            .pointerInput(plan.id) {
+                                detectVerticalDragGestures(
+                                    onVerticalDrag = { change, dragAmount ->
+                                        change.consume()
+                                        dragAccumulatedY += dragAmount
+                                        if (abs(dragAccumulatedY) > 24f) {
+                                            dragAccumulatedY = 0f
+                                            onSwapOrder()
+                                        }
+                                    },
+                                    onDragEnd = { dragAccumulatedY = 0f },
+                                    onDragCancel = { dragAccumulatedY = 0f },
+                                )
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.DragHandle,
+                            contentDescription = stringResource(R.string.additional_plan_reorder_cd),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(6.dp))
+
+                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            if (logoBitmap != null) {
+                                Image(
+                                    bitmap = logoBitmap,
+                                    contentDescription = stringResource(R.string.plan_logo_label),
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(RoundedCornerShape(6.dp)),
+                                )
+                            }
+                            if (plan.name.isNotBlank()) {
+                                Text(
+                                    text = plan.name,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+
+                        QuotaMetricColumn(
+                            label = stringResource(R.string.plan_capacity_label),
+                            value = capacityLabel,
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        )
+
+                        QuotaMetricColumn(
+                            label = stringResource(R.string.plan_duration_label),
+                            value = durationLabel,
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AdditionalPlanDialog(
+    network: UsageNetwork,
+    initialPlan: AdditionalPlan? = null,
+    onDismiss: () -> Unit,
+    onConfirm: (AdditionalPlanDraft) -> Unit,
+) {
+    val context = LocalContext.current
+    val isEditing = initialPlan != null
+    val isEditLocked = initialPlan?.preventEdit == true
+    val stateKey = initialPlan?.id ?: "new-additional-${network.name}"
+
+    val initialCapacityText = remember(initialPlan?.quotaBytes, initialPlan?.capacityUnit) {
+        if (initialPlan != null && initialPlan.quotaBytes > 0L) {
+            val raw = initialPlan.quotaBytes.toDouble() / initialPlan.capacityUnit.bytesFactor.toDouble()
+            if (raw == raw.toLong().toDouble()) {
+                raw.toLong().toString()
+            } else {
+                String.format(java.util.Locale.US, "%.2f", raw).trimEnd('0').trimEnd('.')
+            }
+        } else {
+            ""
+        }
+    }
+
+    var planName by rememberSaveable(stateKey) { mutableStateOf(initialPlan?.name ?: "") }
+    var logoPath by rememberSaveable(stateKey) { mutableStateOf(initialPlan?.logoPath ?: "") }
+    var capacityText by rememberSaveable(stateKey) { mutableStateOf(initialCapacityText) }
+    var capacityUnit by rememberSaveable(stateKey) {
+        mutableStateOf(initialPlan?.capacityUnit ?: PlanCapacityUnit.MB)
+    }
+    var durationText by rememberSaveable(stateKey) {
+        mutableStateOf((initialPlan?.durationValue ?: 7).toString())
+    }
+    var durationUnit by rememberSaveable(stateKey) {
+        mutableStateOf(initialPlan?.durationUnit ?: PlanDurationUnit.DAY)
+    }
+    var preventEdit by rememberSaveable(stateKey) {
+        mutableStateOf(initialPlan?.preventEdit ?: false)
+    }
+
+    val logoBitmap = remember(logoPath) { loadPlanLogoBitmap(logoPath) }
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent(),
+    ) { uri: Uri? ->
+        if (uri != null) {
+            savePickedPlanLogo(context, uri, network)?.let { savedPath ->
+                logoPath = savedPath
+            }
+        }
+    }
+
+    val parsedCapacity = capacityText.toDoubleOrNull()
+    val parsedDuration = durationText.toIntOrNull()
+    val canSave = isEditLocked || (
+        parsedCapacity != null && parsedCapacity > 0.0 &&
+            parsedDuration != null && parsedDuration >= 1
+        )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = stringResource(
+                    if (isEditing) {
+                        R.string.additional_plan_dialog_title_update
+                    } else {
+                        R.string.additional_plan_dialog_title_add
+                    },
+                ),
+                style = MaterialTheme.typography.headlineSmall,
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Box(modifier = Modifier.size(56.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .clip(CircleShape)
+                                .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
+                                .clickable(role = Role.Button) { imagePickerLauncher.launch("image/*") },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (logoBitmap != null) {
+                                Image(
+                                    bitmap = logoBitmap,
+                                    contentDescription = stringResource(R.string.plan_logo_label),
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize(),
+                                )
+                            } else {
+                                Text(
+                                    text = stringResource(R.string.plan_logo_label),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .size(22.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (logoBitmap != null) {
+                                        MaterialTheme.colorScheme.errorContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.primary
+                                    },
+                                )
+                                .clickable(role = Role.Button) {
+                                    if (logoBitmap != null) {
+                                        logoPath = ""
+                                    } else {
+                                        imagePickerLauncher.launch("image/*")
+                                    }
+                                },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = if (logoBitmap != null) Icons.Rounded.Close else Icons.Rounded.CameraAlt,
+                                contentDescription = stringResource(R.string.plan_logo_label),
+                                tint = if (logoBitmap != null) {
+                                    MaterialTheme.colorScheme.onErrorContainer
+                                } else {
+                                    MaterialTheme.colorScheme.onPrimary
+                                },
+                                modifier = Modifier.size(13.dp),
+                            )
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = planName,
+                        onValueChange = { planName = it },
+                        placeholder = { Text(text = stringResource(R.string.additional_plan_name_optional)) },
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+
+                Text(
+                    text = stringResource(R.string.plan_capacity_label),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    OutlinedTextField(
+                        value = capacityText,
+                        onValueChange = { newValue ->
+                            capacityText = newValue.filter { it.isDigit() || it == '.' }
+                        },
+                        enabled = !isEditLocked,
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f),
+                    )
+                    PlanDropdownPill(
+                        selectedLabel = stringResource(capacityUnit.labelResource()),
+                        options = PlanCapacityUnit.entries,
+                        optionLabel = { stringResource(it.labelResource()) },
+                        selectedOption = capacityUnit,
+                        onSelect = { capacityUnit = it },
+                        enabled = !isEditLocked,
+                    )
+                }
+
+                Text(
+                    text = stringResource(R.string.plan_duration_label),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    OutlinedTextField(
+                        value = durationText,
+                        onValueChange = { newValue ->
+                            durationText = newValue.filter { it.isDigit() }
+                        },
+                        enabled = !isEditLocked,
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                    )
+                    PlanDropdownPill(
+                        selectedLabel = stringResource(durationUnit.labelResource()),
+                        options = PlanDurationUnit.entries,
+                        optionLabel = { stringResource(it.labelResource()) },
+                        selectedOption = durationUnit,
+                        onSelect = { durationUnit = it },
+                        enabled = !isEditLocked,
+                    )
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.plan_prevent_edit_label),
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            text = stringResource(R.string.additional_plan_prevent_edit_subtitle),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Switch(
+                        checked = preventEdit,
+                        onCheckedChange = { preventEdit = it },
+                        enabled = !isEditLocked,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val safeCapacity = if (isEditLocked && initialPlan != null) {
+                        initialPlan.quotaBytes.toDouble() / initialPlan.capacityUnit.bytesFactor.toDouble()
+                    } else {
+                        parsedCapacity ?: 0.0
+                    }
+                    onConfirm(
+                        AdditionalPlanDraft(
+                            name = planName,
+                            logoPath = logoPath,
+                            capacityValue = safeCapacity,
+                            capacityUnit = capacityUnit,
+                            durationValue = (parsedDuration ?: 7).coerceAtLeast(1),
+                            durationUnit = durationUnit,
+                            preventEdit = preventEdit,
+                        ),
+                    )
+                },
+                enabled = canSave,
+                shape = AppButtonShape,
+            ) {
+                Text(text = stringResource(R.string.quota_update_action))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, shape = AppButtonShape) {
+                Text(text = stringResource(R.string.action_cancel))
+            }
+        },
+    )
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun PlansListDialog(
+    network: UsageNetwork,
+    activePlan: DataPlan,
+    savedPlans: List<DataPlan>,
+    onDismiss: () -> Unit,
+    onActivateCurrentPlan: () -> Unit,
+    onEditActivePlan: () -> Unit,
+    onAddAdditionalPlanToActive: () -> Unit,
+    onSwitchToSavedPlan: (String) -> Unit,
+    onEditSavedPlan: (String) -> Unit,
+    onDeletePlan: (String) -> Unit,
+    onAddNewPlan: () -> Unit,
+) {
+    var pendingSwitchPlanId by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingDeletePlanId by rememberSaveable { mutableStateOf<String?>(null) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.plans_dialog_title),
+                    style = MaterialTheme.typography.headlineSmall,
+                )
+                Text(
+                    text = stringResource(
+                        if (network == UsageNetwork.WIFI) {
+                            R.string.plan_card_network_wifi
+                        } else {
+                            R.string.plan_card_network_mobile
+                        },
+                    ),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 420.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                if (!activePlan.hasQuota && savedPlans.isEmpty()) {
+                    Text(
+                        text = stringResource(R.string.plans_empty_message),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                if (activePlan.hasQuota) {
+                    Text(
+                        text = stringResource(R.string.plans_active_section),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    PlanListItemCard(
+                        plan = activePlan,
+                        isActivePlan = true,
+                        onPrimaryAction = if (activePlan.pendingActivation) onActivateCurrentPlan else null,
+                        primaryActionLabel = stringResource(R.string.quota_activate_action),
+                        onAddAdditionalClick = if (activePlan.additionalPlans.size < MAX_ADDITIONAL_PLANS) {
+                            onAddAdditionalPlanToActive
+                        } else {
+                            null
+                        },
+                        onEditClick = onEditActivePlan,
+                        onDeleteClick = { pendingDeletePlanId = activePlan.id },
+                    )
+                }
+
+                if (savedPlans.isNotEmpty()) {
+                    Text(
+                        text = stringResource(R.string.plans_saved_section),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    savedPlans.forEach { saved ->
+                        key(saved.id) {
+                            PlanListItemCard(
+                                plan = saved,
+                                isActivePlan = false,
+                                onPrimaryAction = {
+                                    if (activePlan.hasQuota) {
+                                        pendingSwitchPlanId = saved.id
+                                    } else {
+                                        onSwitchToSavedPlan(saved.id)
+                                    }
+                                },
+                                primaryActionLabel = stringResource(R.string.plans_action_switch),
+                                onAddAdditionalClick = null,
+                                onEditClick = { onEditSavedPlan(saved.id) },
+                                onDeleteClick = { pendingDeletePlanId = saved.id },
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onAddNewPlan,
+                shape = AppButtonShape,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Add,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(text = stringResource(R.string.plans_action_add))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, shape = AppButtonShape) {
+                Text(text = stringResource(R.string.action_close))
+            }
+        },
+    )
+
+    if (pendingSwitchPlanId != null) {
+        AlertDialog(
+            onDismissRequest = { pendingSwitchPlanId = null },
+            icon = { Icon(imageVector = Icons.Rounded.SwapHoriz, contentDescription = null) },
+            title = { Text(text = stringResource(R.string.plans_switch_confirm_title)) },
+            text = { Text(text = stringResource(R.string.plans_switch_confirm_body)) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val targetId = pendingSwitchPlanId
+                        pendingSwitchPlanId = null
+                        if (targetId != null) {
+                            onSwitchToSavedPlan(targetId)
+                        }
+                    },
+                    shape = AppButtonShape,
+                ) {
+                    Text(text = stringResource(R.string.action_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { pendingSwitchPlanId = null },
+                    shape = AppButtonShape,
+                ) {
+                    Text(text = stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
+
+    if (pendingDeletePlanId != null) {
+        AlertDialog(
+            onDismissRequest = { pendingDeletePlanId = null },
+            icon = { Icon(imageVector = Icons.Rounded.Delete, contentDescription = null) },
+            title = { Text(text = stringResource(R.string.plans_delete_confirm_title)) },
+            text = { Text(text = stringResource(R.string.plans_delete_confirm_body)) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val targetId = pendingDeletePlanId
+                        pendingDeletePlanId = null
+                        if (targetId != null) {
+                            onDeletePlan(targetId)
+                        }
+                    },
+                    shape = AppButtonShape,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError,
+                    ),
+                ) {
+                    Text(text = stringResource(R.string.plans_action_delete))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { pendingDeletePlanId = null },
+                    shape = AppButtonShape,
+                ) {
+                    Text(text = stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun PlanListItemCard(
+    plan: DataPlan,
+    isActivePlan: Boolean,
+    onPrimaryAction: (() -> Unit)?,
+    primaryActionLabel: String,
+    onAddAdditionalClick: (() -> Unit)?,
+    onEditClick: () -> Unit,
+    onDeleteClick: () -> Unit,
+) {
+    val logoBitmap = remember(plan.logoPath) { loadPlanLogoBitmap(plan.logoPath) }
+    val durationText = "${plan.durationValue} ${stringResource(plan.durationUnit.labelResource())}"
+    val titleText = plan.name.ifBlank { stringResource(R.string.label_quota) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(
+                if (isActivePlan) {
+                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainerLow
+                },
+            )
+            .border(
+                width = 1.dp,
+                color = if (isActivePlan) {
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
+                } else {
+                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                },
+                shape = RoundedCornerShape(16.dp),
+            )
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.weight(1f),
+            ) {
+                if (logoBitmap != null) {
+                    Image(
+                        bitmap = logoBitmap,
+                        contentDescription = stringResource(R.string.plan_logo_label),
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(RoundedCornerShape(6.dp)),
+                    )
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = titleText,
+                        style = MaterialTheme.typography.titleMediumEmphasized,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = "${Format.bytes(plan.quotaBytes)} • $durationText",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            if (isActivePlan) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(
+                            if (plan.pendingActivation) {
+                                MaterialTheme.colorScheme.secondaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.primaryContainer
+                            },
+                        )
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                ) {
+                    Text(
+                        text = stringResource(
+                            if (plan.pendingActivation) {
+                                R.string.plans_status_pending
+                            } else {
+                                R.string.plans_status_active
+                            },
+                        ),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (plan.pendingActivation) {
+                            MaterialTheme.colorScheme.onSecondaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        },
+                    )
+                }
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            if (onPrimaryAction != null) {
+                Button(
+                    onClick = onPrimaryAction,
+                    shape = AppButtonShape,
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    modifier = Modifier.height(34.dp),
+                ) {
+                    Text(
+                        text = primaryActionLabel,
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1,
+                    )
+                }
+            }
+
+            if (onAddAdditionalClick != null) {
+                FilledTonalButton(
+                    onClick = onAddAdditionalClick,
+                    shape = AppButtonShape,
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    modifier = Modifier.height(34.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Add,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = stringResource(R.string.plans_action_add_additional),
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1,
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            IconButton(
+                onClick = onEditClick,
+                modifier = Modifier.size(34.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Edit,
+                    contentDescription = stringResource(R.string.plans_action_edit),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+
+            IconButton(
+                onClick = onDeleteClick,
+                modifier = Modifier.size(34.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Delete,
+                    contentDescription = stringResource(R.string.plans_action_delete),
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -2963,12 +4160,13 @@ private fun savePickedPlanLogo(
     }
     val dir = File(context.filesDir, "plan_logos").apply { mkdirs() }
     val prefix = "plan_logo_${network.name.lowercase()}_"
-    val outFile = File(dir, "$prefix${System.currentTimeMillis()}.png")
+    val outFile = File(dir, "$prefix${System.currentTimeMillis()}_${java.util.UUID.randomUUID().toString().take(6)}.png")
     FileOutputStream(outFile).use { out ->
         scaled.compress(Bitmap.CompressFormat.PNG, 90, out)
     }
-    dir.listFiles()?.forEach { existing ->
-        if (existing != outFile && existing.name.startsWith(prefix)) existing.delete()
+    val existingFiles = dir.listFiles()?.sortedByDescending { it.lastModified() }.orEmpty()
+    if (existingFiles.size > 32) {
+        existingFiles.drop(32).forEach { it.delete() }
     }
     outFile.absolutePath
 }.getOrNull()

@@ -700,6 +700,28 @@ fun MainScreen(
                     onLayoutDirectionChange = { viewModel.setLayoutDirection(it) },
                     onSavePlan = { viewModel.savePlan(it) },
                     onActivatePlan = { viewModel.activatePlan(it) },
+                    onAddPlanToSavedList = { viewModel.addPlanToSavedList(it) },
+                    onUpdateSavedPlan = { network, planId, draft ->
+                        viewModel.updateSavedPlan(network, planId, draft)
+                    },
+                    onSwitchToSavedPlan = { network, planId ->
+                        viewModel.switchToSavedPlan(network, planId)
+                    },
+                    onDeletePlan = { network, planId ->
+                        viewModel.deletePlan(network, planId)
+                    },
+                    onAddAdditionalPlan = { network, draft ->
+                        viewModel.addAdditionalPlan(network, draft)
+                    },
+                    onUpdateAdditionalPlan = { network, additionalId, draft ->
+                        viewModel.updateAdditionalPlan(network, additionalId, draft)
+                    },
+                    onDeleteAdditionalPlan = { network, additionalId ->
+                        viewModel.deleteAdditionalPlan(network, additionalId)
+                    },
+                    onReorderAdditionalPlans = { network, fromIdx, toIdx ->
+                        viewModel.reorderAdditionalPlans(network, fromIdx, toIdx)
+                    },
                 )
             }
         }

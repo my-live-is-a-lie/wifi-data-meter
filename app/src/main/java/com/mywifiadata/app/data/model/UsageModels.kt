@@ -27,6 +27,7 @@ enum class WifiBand { GHZ_2_4, GHZ_5, GHZ_6, UNKNOWN }
 /** حالة شبكة الواي فاي الحالية وتفاصيلها. */
 data class WifiStatus(
     val isWifiConnected: Boolean = false,
+    val isMobileConnected: Boolean = false,
     val isOnline: Boolean = false,
     val ssid: String? = null,
     val bssid: String? = null,
@@ -161,8 +162,41 @@ enum class PlanNetworkType {
     BOTH,
 }
 
+/** الحد الأقصى للباقات الإضافية التابعة للباقة النشطة. */
+const val MAX_ADDITIONAL_PLANS = 2
+
+/** باقة إضافية تابعة للباقة النشطة تأخذ مكانها عند انتهائها. */
+data class AdditionalPlan(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val name: String = "",
+    val logoPath: String = "",
+    val quotaBytes: Long = 0L,
+    val capacityUnit: PlanCapacityUnit = PlanCapacityUnit.MB,
+    val durationValue: Int = 7,
+    val durationUnit: PlanDurationUnit = PlanDurationUnit.DAY,
+    val preventEdit: Boolean = false,
+) {
+    val totalDays: Int
+        get() = (durationValue.coerceAtLeast(1) * durationUnit.daysPerUnit).coerceAtLeast(1)
+}
+
+/** بيانات الباقة الإضافية المُدخلة من نافذة إضافة/تحديث باقة إضافية. */
+data class AdditionalPlanDraft(
+    val name: String = "",
+    val logoPath: String = "",
+    val capacityValue: Double = 0.0,
+    val capacityUnit: PlanCapacityUnit = PlanCapacityUnit.MB,
+    val durationValue: Int = 7,
+    val durationUnit: PlanDurationUnit = PlanDurationUnit.DAY,
+    val preventEdit: Boolean = false,
+) {
+    val quotaBytes: Long
+        get() = (capacityValue.coerceAtLeast(0.0) * capacityUnit.bytesFactor.toDouble()).toLong()
+}
+
 /** بيانات باقة واحدة (للواي فاي أو بيانات الهاتف). */
 data class DataPlan(
+    val id: String = "default-plan",
     val name: String = "",
     val logoPath: String = "",
     val quotaBytes: Long = 0L,
@@ -172,6 +206,7 @@ data class DataPlan(
     val preventEdit: Boolean = false,
     val pendingActivation: Boolean = false,
     val activatedAtMillis: Long = 0L,
+    val additionalPlans: List<AdditionalPlan> = emptyList(),
 ) {
     val hasQuota: Boolean get() = quotaBytes > 0L
 
@@ -187,6 +222,31 @@ data class DataPlan(
             kotlin.math.ceil(remainingMillis.toDouble() / 86_400_000.0).toInt().coerceIn(0, totalDays)
         }
         else -> totalDays
+    }
+
+    fun isExpiredOrDepleted(usedBytes: Long, now: Long): Boolean {
+        if (!hasQuota || pendingActivation || activatedAtMillis <= 0L) return false
+        val endMillis = activatedAtMillis + totalDays.toLong() * 86_400_000L
+        return now >= endMillis || usedBytes >= quotaBytes
+    }
+
+    companion object {
+        fun fromAdditionalPlan(
+            additional: AdditionalPlan,
+            remainingAdditional: List<AdditionalPlan> = emptyList(),
+        ): DataPlan = DataPlan(
+            id = additional.id,
+            name = additional.name,
+            logoPath = additional.logoPath,
+            quotaBytes = additional.quotaBytes,
+            capacityUnit = additional.capacityUnit,
+            durationValue = additional.durationValue,
+            durationUnit = additional.durationUnit,
+            preventEdit = additional.preventEdit,
+            pendingActivation = true,
+            activatedAtMillis = 0L,
+            additionalPlans = remainingAdditional.take(MAX_ADDITIONAL_PLANS),
+        )
     }
 }
 
@@ -225,6 +285,7 @@ enum class AccentColor {
 data class AppSettings(
     val quotaBytes: Long = 0L,
     val cycleStartDay: Int = 1,
+    val planId: String = "wifi-active",
     val planName: String = "",
     val planLogoPath: String = "",
     val planCapacityUnit: PlanCapacityUnit = PlanCapacityUnit.GB,
@@ -234,7 +295,10 @@ data class AppSettings(
     val planPreventEdit: Boolean = false,
     val planPendingActivation: Boolean = false,
     val planActivatedAtMillis: Long = 0L,
-    val mobilePlan: DataPlan = DataPlan(),
+    val planAdditionalPlans: List<AdditionalPlan> = emptyList(),
+    val mobilePlan: DataPlan = DataPlan(id = "mobile-active"),
+    val savedWifiPlans: List<DataPlan> = emptyList(),
+    val savedMobilePlans: List<DataPlan> = emptyList(),
     val notificationsEnabled: Boolean = true,
     val alertThresholdPercent: Int = 80,
     /** فهرس خيار المدة في [SamplingIntervals]؛ يحفظ الوحدة حتى مع تساوي المدد. */
@@ -276,6 +340,7 @@ data class AppSettings(
 
     val wifiPlan: DataPlan
         get() = DataPlan(
+            id = planId,
             name = planName,
             logoPath = planLogoPath,
             quotaBytes = quotaBytes,
@@ -285,6 +350,7 @@ data class AppSettings(
             preventEdit = planPreventEdit,
             pendingActivation = planPendingActivation,
             activatedAtMillis = planActivatedAtMillis,
+            additionalPlans = planAdditionalPlans,
         )
 
     fun planFor(network: UsageNetwork): DataPlan = when (network) {
@@ -294,6 +360,7 @@ data class AppSettings(
 
     fun withPlanFor(network: UsageNetwork, plan: DataPlan): AppSettings = when (network) {
         UsageNetwork.WIFI -> copy(
+            planId = plan.id,
             planName = plan.name,
             planLogoPath = plan.logoPath,
             quotaBytes = plan.quotaBytes,
@@ -303,7 +370,271 @@ data class AppSettings(
             planPreventEdit = plan.preventEdit,
             planPendingActivation = plan.pendingActivation,
             planActivatedAtMillis = plan.activatedAtMillis,
+            planAdditionalPlans = plan.additionalPlans.take(MAX_ADDITIONAL_PLANS),
         )
-        UsageNetwork.MOBILE -> copy(mobilePlan = plan)
+        UsageNetwork.MOBILE -> copy(
+            mobilePlan = plan.copy(additionalPlans = plan.additionalPlans.take(MAX_ADDITIONAL_PLANS)),
+        )
+    }
+
+    fun savedPlansFor(network: UsageNetwork): List<DataPlan> = when (network) {
+        UsageNetwork.WIFI -> savedWifiPlans
+        UsageNetwork.MOBILE -> savedMobilePlans
+    }
+
+    fun withSavedPlansFor(network: UsageNetwork, plans: List<DataPlan>): AppSettings = when (network) {
+        UsageNetwork.WIFI -> copy(savedWifiPlans = plans)
+        UsageNetwork.MOBILE -> copy(savedMobilePlans = plans)
+    }
+
+    /**
+     * عند انتهاء مدة الباقة النشطة أو نفاد سعتها مع وجود باقات إضافية، تحل الباقة
+     * الإضافية الأولى مكان الباقة الرئيسية (بانتظار التفعيل اليدوي) وتُحفظ الباقة
+     * السابقة ضمن قائمة الباقات المحفوظة.
+     */
+    fun promoteExpiredPlanForNetwork(
+        network: UsageNetwork,
+        usedBytes: Long,
+        now: Long,
+    ): AppSettings {
+        val currentPlan = planFor(network)
+        if (!currentPlan.isExpiredOrDepleted(usedBytes, now)) return this
+        val firstAdditional = currentPlan.additionalPlans.firstOrNull() ?: return this
+        val remainingAdditional = currentPlan.additionalPlans.drop(1)
+        val archivedCurrent = currentPlan.copy(
+            id = currentPlan.id.ifBlank { java.util.UUID.randomUUID().toString() },
+            pendingActivation = true,
+            activatedAtMillis = 0L,
+            additionalPlans = emptyList(),
+        )
+        val promotedPlan = DataPlan.fromAdditionalPlan(
+            additional = firstAdditional,
+            remainingAdditional = remainingAdditional,
+        )
+        val updatedSaved = savedPlansFor(network)
+            .filterNot { it.id == archivedCurrent.id } + archivedCurrent
+        return withPlanFor(network, promotedPlan)
+            .withSavedPlansFor(network, updatedSaved)
+    }
+
+    fun promoteExpiredPlansIfNeeded(
+        wifiUsedBytes: Long,
+        mobileUsedBytes: Long,
+        now: Long,
+    ): AppSettings = promoteExpiredPlanForNetwork(UsageNetwork.WIFI, wifiUsedBytes, now)
+        .promoteExpiredPlanForNetwork(UsageNetwork.MOBILE, mobileUsedBytes, now)
+
+    fun addOrSavePlanFromList(draft: PlanDraft): AppSettings {
+        val targetNetworks = when (draft.networkType) {
+            PlanNetworkType.WIFI -> listOf(UsageNetwork.WIFI)
+            PlanNetworkType.MOBILE -> listOf(UsageNetwork.MOBILE)
+            PlanNetworkType.BOTH -> listOf(UsageNetwork.WIFI, UsageNetwork.MOBILE)
+        }
+        var updated = copy(planNetworkType = draft.networkType)
+        val newQuotaBytes = draft.quotaBytes
+        if (newQuotaBytes <= 0L) return updated
+        val safeDuration = draft.durationValue.coerceAtLeast(1)
+        for (network in targetNetworks) {
+            val newPlan = DataPlan(
+                id = java.util.UUID.randomUUID().toString(),
+                name = draft.name.trim(),
+                logoPath = draft.logoPath,
+                quotaBytes = newQuotaBytes,
+                capacityUnit = draft.capacityUnit,
+                durationValue = safeDuration,
+                durationUnit = draft.durationUnit,
+                preventEdit = draft.preventEdit,
+                pendingActivation = true,
+                activatedAtMillis = 0L,
+            )
+            val currentActive = updated.planFor(network)
+            updated = if (!currentActive.hasQuota) {
+                updated.withPlanFor(network, newPlan)
+            } else {
+                updated.withSavedPlansFor(network, updated.savedPlansFor(network) + newPlan)
+            }
+        }
+        return updated
+    }
+
+    fun updateSavedPlan(
+        network: UsageNetwork,
+        planId: String,
+        draft: PlanDraft,
+    ): AppSettings {
+        val updatedList = savedPlansFor(network).map { plan ->
+            if (plan.id != planId) {
+                plan
+            } else if (plan.hasQuota && plan.preventEdit) {
+                plan.copy(
+                    name = draft.name.trim(),
+                    logoPath = draft.logoPath,
+                )
+            } else {
+                val newQuotaBytes = draft.quotaBytes
+                val safeDuration = draft.durationValue.coerceAtLeast(1)
+                plan.copy(
+                    name = draft.name.trim(),
+                    logoPath = draft.logoPath,
+                    quotaBytes = newQuotaBytes,
+                    capacityUnit = draft.capacityUnit,
+                    durationValue = safeDuration,
+                    durationUnit = draft.durationUnit,
+                    preventEdit = if (newQuotaBytes > 0L) draft.preventEdit else false,
+                )
+            }
+        }.filter { it.hasQuota }
+        return withSavedPlansFor(network, updatedList)
+    }
+
+    fun switchToSavedPlan(
+        network: UsageNetwork,
+        planId: String,
+        now: Long,
+    ): AppSettings {
+        val savedList = savedPlansFor(network)
+        val targetPlan = savedList.firstOrNull { it.id == planId } ?: return this
+        val currentActive = planFor(network)
+        val remainingSaved = savedList.filterNot { it.id == planId }
+        val updatedSaved = if (currentActive.hasQuota) {
+            val resetPrevious = currentActive.copy(
+                id = currentActive.id.ifBlank { java.util.UUID.randomUUID().toString() },
+                pendingActivation = true,
+                activatedAtMillis = 0L,
+            )
+            remainingSaved + resetPrevious
+        } else {
+            remainingSaved
+        }
+        val activatedTarget = targetPlan.copy(
+            pendingActivation = false,
+            activatedAtMillis = now,
+        )
+        return withPlanFor(network, activatedTarget)
+            .withSavedPlansFor(network, updatedSaved)
+    }
+
+    fun deletePlan(
+        network: UsageNetwork,
+        planId: String,
+    ): AppSettings {
+        val currentActive = planFor(network)
+        if (currentActive.hasQuota && currentActive.id == planId) {
+            val firstAdditional = currentActive.additionalPlans.firstOrNull()
+            return if (firstAdditional != null) {
+                val promoted = DataPlan.fromAdditionalPlan(
+                    additional = firstAdditional,
+                    remainingAdditional = currentActive.additionalPlans.drop(1),
+                )
+                withPlanFor(network, promoted)
+            } else {
+                withPlanFor(
+                    network = network,
+                    plan = DataPlan(
+                        id = if (network == UsageNetwork.WIFI) "wifi-active" else "mobile-active",
+                    ),
+                )
+            }
+        }
+        return withSavedPlansFor(
+            network = network,
+            plans = savedPlansFor(network).filterNot { it.id == planId },
+        )
+    }
+
+    fun addAdditionalPlan(
+        network: UsageNetwork,
+        draft: AdditionalPlanDraft,
+    ): AppSettings {
+        val currentActive = planFor(network)
+        if (!currentActive.hasQuota || currentActive.additionalPlans.size >= MAX_ADDITIONAL_PLANS) {
+            return this
+        }
+        val newQuotaBytes = draft.quotaBytes
+        if (newQuotaBytes <= 0L) return this
+        val newAdditional = AdditionalPlan(
+            id = java.util.UUID.randomUUID().toString(),
+            name = draft.name.trim(),
+            logoPath = draft.logoPath,
+            quotaBytes = newQuotaBytes,
+            capacityUnit = draft.capacityUnit,
+            durationValue = draft.durationValue.coerceAtLeast(1),
+            durationUnit = draft.durationUnit,
+            preventEdit = draft.preventEdit,
+        )
+        return withPlanFor(
+            network = network,
+            plan = currentActive.copy(
+                additionalPlans = (currentActive.additionalPlans + newAdditional).take(MAX_ADDITIONAL_PLANS),
+            ),
+        )
+    }
+
+    fun updateAdditionalPlan(
+        network: UsageNetwork,
+        additionalPlanId: String,
+        draft: AdditionalPlanDraft,
+    ): AppSettings {
+        val currentActive = planFor(network)
+        val updatedAdditional = currentActive.additionalPlans.map { item ->
+            if (item.id != additionalPlanId) {
+                item
+            } else if (item.preventEdit) {
+                item.copy(
+                    name = draft.name.trim(),
+                    logoPath = draft.logoPath,
+                )
+            } else {
+                val newQuotaBytes = draft.quotaBytes
+                if (newQuotaBytes <= 0L) {
+                    item
+                } else {
+                    item.copy(
+                        name = draft.name.trim(),
+                        logoPath = draft.logoPath,
+                        quotaBytes = newQuotaBytes,
+                        capacityUnit = draft.capacityUnit,
+                        durationValue = draft.durationValue.coerceAtLeast(1),
+                        durationUnit = draft.durationUnit,
+                        preventEdit = draft.preventEdit,
+                    )
+                }
+            }
+        }
+        return withPlanFor(
+            network = network,
+            plan = currentActive.copy(additionalPlans = updatedAdditional),
+        )
+    }
+
+    fun deleteAdditionalPlan(
+        network: UsageNetwork,
+        additionalPlanId: String,
+    ): AppSettings {
+        val currentActive = planFor(network)
+        return withPlanFor(
+            network = network,
+            plan = currentActive.copy(
+                additionalPlans = currentActive.additionalPlans.filterNot { it.id == additionalPlanId },
+            ),
+        )
+    }
+
+    fun reorderAdditionalPlans(
+        network: UsageNetwork,
+        fromIndex: Int,
+        toIndex: Int,
+    ): AppSettings {
+        val currentActive = planFor(network)
+        val list = currentActive.additionalPlans.toMutableList()
+        if (fromIndex !in list.indices || toIndex !in list.indices || fromIndex == toIndex) {
+            return this
+        }
+        val moved = list.removeAt(fromIndex)
+        list.add(toIndex, moved)
+        return withPlanFor(
+            network = network,
+            plan = currentActive.copy(additionalPlans = list),
+        )
     }
 }
