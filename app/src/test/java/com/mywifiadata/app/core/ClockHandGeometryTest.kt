@@ -108,6 +108,60 @@ class ClockHandGeometryTest {
     }
 
     @Test
+    fun `short hand covered by the center text is extended instead of disappearing`() {
+        // نص عريض يغطي العقرب القصير كاملًا عند اتجاه الأسفل، فلا بد أن يظهر
+        // طرفه خارج النص بدل أن يختفي أثناء دوران العقرب.
+        val wideCenter = HandObstacle(left = -45f, top = -50f, right = 45f, bottom = 50f)
+        val segment = ClockHandGeometry.visibleSegment(
+            angleDeg = 90f,
+            endRadius = 60f,
+            obstacles = listOf(wideCenter),
+            minLength = 3f,
+            maxReach = 150f,
+            minVisibleLength = 20f,
+        )
+
+        assertNotNull(segment)
+        assertEquals(45f, segment!!.first, 0.01f)
+        assertEquals(65f, segment.second, 0.01f)
+    }
+
+    @Test
+    fun `extending the visible part never passes the maximum reach`() {
+        val wideCenter = HandObstacle(left = -45f, top = -50f, right = 45f, bottom = 50f)
+        val segment = ClockHandGeometry.visibleSegment(
+            angleDeg = 90f,
+            endRadius = 60f,
+            obstacles = listOf(wideCenter),
+            minLength = 3f,
+            maxReach = 70f,
+            minVisibleLength = 40f,
+        )
+
+        assertNotNull(segment)
+        assertEquals(45f, segment!!.first, 0.01f)
+        assertEquals(70f, segment.second, 0.01f)
+    }
+
+    @Test
+    fun `hand shortened by an outer text is not stretched toward it`() {
+        // عقرب يتوقف عند نص علوي قريب؛ لا نمدّه داخل النص بحجة أنه قصير.
+        val nearOuterText = HandObstacle(left = -40f, top = -60f, right = 40f, bottom = -45f)
+        val segment = ClockHandGeometry.visibleSegment(
+            angleDeg = 0f,
+            endRadius = 120f,
+            obstacles = listOf(centerBlock, nearOuterText),
+            minLength = 3f,
+            maxReach = 150f,
+            minVisibleLength = 30f,
+        )
+
+        assertNotNull(segment)
+        assertEquals(40f, segment!!.first, 0.01f)
+        assertEquals(45f, segment.second, 0.01f)
+    }
+
+    @Test
     fun `inflating an obstacle adds the gap on every side`() {
         val inflated = centerBlock.inflated(delta = 6f)
 
@@ -167,5 +221,73 @@ class ClockHandGeometryTest {
         }
 
         assertEquals(40f, spring.advance(40f, now + 16L), 1f)
+    }
+
+    @Test
+    fun `short hand hidden inside the center block is extended outwards`() {
+        val centerBlock = HandObstacle(left = -60f, top = -40f, right = 60f, bottom = 40f)
+
+        val segment = ClockHandGeometry.visibleSegment(
+            angleDeg = 90f,
+            endRadius = 45f,
+            obstacles = listOf(centerBlock),
+            minLength = 1f,
+            maxReach = 105f,
+            minVisibleLength = 13.9f,
+        )
+
+        assertNotNull(segment)
+        // يبدأ بعد النص ثم يُمدّ للخارج حتى يظهر بطول مرئي مقبول.
+        assertEquals(40f, segment!!.first, 0.01f)
+        assertEquals(53.9f, segment.second, 0.01f)
+    }
+
+    @Test
+    fun `hand extension never passes the allowed reach`() {
+        val centerBlock = HandObstacle(left = -60f, top = -40f, right = 60f, bottom = 40f)
+
+        val segment = ClockHandGeometry.visibleSegment(
+            angleDeg = 90f,
+            endRadius = 45f,
+            obstacles = listOf(centerBlock),
+            minLength = 1f,
+            maxReach = 60f,
+            minVisibleLength = 100f,
+        )
+
+        assertEquals(40f, segment!!.first, 0.01f)
+        assertEquals(60f, segment.second, 0.01f)
+    }
+
+    @Test
+    fun `outer text stops the hand without extending it over the text`() {
+        val centerBlock = HandObstacle(left = -60f, top = -40f, right = 60f, bottom = 40f)
+        val outerText = HandObstacle(left = -30f, top = -100f, right = 30f, bottom = -70f)
+
+        val segment = ClockHandGeometry.visibleSegment(
+            angleDeg = 0f,
+            endRadius = 120f,
+            obstacles = listOf(centerBlock, outerText),
+            minLength = 1f,
+            maxReach = 140f,
+            minVisibleLength = 80f,
+        )
+
+        assertEquals(40f, segment!!.first, 0.01f)
+        assertEquals(70f, segment.second, 0.01f)
+    }
+
+    @Test
+    fun `hand fully covered without reach allowance stays hidden as before`() {
+        val centerBlock = HandObstacle(left = -60f, top = -40f, right = 60f, bottom = 40f)
+
+        val segment = ClockHandGeometry.visibleSegment(
+            angleDeg = 90f,
+            endRadius = 35f,
+            obstacles = listOf(centerBlock),
+            minLength = 1f,
+        )
+
+        assertNull(segment)
     }
 }

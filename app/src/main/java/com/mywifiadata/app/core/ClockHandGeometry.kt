@@ -42,6 +42,13 @@ object ClockHandGeometry {
         endRadius: Float,
         obstacles: List<HandObstacle>,
         minLength: Float,
+        /**
+         * أقصى مسافة يسمح للعقرب بالوصول إليها إن كان النص المحيط بالمركز
+         * يغطي كامل طوله؛ يبقى العقرب ظاهرًا ولا يختفي أثناء دورانه.
+         */
+        maxReach: Float = endRadius,
+        /** أقل طول مرئي مقبول قبل تمديد العقرب للخارج. */
+        minVisibleLength: Float = 0f,
     ): Pair<Float, Float>? {
         val radians = Math.toRadians(angleDeg.toDouble() - 90.0)
         val dx = kotlin.math.cos(radians).toFloat()
@@ -56,6 +63,7 @@ object ClockHandGeometry {
 
         var visibleStart = 0f
         var visibleEnd = endRadius
+        var blockedByOuterText = false
         for ((enter, exit) in intervals) {
             if (enter <= visibleStart) {
                 // النص يغطي بداية العقرب، فيظهر العقرب بعد نهايته.
@@ -63,8 +71,15 @@ object ClockHandGeometry {
             } else {
                 // أول نص أمام العقرب يقلّص طرفه من جهته.
                 visibleEnd = minOf(visibleEnd, enter)
+                blockedByOuterText = true
                 break
             }
+        }
+
+        // النص المحيط بالمركز قد يغطي العقرب القصير كاملًا عند بعض الزوايا،
+        // فلا نتركه يختفي: نمدّ طرفه للخارج ضمن [maxReach] حتى يظهر جزء منه.
+        if (!blockedByOuterText && visibleEnd - visibleStart < minVisibleLength) {
+            visibleEnd = minOf(maxReach, maxOf(visibleEnd, visibleStart + minVisibleLength))
         }
 
         return if (visibleEnd - visibleStart >= minLength) visibleStart to visibleEnd else null

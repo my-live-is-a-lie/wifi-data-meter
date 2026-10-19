@@ -12,7 +12,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.drawable.Icon as AndroidIcon
 import android.os.Build
-import android.os.Bundle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -112,6 +111,7 @@ import com.mywifiadata.app.ui.components.SpeedTestDataWarningDialog
 import com.mywifiadata.app.ui.AppViewModel
 import com.mywifiadata.app.ui.theme.AppButtonShape
 import com.mywifiadata.app.widget.UsageWidgetProvider
+import com.mywifiadata.app.widget.UsageWidgetUpdater
 import kotlinx.coroutines.launch
 
 private enum class AppTab(val labelRes: Int, val icon: ImageVector) {
@@ -321,9 +321,11 @@ fun MainScreen(
             UsageWidgetProvider.DEFAULT_USAGE_CARD_STYLE,
             UsageWidgetProvider.MAX_USAGE_CARD_STYLE_INDEX,
         )
+        // الأداة واحدة وتتبع شكل البطاقة المختار: نزامن الشكل أولًا ثم نطلب
+        // إضافتها، فتظهر بالشكل المعروض في التطبيق لا بشكل افتراضي مختلف.
+        UsageWidgetUpdater.syncStyle(context, safeStyleIndex)
         val pinResultIntent = Intent(context, UsageWidgetProvider::class.java).apply {
             action = UsageWidgetProvider.ACTION_WIDGET_PINNED
-            putExtra(UsageWidgetProvider.EXTRA_USAGE_CARD_STYLE, safeStyleIndex)
         }
         val mutableFlag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             PendingIntent.FLAG_MUTABLE
@@ -332,16 +334,13 @@ fun MainScreen(
         }
         val pinResult = PendingIntent.getBroadcast(
             context,
-            safeStyleIndex,
+            0,
             pinResultIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or mutableFlag,
         )
-        val initialOptions = Bundle().apply {
-            putInt(UsageWidgetProvider.EXTRA_USAGE_CARD_STYLE, safeStyleIndex)
-        }
         val requested = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
             widgetManager.isRequestPinAppWidgetSupported &&
-            widgetManager.requestPinAppWidget(provider, initialOptions, pinResult)
+            widgetManager.requestPinAppWidget(provider, null, pinResult)
         scope.launch {
             snackbarHostState.showSnackbar(
                 if (requested) widgetPinRequestedMessage else widgetPinUnsupportedMessage,

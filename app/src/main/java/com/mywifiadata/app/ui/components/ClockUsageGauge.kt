@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.boundsInParent
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -43,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mywifiadata.app.R
 import com.mywifiadata.app.core.ClockHandGeometry
+import com.mywifiadata.app.core.ClockText
 import com.mywifiadata.app.core.HandObstacle
 import com.mywifiadata.app.core.HandSpring
 import com.mywifiadata.app.ui.theme.LocalDownloadColor
@@ -102,11 +104,13 @@ fun ClockUsageGauge(
         label = "clock-usage-gauge-progress",
     )
 
-    // نص الساعة (الساعة:الدقيقة) يتحدّث كل ثانية، أما زوايا العقارب فتُحسب من
-    // ساعة متحركة بإطارات الشاشة كي تنساب الحركة كساعة حائط حقيقية بلا قفزات.
-    val clockText = remember(timeMillis) {
-        val clock = clockHandsFor(timeMillis)
-        String.format(Locale.US, "%02d:%02d", clock.hourOfDay, clock.minute)
+    // صيغة 12 ساعة بلغة التطبيق: «٥:٠٤ م» بالعربية و«5:04 PM» بالإنجليزية،
+    // أما زوايا العقارب فتُحسب من ساعة متحركة بإطارات الشاشة كساعة حائط حقيقية.
+    val amLabel = stringResource(R.string.clock_usage_time_am)
+    val pmLabel = stringResource(R.string.clock_usage_time_pm)
+    val appLocale = LocalConfiguration.current.locales[0]
+    val clockText = remember(timeMillis, appLocale) {
+        formatClockText(clockHandsFor(timeMillis), appLocale, amLabel, pmLabel)
     }
     val sweepingNow = remember { mutableLongStateOf(timeMillis) }
     LaunchedEffect(Unit) {
@@ -206,6 +210,8 @@ fun ClockUsageGauge(
                     obstacles = obstacles,
                     spring = handSprings[0],
                     nowMillis = nowMillis,
+                    maxReach = clockRadius * 0.84f,
+                    minVisibleLength = clockRadius * 0.14f,
                 )
                 drawHand(
                     angleDeg = clock.hourAngle,
@@ -216,16 +222,20 @@ fun ClockUsageGauge(
                     obstacles = obstacles,
                     spring = handSprings[1],
                     nowMillis = nowMillis,
+                    maxReach = clockRadius * 0.84f,
+                    minVisibleLength = clockRadius * 0.14f,
                 )
                 drawHand(
                     angleDeg = clock.secondAngle,
-                    endRadius = clockRadius * 0.50f,
+                    endRadius = clockRadius * 0.58f,
                     width = 5.dp.toPx(),
                     color = secondHandColor,
                     center = center,
                     obstacles = obstacles,
                     spring = handSprings[2],
                     nowMillis = nowMillis,
+                    maxReach = clockRadius * 0.84f,
+                    minVisibleLength = clockRadius * 0.11f,
                 )
             }
 
@@ -237,7 +247,10 @@ fun ClockUsageGauge(
             ) {
                 Text(
                     text = clockText,
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 10.sp,
+                        lineHeight = 12.sp,
+                    ),
                     color = mutedColor,
                     maxLines = 1,
                 )
@@ -356,12 +369,16 @@ private fun DrawScope.drawHand(
     obstacles: List<HandObstacle>,
     spring: HandSpring,
     nowMillis: Long,
+    maxReach: Float,
+    minVisibleLength: Float,
 ) {
     val segment = ClockHandGeometry.visibleSegment(
         angleDeg = angleDeg,
         endRadius = endRadius,
         obstacles = obstacles,
         minLength = 0f,
+        maxReach = maxReach,
+        minVisibleLength = minVisibleLength,
     )
     val targetLength = segment?.let { it.second - it.first } ?: 0f
     val visibleLength = spring.advance(targetLength, nowMillis)
@@ -381,3 +398,20 @@ private fun DrawScope.drawHand(
         cap = StrokeCap.Round,
     )
 }
+
+/**
+ * نص الساعة بصيغة 12 ساعة بلغة التطبيق، مثل «٥:٠٤ م» بالعربية و«5:04 PM»
+ * بالإنجليزية، مع أرقام عربية-هندية عندما تكون لغة التطبيق العربية.
+ */
+private fun formatClockText(
+    clock: ClockHands,
+    locale: Locale,
+    amLabel: String,
+    pmLabel: String,
+): String = ClockText.format(
+    hourOfDay = clock.hourOfDay,
+    minutes = clock.minute,
+    locale = locale,
+    amLabel = amLabel,
+    pmLabel = pmLabel,
+)

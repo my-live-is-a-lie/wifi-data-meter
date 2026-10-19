@@ -4,6 +4,7 @@ import android.content.Context
 import com.mywifiadata.app.core.AppLanguage
 import com.mywifiadata.app.core.SamplingIntervals
 import com.mywifiadata.app.core.SpeedTestDataUsage
+import com.mywifiadata.app.core.UsageCardStyles
 import com.mywifiadata.app.data.model.AccentColor
 import com.mywifiadata.app.data.model.AppLayoutDirection
 import com.mywifiadata.app.data.model.AppSettings
@@ -38,6 +39,23 @@ class SettingsStore(context: Context) {
         val updated = transform(_settings.value)
         write(updated)
         _settings.value = updated
+    }
+
+    /**
+     * يقرأ فهرس شكل البطاقة ويرحّل القيم المحفوظة قبل إزالة النمط الجانبي،
+     * ثم يكتب الفهرس المرحّل والنسخة الجديدة مرة واحدة.
+     */
+    private fun readUsageCardStyle(): Int {
+        val storedVersion = prefs.getInt(KEY_USAGE_CARD_STYLE_VERSION, 0)
+        val storedStyle = prefs.getInt(KEY_USAGE_CARD_STYLE, UsageCardStyles.RING)
+        val migrated = UsageCardStyles.migrate(storedStyle, storedVersion)
+        if (storedVersion < UsageCardStyles.LATEST_VERSION || storedStyle != migrated) {
+            prefs.edit()
+                .putInt(KEY_USAGE_CARD_STYLE, migrated)
+                .putInt(KEY_USAGE_CARD_STYLE_VERSION, UsageCardStyles.LATEST_VERSION)
+                .apply()
+        }
+        return migrated
     }
 
     fun clearAll() {
@@ -152,7 +170,7 @@ class SettingsStore(context: Context) {
         ),
         trackingEnabled = prefs.getBoolean(KEY_TRACKING, false),
         hideStatusBarIcon = prefs.getBoolean(KEY_HIDE_STATUS_BAR_ICON, false),
-        usageCardStyleIndex = prefs.getInt(KEY_USAGE_CARD_STYLE, 0).coerceAtLeast(0),
+        usageCardStyleIndex = readUsageCardStyle(),
         dashboardLayout = DashboardLayout.decode(prefs.getString(KEY_DASHBOARD_LAYOUT, null)),
         historyLineChartEnabled = prefs.getBoolean(KEY_HISTORY_LINE_CHART, false),
         appsLineChartEnabled = prefs.getBoolean(KEY_APPS_LINE_CHART, false),
@@ -268,6 +286,7 @@ class SettingsStore(context: Context) {
             .putBoolean(KEY_TRACKING, settings.trackingEnabled)
             .putBoolean(KEY_HIDE_STATUS_BAR_ICON, settings.hideStatusBarIcon)
             .putInt(KEY_USAGE_CARD_STYLE, settings.usageCardStyleIndex)
+            .putInt(KEY_USAGE_CARD_STYLE_VERSION, UsageCardStyles.LATEST_VERSION)
             .putString(KEY_DASHBOARD_LAYOUT, settings.dashboardLayout.encode())
             .putBoolean(KEY_HISTORY_LINE_CHART, settings.historyLineChartEnabled)
             .putBoolean(KEY_APPS_LINE_CHART, settings.appsLineChartEnabled)
@@ -338,6 +357,7 @@ class SettingsStore(context: Context) {
         private const val KEY_TRACKING = "tracking_enabled"
         private const val KEY_HIDE_STATUS_BAR_ICON = "hide_status_bar_icon"
         private const val KEY_USAGE_CARD_STYLE = "usage_card_style"
+        private const val KEY_USAGE_CARD_STYLE_VERSION = "usage_card_style_version"
         private const val KEY_DASHBOARD_LAYOUT = "dashboard_layout"
         private const val KEY_HISTORY_LINE_CHART = "history_line_chart_enabled"
         private const val KEY_APPS_LINE_CHART = "apps_line_chart_enabled"

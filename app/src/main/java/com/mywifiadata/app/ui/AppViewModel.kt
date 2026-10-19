@@ -443,6 +443,8 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
             todayUpload = today.txBytes,
             cycleUsage = currentState.activeCycle.totalBytes,
             quota = currentState.quotaBytes,
+            daysLeft = currentState.daysLeft,
+            styleIndex = settings.usageCardStyleIndex,
         )
 
         val sameHistorySelection = dailyLoadedNetwork == currentState.historyNetwork &&
@@ -1027,6 +1029,8 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
     fun setAppLanguage(languageTag: String) {
         val language = AppLanguage.normalize(languageTag)
         repository.settingsStore.update { it.copy(appLanguage = language) }
+        // نصوص الأداة بلغة التطبيق أيضًا، فنعيد رسمها فور تغيير اللغة.
+        UsageWidgetProvider.updateAll(repository.context)
     }
 
     /** Changes the launcher alias only after the recovery tile has actually been added. */
@@ -1209,14 +1213,13 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
     }
 
     fun setUsageCardStyle(styleIndex: Int) {
-        repository.settingsStore.update {
-            it.copy(
-                usageCardStyleIndex = styleIndex.coerceIn(
-                    UsageWidgetProvider.DEFAULT_USAGE_CARD_STYLE,
-                    UsageWidgetProvider.MAX_USAGE_CARD_STYLE_INDEX,
-                ),
-            )
-        }
+        val safeStyle = styleIndex.coerceIn(
+            UsageWidgetProvider.DEFAULT_USAGE_CARD_STYLE,
+            UsageWidgetProvider.MAX_USAGE_CARD_STYLE_INDEX,
+        )
+        repository.settingsStore.update { it.copy(usageCardStyleIndex = safeStyle) }
+        // الأداة تتبع شكل البطاقة المختار، فتتغيّر كل الأدوات المضافة فورًا.
+        UsageWidgetUpdater.syncStyle(repository.context, safeStyle)
     }
 
     fun setDashboardLayout(layout: DashboardLayout) {

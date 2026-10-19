@@ -85,8 +85,8 @@
     <string name="label_days">Days</string>
 
     <string name="quota_ring_title">Billing cycle usage</string>
-    <string name="widget_title">Data usage</string>
-    <string name="widget_description">A card showing Wi-Fi data usage</string>
+    <string name="widget_title">Usage card</string>
+    <string name="widget_description">Wi-Fi usage card — follows the card style selected in the app</string>
     <string name="widget_traffic_line">%1$s %2$s</string>
     <string name="action_add_widget">Add to home screen</string>
     <string name="cd_previous_usage_card">Previous card style</string>
@@ -113,6 +113,8 @@
     <string name="plan_unit_gb">Gigabytes</string>
     <string name="plan_unit_tb">Terabytes</string>
     <string name="plan_duration_day">Day</string>
+    <string name="clock_usage_time_am">AM</string>
+    <string name="clock_usage_time_pm">PM</string>
     <string name="clock_usage_days_unit">days</string>
     <string name="plan_duration_week">Week</string>
     <string name="plan_duration_month">Month</string>
