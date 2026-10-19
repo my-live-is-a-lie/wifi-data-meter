@@ -74,7 +74,7 @@ class UsageWidgetProvider : AppWidgetProvider() {
         const val EXTRA_USAGE_CARD_STYLE = "com.mywifiadata.app.widget.EXTRA_USAGE_CARD_STYLE"
         const val EXTRA_OPEN_USAGE_CARD_STYLE = "com.mywifiadata.app.widget.EXTRA_OPEN_USAGE_CARD_STYLE"
         const val DEFAULT_USAGE_CARD_STYLE = 0
-        const val MAX_USAGE_CARD_STYLE_INDEX = 2
+        const val MAX_USAGE_CARD_STYLE_INDEX = 3
         private const val KEY_WIDGET_STYLE_PREFIX = "widget_style_"
 
         private fun widgetStylePreferenceKey(widgetId: Int): String =
