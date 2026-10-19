@@ -1,6 +1,7 @@
 package com.mywifiadata.app.data
 
 import com.mywifiadata.app.data.model.AdditionalPlan
+import com.mywifiadata.app.data.model.CompletedPlanRecord
 import com.mywifiadata.app.data.model.DataPlan
 import com.mywifiadata.app.data.model.MAX_ADDITIONAL_PLANS
 import com.mywifiadata.app.data.model.PlanCapacityUnit
@@ -105,6 +106,57 @@ internal object PlanStorageCodec {
             pendingActivation = pendingActivation,
             activatedAtMillis = activatedAtMillis,
             additionalPlans = additionalPlans,
+        )
+    }
+
+    fun encodeCompletedPlans(records: List<CompletedPlanRecord>): String =
+        records.joinToString("\n") { record ->
+            listOf(
+                encodeText(record.id),
+                encodeText(record.planId),
+                encodeText(record.name),
+                encodeText(record.logoPath),
+                record.quotaBytes.toString(),
+                record.capacityUnit.name,
+                record.durationValue.toString(),
+                record.durationUnit.name,
+                record.startMillis.toString(),
+                record.endMillis.toString(),
+                record.usedBytes.toString(),
+            ).joinToString("|")
+        }
+
+    fun decodeCompletedPlans(encoded: String?): List<CompletedPlanRecord> {
+        if (encoded.isNullOrBlank()) return emptyList()
+        return encoded.split('\n').mapNotNull(::decodeCompletedPlan)
+    }
+
+    private fun decodeCompletedPlan(line: String): CompletedPlanRecord? {
+        val parts = line.split('|')
+        if (parts.size < 11) return null
+        val id = decodeText(parts[0]).ifBlank { return null }
+        val planId = decodeText(parts[1])
+        val name = decodeText(parts[2])
+        val logoPath = decodeText(parts[3])
+        val quotaBytes = parts[4].toLongOrNull() ?: return null
+        val capacityUnit = PlanCapacityUnit.entries.firstOrNull { it.name == parts[5] } ?: PlanCapacityUnit.GB
+        val durationValue = parts[6].toIntOrNull()?.coerceAtLeast(1) ?: return null
+        val durationUnit = PlanDurationUnit.entries.firstOrNull { it.name == parts[7] } ?: PlanDurationUnit.DAY
+        val startMillis = parts[8].toLongOrNull() ?: return null
+        val endMillis = parts[9].toLongOrNull() ?: return null
+        val usedBytes = parts[10].toLongOrNull() ?: 0L
+        return CompletedPlanRecord(
+            id = id,
+            planId = planId,
+            name = name,
+            logoPath = logoPath,
+            quotaBytes = quotaBytes,
+            capacityUnit = capacityUnit,
+            durationValue = durationValue,
+            durationUnit = durationUnit,
+            startMillis = startMillis,
+            endMillis = endMillis,
+            usedBytes = usedBytes,
         )
     }
 

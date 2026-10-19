@@ -366,5 +366,14 @@
     <string name="history_least_apps">Lowest-usage apps</string>
     <string name="history_apps_search_empty">No matching app for the selected day. Try another name or clear the search.</string>
     <string name="history_apps_empty">No app usage data for the selected day.</string>
+    <string name="history_plan_sort_newest">Newest</string>
+    <string name="history_plan_sort_oldest">Oldest</string>
+    <string name="history_plan_empty_title">No completed plans</string>
+    <string name="history_plan_empty_body">Plans that finished their duration or used up their quota will appear here.</string>
+    <string name="history_plan_start_date">Start date</string>
+    <string name="history_plan_end_date">End date</string>
+    <string name="history_plan_apps_title">Plan apps</string>
+    <string name="history_plan_apps_empty">No app usage data during this plan period.</string>
+    <string name="history_plan_apps_search_empty">No matching app for this plan period. Try another name or clear the search.</string>
     <string name="apps_fast_scroll">App list position and fast scrolling</string>
 </resources>

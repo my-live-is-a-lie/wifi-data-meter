@@ -381,5 +381,14 @@
     <string name="history_least_apps">أقل التطبيقات استهلاكًا</string>
     <string name="history_apps_search_empty">لا يوجد تطبيق مطابق في اليوم المحدد. جرّب اسمًا آخر أو امسح البحث.</string>
     <string name="history_apps_empty">لا توجد بيانات استهلاك للتطبيقات في اليوم المحدد.</string>
+    <string name="history_plan_sort_newest">الأحدث</string>
+    <string name="history_plan_sort_oldest">الأقدم</string>
+    <string name="history_plan_empty_title">لا توجد باقات منتهية</string>
+    <string name="history_plan_empty_body">ستظهر هنا الباقات التي انتهت مدتها أو نفدت سعتها.</string>
+    <string name="history_plan_start_date">تاريخ البدء</string>
+    <string name="history_plan_end_date">تاريخ الانتهاء</string>
+    <string name="history_plan_apps_title">تطبيقات الباقة</string>
+    <string name="history_plan_apps_empty">لا توجد بيانات استهلاك للتطبيقات خلال فترة هذه الباقة.</string>
+    <string name="history_plan_apps_search_empty">لا يوجد تطبيق مطابق في فترة هذه الباقة. جرّب اسمًا آخر أو امسح البحث.</string>
     <string name="apps_fast_scroll">موضع القائمة والسحب السريع بين التطبيقات</string>
 </resources>
