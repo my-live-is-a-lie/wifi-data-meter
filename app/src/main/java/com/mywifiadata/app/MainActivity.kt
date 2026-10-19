@@ -24,7 +24,7 @@ import com.mywifiadata.app.data.model.ThemeMode
 import com.mywifiadata.app.ui.AppViewModel
 import com.mywifiadata.app.ui.screens.MainScreen
 import com.mywifiadata.app.ui.theme.AppTheme
-import com.mywifiadata.app.widget.UsageWidgetProvider
+import com.mywifiadata.app.widget.UsageWidgetUpdater
 
 /**
  * الشاشة الوحيدة في التطبيق: تستضيف واجهة Compose بكاملها.
@@ -44,19 +44,9 @@ class MainActivity : ComponentActivity() {
             this,
             visible = !repository.settingsStore.current.appIconHidden,
         )
-        // فتح الأداة اختيار صريح لشكلها؛ أما التشغيل العادي فيستعيد القيمة دون الكتابة فوقها.
-        val hasWidgetStyle = intent.hasExtra(UsageWidgetProvider.EXTRA_OPEN_USAGE_CARD_STYLE)
-        if (savedInstanceState == null && hasWidgetStyle) {
-            val openedStyle = intent.getIntExtra(
-                UsageWidgetProvider.EXTRA_OPEN_USAGE_CARD_STYLE,
-                UsageWidgetProvider.DEFAULT_USAGE_CARD_STYLE,
-            ).coerceIn(
-                UsageWidgetProvider.DEFAULT_USAGE_CARD_STYLE,
-                UsageWidgetProvider.MAX_USAGE_CARD_STYLE_INDEX,
-            )
-            repository.settingsStore.update { it.copy(usageCardStyleIndex = openedStyle) }
-        }
-
+        // الأداة تتبع شكل البطاقة المختار؛ نزامنه عند فتح التطبيق أيضًا حتى لو
+        // أُضيفت الأداة من قائمة الأدوات دون المرور بزر «إضافة أداة».
+        UsageWidgetUpdater.syncStyle(this, repository.settingsStore.current.usageCardStyleIndex)
         setContent {
             val settings by repository.settingsStore.settings.collectAsStateWithLifecycle()
             val configuration = LocalConfiguration.current

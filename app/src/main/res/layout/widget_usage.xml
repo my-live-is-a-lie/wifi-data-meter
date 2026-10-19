@@ -6,7 +6,7 @@
     android:background="@drawable/widget_usage_background"
     android:gravity="center"
     android:layoutDirection="locale"
-    android:minHeight="244dp"
+    android:minHeight="250dp"
     android:orientation="vertical"
     android:padding="14dp">
 

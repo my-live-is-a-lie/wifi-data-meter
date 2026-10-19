@@ -484,7 +484,11 @@ fun DashboardScreen(
                             state = state,
                             isCompact = isHeroCompact && !isEditing,
                             isEditing = isEditing,
-                            selectedStyleIndex = selectedCardStyle,
+                            // قد تعود حالة محفوظة من نسخة سابقة بفهرس نمط أُزيل.
+                            selectedStyleIndex = selectedCardStyle.coerceIn(
+                                0,
+                                UsageCardStyle.entries.lastIndex,
+                            ),
                             onOpenQuotaSettings = onOpenQuotaSettings,
                             horizontalStartPadding = if (isEditing) 0.dp else horizontalStartPadding,
                             horizontalEndPadding = if (isEditing) 0.dp else horizontalEndPadding,
@@ -1059,7 +1063,6 @@ private fun toggleId(ids: Set<String>, id: String): Set<String> =
 private enum class UsageCardStyle {
     RING,
     DOTTED_RING,
-    SPLIT,
 
     /** ساعة حقيقية داخل ميناء منقّط، حولها قوس نسبة الاستهلاك. */
     CLOCK,
@@ -1201,50 +1204,6 @@ private fun FullUsageCard(
                         contentDescription = stringResource(R.string.quota_ring_title),
                     ) {
                         FullGaugeCenter(usageValue, usageLabel, usedValue)
-                    }
-                }
-
-                UsageCardStyle.SPLIT.ordinal -> {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        UsageRing(
-                            progress = progress,
-                            modifier = Modifier.size(148.dp),
-                            strokeWidth = 16.dp,
-                            startColor = gaugeStartColor,
-                            endColor = gaugeEndColor,
-                            contentDescription = stringResource(R.string.quota_ring_title),
-                        ) {
-                            Text(
-                                text = usageValue,
-                                style = MaterialTheme.typography.titleLargeEmphasized,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                textAlign = TextAlign.Center,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.Center,
-                        ) {
-                            Text(
-                                text = usageLabel,
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = usedValue,
-                                style = MaterialTheme.typography.titleMediumEmphasized,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
                     }
                 }
 

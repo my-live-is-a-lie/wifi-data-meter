@@ -93,8 +93,8 @@
 
     <!-- البطاقة الرئيسية (الحلقة) -->
     <string name="quota_ring_title">استهلاك دورة الفاتورة</string>
-    <string name="widget_title">استهلاك البيانات</string>
-    <string name="widget_description">بطاقة تعرض استهلاك بيانات الواي فاي</string>
+    <string name="widget_title">بطاقة الاستهلاك</string>
+    <string name="widget_description">بطاقة استهلاك الواي فاي — تتبع شكل البطاقة المختار في التطبيق</string>
     <string name="widget_traffic_line">%1$s %2$s</string>
     <string name="action_add_widget">إضافة للشاشة الرئيسية</string>
     <string name="cd_previous_usage_card">شكل البطاقة السابق</string>
@@ -121,6 +121,8 @@
     <string name="plan_unit_gb">جيجابايت</string>
     <string name="plan_unit_tb">تيرابايت</string>
     <string name="plan_duration_day">يوم</string>
+    <string name="clock_usage_time_am">ص</string>
+    <string name="clock_usage_time_pm">م</string>
     <string name="clock_usage_days_unit">يوم</string>
     <string name="plan_duration_week">أسبوع</string>
     <string name="plan_duration_month">شهر</string>
