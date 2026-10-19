@@ -390,5 +390,10 @@
     <string name="history_plan_apps_title">تطبيقات الباقة</string>
     <string name="history_plan_apps_empty">لا توجد بيانات استهلاك للتطبيقات خلال فترة هذه الباقة.</string>
     <string name="history_plan_apps_search_empty">لا يوجد تطبيق مطابق في فترة هذه الباقة. جرّب اسمًا آخر أو امسح البحث.</string>
+    <string name="plan_reset_action">إعادة تعيين</string>
+    <string name="plan_reset_confirm_title">إعادة تعيين الباقة</string>
+    <string name="plan_reset_confirm_body">سيتم إعادة ضبط استهلاك الباقة وعدد الأيام إلى الصفر قبل بدء الاحتساب، كما سيتم تعطيل خيار «امنع التعديل» لتتمكن من تعديل السعة والمدة مجددًا. هل تريد المتابعة؟</string>
+    <string name="plan_prevent_edit_warning_title">تفعيل منع التعديل</string>
+    <string name="plan_prevent_edit_warning_body">عند تفعيل «امنع التعديل» وحفظ الباقة، لن تتمكن من تعديل سعة الباقة أو مدتها لاحقًا (يُسمح فقط بتغيير الاسم والشعار).\n\nيمكنك تعطيل هذا الخيار لاحقًا عن طريق الضغط على زر «إعادة تعيين» لإعادة ضبط استهلاك الباقة.</string>
     <string name="apps_fast_scroll">موضع القائمة والسحب السريع بين التطبيقات</string>
 </resources>

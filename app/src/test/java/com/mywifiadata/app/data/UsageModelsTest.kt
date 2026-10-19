@@ -364,5 +364,19 @@ class UsageModelsTest {
             listOf("باقة قديمة", "باقة احتياطية"),
             oldestFirstState.visibleCompletedPlans.map { it.name },
         )
+
+        // اختبار إعادة تعيين الباقة: يصفر التفعيل ويعطل خيار «امنع التعديل»
+        val lockedActive = AppSettings(
+            planId = "wifi-locked",
+            planName = "باقة مقفلة",
+            quotaBytes = 50_000_000_000L,
+            planPreventEdit = true,
+            planPendingActivation = false,
+            planActivatedAtMillis = now,
+        )
+        val afterReset = lockedActive.resetActivePlan(UsageNetwork.WIFI)
+        assertFalse(afterReset.planFor(UsageNetwork.WIFI).preventEdit)
+        assertTrue(afterReset.planFor(UsageNetwork.WIFI).pendingActivation)
+        assertEquals(0L, afterReset.planFor(UsageNetwork.WIFI).activatedAtMillis)
     }
 }

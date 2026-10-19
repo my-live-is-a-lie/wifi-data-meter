@@ -768,4 +768,53 @@ data class AppSettings(
         return withSavedPlansFor(network, newSaved)
             .withActivePlanIndexFor(network, newActiveIndex)
     }
+
+    /**
+     * إعادة تعيين الباقة الرئيسية: تصفير الاستهلاك وعدد الأيام قبل بدء الاحتساب
+     * وإلغاء خيار «امنع التعديل» ليتمكن المستخدم من تعديل السعة والمدة مجددًا.
+     */
+    fun resetActivePlan(network: UsageNetwork): AppSettings {
+        val current = planFor(network)
+        if (!current.hasQuota) return this
+        return withPlanFor(
+            network = network,
+            plan = current.copy(
+                preventEdit = false,
+                pendingActivation = true,
+                activatedAtMillis = 0L,
+            ),
+        )
+    }
+
+    /**
+     * إعادة تعيين باقة محفوظة: تصفير حالتها وإلغاء خيار «امنع التعديل».
+     */
+    fun resetSavedPlan(network: UsageNetwork, planId: String): AppSettings {
+        val updated = savedPlansFor(network).map { plan ->
+            if (plan.id == planId) {
+                plan.copy(
+                    preventEdit = false,
+                    pendingActivation = true,
+                    activatedAtMillis = 0L,
+                )
+            } else {
+                plan
+            }
+        }
+        return withSavedPlansFor(network, updated)
+    }
+
+    /**
+     * إعادة تعيين باقة إضافية لإلغاء خيار «امنع التعديل».
+     */
+    fun resetAdditionalPlan(network: UsageNetwork, additionalPlanId: String): AppSettings {
+        val currentActive = planFor(network)
+        val updatedAdditional = currentActive.additionalPlans.map { item ->
+            if (item.id == additionalPlanId) item.copy(preventEdit = false) else item
+        }
+        return withPlanFor(
+            network = network,
+            plan = currentActive.copy(additionalPlans = updatedAdditional),
+        )
+    }
 }
