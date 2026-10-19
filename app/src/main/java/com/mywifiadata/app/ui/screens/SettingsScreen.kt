@@ -43,6 +43,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.absoluteOffset
+import androidx.compose.foundation.layout.absolutePadding
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -852,7 +853,6 @@ fun SettingsScreen(
             network = selectedPlanNetwork,
             activePlan = state.planFor(selectedPlanNetwork),
             savedPlans = settings.savedPlansFor(selectedPlanNetwork),
-            activePlanIndex = settings.activePlanIndexFor(selectedPlanNetwork),
             onSelectNetwork = { selectedPlanNetwork = it },
             onDismiss = { showPlansListDialog = false },
             onActivateCurrentPlan = { onActivatePlan(selectedPlanNetwork) },
@@ -2840,70 +2840,94 @@ private fun PlanCardPageIndicator(
     }
 }
 
+/**
+ * نص أولي لقيمة السعة بالوحدة المختارة، بلا أصفار زائدة («80» بدل «80.0»)،
+ * أو نص فارغ عندما لا توجد سعة محددة.
+ */
+private fun planCapacityInitialText(value: Double?): String {
+    if (value == null || value <= 0.0) return ""
+    return if (value == value.toLong().toDouble()) {
+        value.toLong().toString()
+    } else {
+        String.format(java.util.Locale.US, "%.2f", value).trimEnd('0').trimEnd('.')
+    }
+}
+
+/** نتيجة النموذج الموحّد؛ يحوّلها كل مستدعٍ إلى المسودة التي يحتاجها. */
+private data class PlanFormResult(
+    val name: String,
+    val logoPath: String,
+    val capacityValue: Double,
+    val capacityUnit: PlanCapacityUnit,
+    val durationValue: Int,
+    val durationUnit: PlanDurationUnit,
+    val networkType: PlanNetworkType,
+    val preventEdit: Boolean,
+)
+
+/**
+ * نموذج إضافة/تحديث باقة واحدة، يستخدمه تعديل الباقة الأساسية والباقة
+ * الإضافية معًا حتى تتطابق النافذة والأسلوب بلا نسختين من نفس الوظيفة.
+ *
+ * الاختلافات بين الحالتين محصورة في القيم الأولية والعناوين وحقل نوع الباقة
+ * (يظهر للباقة الأساسية فقط) وقاعدة السماح بسعة فارغة (تعني «بلا باقة» في
+ * الباقة الأساسية).
+ */
 @Composable
-private fun QuotaDialog(
-    settings: AppSettings,
-    initialNetwork: UsageNetwork = UsageNetwork.WIFI,
-    initialPlanOverride: DataPlan? = null,
-    isAddingNewPlan: Boolean = false,
-    lockNetworkType: Boolean = false,
+private fun PlanFormDialog(
+    stateKey: String,
+    title: String,
+    confirmLabel: String,
+    initialName: String,
+    initialLogoPath: String,
+    initialCapacityValue: Double?,
+    initialCapacityUnit: PlanCapacityUnit,
+    initialDurationValue: Int,
+    initialDurationUnit: PlanDurationUnit,
+    initialPreventEdit: Boolean,
+    networkType: PlanNetworkType,
+    onNetworkTypeChange: (PlanNetworkType) -> Unit,
+    showNetworkType: Boolean,
+    editLocked: Boolean,
+    capacityOptional: Boolean,
+    defaultDurationValue: Int,
     onDismiss: () -> Unit,
-    onResetPlan: (() -> Unit)? = null,
-    onConfirm: (PlanDraft) -> Unit,
+    onResetPlan: (() -> Unit)?,
+    onConfirm: (PlanFormResult) -> Unit,
+    namePlaceholderRes: Int = R.string.plan_name_label,
 ) {
     val context = LocalContext.current
-    val initialNetworkType = when (initialNetwork) {
-        UsageNetwork.WIFI -> PlanNetworkType.WIFI
-        UsageNetwork.MOBILE -> PlanNetworkType.MOBILE
+    var wasResetInDialog by rememberSaveable(stateKey) { mutableStateOf(false) }
+    var showResetConfirmDialog by rememberSaveable(stateKey) { mutableStateOf(false) }
+    var showPreventEditWarningDialog by rememberSaveable(stateKey) { mutableStateOf(false) }
+    val isEditLocked = editLocked && !wasResetInDialog
+
+    val initialCapacityText = remember(initialCapacityValue) {
+        planCapacityInitialText(initialCapacityValue)
     }
-    var networkType by rememberSaveable(initialNetworkType) { mutableStateOf(initialNetworkType) }
+
+    var planName by rememberSaveable(stateKey, initialName) { mutableStateOf(initialName) }
+    var logoPath by rememberSaveable(stateKey, initialLogoPath) { mutableStateOf(initialLogoPath) }
+    var capacityText by rememberSaveable(stateKey, initialCapacityText) {
+        mutableStateOf(initialCapacityText)
+    }
+    var capacityUnit by rememberSaveable(stateKey, initialCapacityUnit) {
+        mutableStateOf(initialCapacityUnit)
+    }
+    var durationText by rememberSaveable(stateKey, initialDurationValue) {
+        mutableStateOf(initialDurationValue.toString())
+    }
+    var durationUnit by rememberSaveable(stateKey, initialDurationUnit) {
+        mutableStateOf(initialDurationUnit)
+    }
+    var preventEdit by rememberSaveable(stateKey, initialPreventEdit) {
+        mutableStateOf(initialPreventEdit)
+    }
+
     val activePlanNetwork = when (networkType) {
         PlanNetworkType.MOBILE -> UsageNetwork.MOBILE
         PlanNetworkType.WIFI, PlanNetworkType.BOTH -> UsageNetwork.WIFI
     }
-    val activePlan = when {
-        initialPlanOverride != null -> initialPlanOverride
-        isAddingNewPlan -> DataPlan()
-        else -> settings.planFor(activePlanNetwork)
-    }
-    val hasActiveQuota = !isAddingNewPlan && activePlan.hasQuota
-    val stateKey = initialPlanOverride?.id ?: if (isAddingNewPlan) "new-${activePlanNetwork.name}" else activePlanNetwork.name
-    var wasResetInDialog by rememberSaveable(stateKey) { mutableStateOf(false) }
-    var showResetConfirmDialog by rememberSaveable(stateKey) { mutableStateOf(false) }
-    var showPreventEditWarningDialog by rememberSaveable(stateKey) { mutableStateOf(false) }
-    val isEditLocked = hasActiveQuota && activePlan.preventEdit && !wasResetInDialog
-
-    val initialCapacityValue = remember(activePlan.quotaBytes, activePlan.capacityUnit) {
-        if (activePlan.quotaBytes > 0L) {
-            val raw = activePlan.quotaBytes.toDouble() / activePlan.capacityUnit.bytesFactor.toDouble()
-            if (raw == raw.toLong().toDouble()) {
-                raw.toLong().toString()
-            } else {
-                String.format(java.util.Locale.US, "%.2f", raw).trimEnd('0').trimEnd('.')
-            }
-        } else {
-            ""
-        }
-    }
-
-    var planName by rememberSaveable(stateKey, activePlan.name) { mutableStateOf(activePlan.name) }
-    var logoPath by rememberSaveable(stateKey, activePlan.logoPath) { mutableStateOf(activePlan.logoPath) }
-    var capacityText by rememberSaveable(stateKey, initialCapacityValue) {
-        mutableStateOf(initialCapacityValue)
-    }
-    var capacityUnit by rememberSaveable(stateKey, activePlan.capacityUnit) {
-        mutableStateOf(activePlan.capacityUnit)
-    }
-    var durationText by rememberSaveable(stateKey, activePlan.durationValue) {
-        mutableStateOf(activePlan.durationValue.toString())
-    }
-    var durationUnit by rememberSaveable(stateKey, activePlan.durationUnit) {
-        mutableStateOf(activePlan.durationUnit)
-    }
-    var preventEdit by rememberSaveable(stateKey, activePlan.preventEdit) {
-        mutableStateOf(activePlan.preventEdit)
-    }
-
     val logoBitmap = remember(logoPath) { loadPlanLogoBitmap(logoPath) }
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent(),
@@ -2918,17 +2942,18 @@ private fun QuotaDialog(
     val parsedCapacity = capacityText.toDoubleOrNull()
     val parsedDuration = durationText.toIntOrNull()
     val canSave = isEditLocked || (
-        (if (isAddingNewPlan) parsedCapacity != null && parsedCapacity > 0.0 else capacityText.isBlank() || (parsedCapacity != null && parsedCapacity >= 0.0)) &&
-            (parsedDuration != null && parsedDuration >= 1)
+        (if (capacityOptional) {
+            capacityText.isBlank() || (parsedCapacity != null && parsedCapacity >= 0.0)
+        } else {
+            parsedCapacity != null && parsedCapacity > 0.0
+        }) && (parsedDuration != null && parsedDuration >= 1)
         )
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = stringResource(
-                    if (hasActiveQuota) R.string.quota_dialog_title_update else R.string.quota_dialog_title_add,
-                ),
+                text = title,
                 style = MaterialTheme.typography.headlineSmall,
             )
         },
@@ -2946,7 +2971,7 @@ private fun QuotaDialog(
                     TextField(
                         value = planName,
                         onValueChange = { planName = it },
-                        placeholder = { Text(text = stringResource(R.string.plan_name_label)) },
+                        placeholder = { Text(text = stringResource(namePlaceholderRes)) },
                         singleLine = true,
                         colors = TextFieldDefaults.colors(
                             focusedContainerColor = Color.Transparent,
@@ -3062,7 +3087,7 @@ private fun QuotaDialog(
                     )
                 }
 
-                if (!lockNetworkType && !hasActiveQuota) {
+                if (showNetworkType) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -3078,7 +3103,7 @@ private fun QuotaDialog(
                             options = PlanNetworkType.entries,
                             optionLabel = { stringResource(it.labelResource()) },
                             selectedOption = networkType,
-                            onSelect = { networkType = it },
+                            onSelect = onNetworkTypeChange,
                             enabled = !isEditLocked,
                         )
                     }
@@ -3089,11 +3114,19 @@ private fun QuotaDialog(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Text(
-                        text = stringResource(R.string.plan_prevent_edit_label),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.plan_prevent_edit_label),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            text = stringResource(R.string.plan_prevent_edit_subtitle),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
                     Switch(
                         checked = preventEdit,
                         onCheckedChange = { checked ->
@@ -3113,7 +3146,7 @@ private fun QuotaDialog(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (hasActiveQuota && onResetPlan != null) {
+                if (onResetPlan != null) {
                     TextButton(
                         onClick = { showResetConfirmDialog = true },
                         shape = AppButtonShape,
@@ -3132,12 +3165,17 @@ private fun QuotaDialog(
                 Button(
                     onClick = {
                         onConfirm(
-                            PlanDraft(
+                            PlanFormResult(
                                 name = planName,
                                 logoPath = logoPath,
-                                capacityValue = parsedCapacity ?: 0.0,
+                                capacityValue = if (isEditLocked) {
+                                    initialCapacityValue ?: 0.0
+                                } else {
+                                    parsedCapacity ?: 0.0
+                                },
                                 capacityUnit = capacityUnit,
-                                durationValue = (parsedDuration ?: 28).coerceAtLeast(1),
+                                durationValue = (parsedDuration ?: defaultDurationValue)
+                                    .coerceAtLeast(1),
                                 durationUnit = durationUnit,
                                 networkType = networkType,
                                 preventEdit = preventEdit,
@@ -3147,11 +3185,7 @@ private fun QuotaDialog(
                     enabled = canSave,
                     shape = AppButtonShape,
                 ) {
-                    Text(
-                        text = stringResource(
-                            if (hasActiveQuota) R.string.action_save else R.string.plans_action_add,
-                        ),
-                    )
+                    Text(text = confirmLabel)
                 }
             }
         },
@@ -3215,6 +3249,83 @@ private fun QuotaDialog(
             },
         )
     }
+}
+
+/**
+ * تعديل/إضافة الباقة الأساسية (أو باقة محفوظة) بالنموذج الموحّد.
+ * السعة الفارغة تعني «بلا سعة محددة»، ولذلك لا تُشترط عند تحديث باقة قائمة.
+ */
+@Composable
+private fun QuotaDialog(
+    settings: AppSettings,
+    initialNetwork: UsageNetwork = UsageNetwork.WIFI,
+    initialPlanOverride: DataPlan? = null,
+    isAddingNewPlan: Boolean = false,
+    lockNetworkType: Boolean = false,
+    onDismiss: () -> Unit,
+    onResetPlan: (() -> Unit)? = null,
+    onConfirm: (PlanDraft) -> Unit,
+) {
+    val initialNetworkType = when (initialNetwork) {
+        UsageNetwork.WIFI -> PlanNetworkType.WIFI
+        UsageNetwork.MOBILE -> PlanNetworkType.MOBILE
+    }
+    var networkType by rememberSaveable(initialNetworkType) { mutableStateOf(initialNetworkType) }
+    val activePlanNetwork = when (networkType) {
+        PlanNetworkType.MOBILE -> UsageNetwork.MOBILE
+        PlanNetworkType.WIFI, PlanNetworkType.BOTH -> UsageNetwork.WIFI
+    }
+    val activePlan = when {
+        initialPlanOverride != null -> initialPlanOverride
+        isAddingNewPlan -> DataPlan()
+        else -> settings.planFor(activePlanNetwork)
+    }
+    val hasActiveQuota = !isAddingNewPlan && activePlan.hasQuota
+    val stateKey = initialPlanOverride?.id
+        ?: if (isAddingNewPlan) "new-${activePlanNetwork.name}" else activePlanNetwork.name
+
+    PlanFormDialog(
+        stateKey = stateKey,
+        title = stringResource(
+            if (hasActiveQuota) R.string.quota_dialog_title_update else R.string.quota_dialog_title_add,
+        ),
+        confirmLabel = stringResource(
+            if (hasActiveQuota) R.string.action_save else R.string.plans_action_add,
+        ),
+        initialName = activePlan.name,
+        initialLogoPath = activePlan.logoPath,
+        initialCapacityValue = if (activePlan.quotaBytes > 0L) {
+            activePlan.quotaBytes.toDouble() / activePlan.capacityUnit.bytesFactor.toDouble()
+        } else {
+            null
+        },
+        initialCapacityUnit = activePlan.capacityUnit,
+        initialDurationValue = activePlan.durationValue,
+        initialDurationUnit = activePlan.durationUnit,
+        initialPreventEdit = activePlan.preventEdit,
+        networkType = networkType,
+        onNetworkTypeChange = { networkType = it },
+        showNetworkType = !lockNetworkType && !hasActiveQuota,
+        editLocked = hasActiveQuota && activePlan.preventEdit,
+        capacityOptional = !isAddingNewPlan,
+        defaultDurationValue = 28,
+        onDismiss = onDismiss,
+        onResetPlan = if (hasActiveQuota) onResetPlan else null,
+        onConfirm = { form ->
+            onConfirm(
+                PlanDraft(
+                    name = form.name,
+                    logoPath = form.logoPath,
+                    capacityValue = form.capacityValue,
+                    capacityUnit = form.capacityUnit,
+                    durationValue = form.durationValue,
+                    durationUnit = form.durationUnit,
+                    networkType = form.networkType,
+                    preventEdit = form.preventEdit,
+                ),
+            )
+        },
+    )
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -3532,7 +3643,12 @@ private fun AdditionalPlanRow(
                         scaleX = dragScale
                         scaleY = dragScale
                         shadowElevation = if (isDragging) 8.dp.toPx() else 0f
-                        shape = RoundedCornerShape(16.dp)
+                        shape = AbsoluteRoundedCornerShape(
+                            topLeft = 10.dp,
+                            bottomLeft = 10.dp,
+                            topRight = 16.dp,
+                            bottomRight = 16.dp,
+                        )
                         clip = true
                     }
                     .background(deleteRed),
@@ -3606,8 +3722,8 @@ private fun AdditionalPlanRow(
                         .padding(start = redBarWidthDp)
                         .clip(
                             AbsoluteRoundedCornerShape(
-                                topLeft = 8.dp,
-                                bottomLeft = 8.dp,
+                                topLeft = 4.dp,
+                                bottomLeft = 4.dp,
                                 topRight = 16.dp,
                                 bottomRight = 16.dp,
                             ),
@@ -3734,364 +3850,58 @@ private fun AdditionalPlanDialog(
     onResetPlan: (() -> Unit)? = null,
     onConfirm: (AdditionalPlanDraft) -> Unit,
 ) {
-    val context = LocalContext.current
     val isEditing = initialPlan != null
-    val stateKey = initialPlan?.id ?: "new-additional-${network.name}"
-    var wasResetInDialog by rememberSaveable(stateKey) { mutableStateOf(false) }
-    var showResetConfirmDialog by rememberSaveable(stateKey) { mutableStateOf(false) }
-    var showPreventEditWarningDialog by rememberSaveable(stateKey) { mutableStateOf(false) }
-    val isEditLocked = initialPlan?.preventEdit == true && !wasResetInDialog
+    val networkType = when (network) {
+        UsageNetwork.WIFI -> PlanNetworkType.WIFI
+        UsageNetwork.MOBILE -> PlanNetworkType.MOBILE
+    }
 
-    val initialCapacityText = remember(initialPlan?.quotaBytes, initialPlan?.capacityUnit) {
-        if (initialPlan != null && initialPlan.quotaBytes > 0L) {
-            val raw = initialPlan.quotaBytes.toDouble() / initialPlan.capacityUnit.bytesFactor.toDouble()
-            if (raw == raw.toLong().toDouble()) {
-                raw.toLong().toString()
+    // الباقة الإضافية تستخدم النموذج نفسه المستخدم للباقة الأساسية؛ الفرق
+    // الوحيد أنها بلا نوع شبكة، وأن السعة مطلوبة دائمًا.
+    PlanFormDialog(
+        stateKey = initialPlan?.id ?: "new-additional-${network.name}",
+        title = stringResource(
+            if (isEditing) {
+                R.string.additional_plan_dialog_title_update
             } else {
-                String.format(java.util.Locale.US, "%.2f", raw).trimEnd('0').trimEnd('.')
-            }
-        } else {
-            ""
-        }
-    }
-
-    var planName by rememberSaveable(stateKey) { mutableStateOf(initialPlan?.name ?: "") }
-    var logoPath by rememberSaveable(stateKey) { mutableStateOf(initialPlan?.logoPath ?: "") }
-    var capacityText by rememberSaveable(stateKey) { mutableStateOf(initialCapacityText) }
-    var capacityUnit by rememberSaveable(stateKey) {
-        mutableStateOf(initialPlan?.capacityUnit ?: PlanCapacityUnit.MB)
-    }
-    var durationText by rememberSaveable(stateKey) {
-        mutableStateOf((initialPlan?.durationValue ?: 7).toString())
-    }
-    var durationUnit by rememberSaveable(stateKey) {
-        mutableStateOf(initialPlan?.durationUnit ?: PlanDurationUnit.DAY)
-    }
-    var preventEdit by rememberSaveable(stateKey) {
-        mutableStateOf(initialPlan?.preventEdit ?: false)
-    }
-
-    val logoBitmap = remember(logoPath) { loadPlanLogoBitmap(logoPath) }
-    val imagePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent(),
-    ) { uri: Uri? ->
-        if (uri != null) {
-            savePickedPlanLogo(context, uri, network)?.let { savedPath ->
-                logoPath = savedPath
-            }
-        }
-    }
-
-    val parsedCapacity = capacityText.toDoubleOrNull()
-    val parsedDuration = durationText.toIntOrNull()
-    val canSave = isEditLocked || (
-        parsedCapacity != null && parsedCapacity > 0.0 &&
-            parsedDuration != null && parsedDuration >= 1
-        )
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                text = stringResource(
-                    if (isEditing) {
-                        R.string.additional_plan_dialog_title_update
-                    } else {
-                        R.string.additional_plan_dialog_title_add
-                    },
+                R.string.additional_plan_dialog_title_add
+            },
+        ),
+        confirmLabel = stringResource(
+            if (isEditing) R.string.action_save else R.string.plans_action_add,
+        ),
+        initialName = initialPlan?.name ?: "",
+        initialLogoPath = initialPlan?.logoPath ?: "",
+        initialCapacityValue = initialPlan
+            ?.takeIf { it.quotaBytes > 0L }
+            ?.let { it.quotaBytes.toDouble() / it.capacityUnit.bytesFactor.toDouble() },
+        initialCapacityUnit = initialPlan?.capacityUnit ?: PlanCapacityUnit.MB,
+        initialDurationValue = initialPlan?.durationValue ?: 7,
+        initialDurationUnit = initialPlan?.durationUnit ?: PlanDurationUnit.DAY,
+        initialPreventEdit = initialPlan?.preventEdit ?: false,
+        networkType = networkType,
+        onNetworkTypeChange = {},
+        showNetworkType = false,
+        editLocked = initialPlan?.preventEdit == true,
+        capacityOptional = false,
+        defaultDurationValue = 7,
+        namePlaceholderRes = R.string.additional_plan_name_optional,
+        onDismiss = onDismiss,
+        onResetPlan = if (isEditing) onResetPlan else null,
+        onConfirm = { form ->
+            onConfirm(
+                AdditionalPlanDraft(
+                    name = form.name,
+                    logoPath = form.logoPath,
+                    capacityValue = form.capacityValue,
+                    capacityUnit = form.capacityUnit,
+                    durationValue = form.durationValue,
+                    durationUnit = form.durationUnit,
+                    preventEdit = form.preventEdit,
                 ),
-                style = MaterialTheme.typography.headlineSmall,
             )
         },
-        text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Box(modifier = Modifier.size(56.dp)) {
-                        Box(
-                            modifier = Modifier
-                                .matchParentSize()
-                                .clip(CircleShape)
-                                .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
-                                .clickable(role = Role.Button) { imagePickerLauncher.launch("image/*") },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            if (logoBitmap != null) {
-                                Image(
-                                    bitmap = logoBitmap,
-                                    contentDescription = stringResource(R.string.plan_logo_label),
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize(),
-                                )
-                            } else {
-                                Text(
-                                    text = stringResource(R.string.plan_logo_label),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .size(22.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (logoBitmap != null) {
-                                        MaterialTheme.colorScheme.errorContainer
-                                    } else {
-                                        MaterialTheme.colorScheme.primary
-                                    },
-                                )
-                                .clickable(role = Role.Button) {
-                                    if (logoBitmap != null) {
-                                        logoPath = ""
-                                    } else {
-                                        imagePickerLauncher.launch("image/*")
-                                    }
-                                },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                imageVector = if (logoBitmap != null) Icons.Rounded.Close else Icons.Rounded.CameraAlt,
-                                contentDescription = stringResource(R.string.plan_logo_label),
-                                tint = if (logoBitmap != null) {
-                                    MaterialTheme.colorScheme.onErrorContainer
-                                } else {
-                                    MaterialTheme.colorScheme.onPrimary
-                                },
-                                modifier = Modifier.size(13.dp),
-                            )
-                        }
-                    }
-
-                    OutlinedTextField(
-                        value = planName,
-                        onValueChange = { planName = it },
-                        placeholder = { Text(text = stringResource(R.string.additional_plan_name_optional)) },
-                        singleLine = true,
-                        shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-
-                Text(
-                    text = stringResource(R.string.plan_capacity_label),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    OutlinedTextField(
-                        value = capacityText,
-                        onValueChange = { newValue ->
-                            capacityText = newValue.filter { it.isDigit() || it == '.' }
-                        },
-                        enabled = !isEditLocked,
-                        singleLine = true,
-                        shape = RoundedCornerShape(14.dp),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.weight(1f),
-                    )
-                    PlanDropdownPill(
-                        selectedLabel = stringResource(capacityUnit.labelResource()),
-                        options = PlanCapacityUnit.entries,
-                        optionLabel = { stringResource(it.labelResource()) },
-                        selectedOption = capacityUnit,
-                        onSelect = { capacityUnit = it },
-                        enabled = !isEditLocked,
-                    )
-                }
-
-                Text(
-                    text = stringResource(R.string.plan_duration_label),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    OutlinedTextField(
-                        value = durationText,
-                        onValueChange = { newValue ->
-                            durationText = newValue.filter { it.isDigit() }
-                        },
-                        enabled = !isEditLocked,
-                        singleLine = true,
-                        shape = RoundedCornerShape(14.dp),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f),
-                    )
-                    PlanDropdownPill(
-                        selectedLabel = stringResource(durationUnit.labelResource()),
-                        options = PlanDurationUnit.entries,
-                        optionLabel = { stringResource(it.labelResource()) },
-                        selectedOption = durationUnit,
-                        onSelect = { durationUnit = it },
-                        enabled = !isEditLocked,
-                    )
-                }
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(R.string.plan_prevent_edit_label),
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        Text(
-                            text = stringResource(R.string.additional_plan_prevent_edit_subtitle),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Switch(
-                        checked = preventEdit,
-                        onCheckedChange = { checked ->
-                            if (checked) {
-                                showPreventEditWarningDialog = true
-                            } else {
-                                preventEdit = false
-                            }
-                        },
-                        enabled = !isEditLocked,
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (isEditing && onResetPlan != null) {
-                    TextButton(
-                        onClick = { showResetConfirmDialog = true },
-                        shape = AppButtonShape,
-                    ) {
-                        Text(
-                            text = stringResource(R.string.plan_reset_action),
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.weight(1f))
-                TextButton(onClick = onDismiss, shape = AppButtonShape) {
-                    Text(text = stringResource(R.string.action_cancel))
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Button(
-                    onClick = {
-                        val safeCapacity = if (isEditLocked && initialPlan != null) {
-                            initialPlan.quotaBytes.toDouble() / initialPlan.capacityUnit.bytesFactor.toDouble()
-                        } else {
-                            parsedCapacity ?: 0.0
-                        }
-                        onConfirm(
-                            AdditionalPlanDraft(
-                                name = planName,
-                                logoPath = logoPath,
-                                capacityValue = safeCapacity,
-                                capacityUnit = capacityUnit,
-                                durationValue = (parsedDuration ?: 7).coerceAtLeast(1),
-                                durationUnit = durationUnit,
-                                preventEdit = preventEdit,
-                            ),
-                        )
-                    },
-                    enabled = canSave,
-                    shape = AppButtonShape,
-                ) {
-                    Text(
-                        text = stringResource(
-                            if (isEditing) R.string.action_save else R.string.plans_action_add,
-                        ),
-                    )
-                }
-            }
-        },
-        dismissButton = null,
     )
-
-    if (showResetConfirmDialog) {
-        AlertDialog(
-            onDismissRequest = { showResetConfirmDialog = false },
-            icon = { Icon(imageVector = Icons.Rounded.Refresh, contentDescription = null) },
-            title = { Text(text = stringResource(R.string.plan_reset_confirm_title)) },
-            text = { Text(text = stringResource(R.string.plan_reset_confirm_body)) },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        showResetConfirmDialog = false
-                        wasResetInDialog = true
-                        preventEdit = false
-                        onResetPlan?.invoke()
-                    },
-                    shape = AppButtonShape,
-                ) {
-                    Text(text = stringResource(R.string.action_confirm))
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { showResetConfirmDialog = false },
-                    shape = AppButtonShape,
-                ) {
-                    Text(text = stringResource(R.string.action_cancel))
-                }
-            },
-        )
-    }
-
-    if (showPreventEditWarningDialog) {
-        AlertDialog(
-            onDismissRequest = { showPreventEditWarningDialog = false },
-            icon = { Icon(imageVector = Icons.Rounded.Info, contentDescription = null) },
-            title = { Text(text = stringResource(R.string.plan_prevent_edit_warning_title)) },
-            text = { Text(text = stringResource(R.string.plan_prevent_edit_warning_body)) },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        showPreventEditWarningDialog = false
-                        preventEdit = true
-                    },
-                    shape = AppButtonShape,
-                ) {
-                    Text(text = stringResource(R.string.action_confirm))
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { showPreventEditWarningDialog = false },
-                    shape = AppButtonShape,
-                ) {
-                    Text(text = stringResource(R.string.action_cancel))
-                }
-            },
-        )
-    }
 }
 
 private data class PlanListEntry(
@@ -4106,7 +3916,6 @@ private fun PlansListDialog(
     network: UsageNetwork,
     activePlan: DataPlan,
     savedPlans: List<DataPlan>,
-    activePlanIndex: Int = 0,
     onSelectNetwork: (UsageNetwork) -> Unit,
     onDismiss: () -> Unit,
     onActivateCurrentPlan: () -> Unit,
@@ -4121,23 +3930,27 @@ private fun PlansListDialog(
     var pendingSwitchPlanId by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingDeletePlanId by rememberSaveable { mutableStateOf<String?>(null) }
 
-    val displayEntries = remember(network, activePlan, savedPlans, activePlanIndex) {
-        val list = savedPlans.map {
-            PlanListEntry(key = "saved-${it.id}", plan = it, isActive = false)
-        }.toMutableList()
-        if (activePlan.hasQuota) {
-            val insertIdx = activePlanIndex.coerceIn(0, list.size)
-            list.add(
-                insertIdx,
-                PlanListEntry(
-                    key = "active-${network.name}-${activePlan.id}",
-                    plan = activePlan,
-                    isActive = true,
-                ),
-            )
+    // الباقة المفعلة مثبتة دائمًا في أول القائمة، ثم تأتي الباقات المحفوظة بترتيبها.
+    val displayEntries = remember(network, activePlan, savedPlans) {
+        buildList {
+            if (activePlan.hasQuota) {
+                add(
+                    PlanListEntry(
+                        key = "active-${network.name}-${activePlan.id}",
+                        plan = activePlan,
+                        isActive = true,
+                    ),
+                )
+            }
+            savedPlans.forEach { plan ->
+                add(PlanListEntry(key = "saved-${plan.id}", plan = plan, isActive = false))
+            }
         }
-        list
     }
+
+    // لا يمكن تحريك أي باقة فوق الباقة المفعلة المثبتة في أول القائمة.
+    val pinnedActiveIndex = displayEntries.indexOfFirst { it.isActive }
+    val minReorderIndex = if (pinnedActiveIndex >= 0) pinnedActiveIndex + 1 else 0
 
     val density = LocalDensity.current
     val defaultCardHeightPx = with(density) { 54.dp.toPx() }
@@ -4178,14 +3991,15 @@ private fun PlansListDialog(
             }
             return target
         } else if (dy < 0f) {
+            val lowerBound = minReorderIndex.coerceAtMost(displayEntries.lastIndex)
             var target = fromIdx
-            for (i in (fromIdx - 1) downTo 0) {
+            for (i in (fromIdx - 1) downTo lowerBound) {
                 val itemMid = topOfIndex(i) + heightOfIndex(i) * 0.55f
                 if (draggedCenterY < itemMid) {
                     target = i
                 }
             }
-            return target
+            return target.coerceAtLeast(lowerBound)
         }
         return fromIdx
     }
@@ -4267,9 +4081,9 @@ private fun PlansListDialog(
                     )
                 }
 
-                val canReorder = displayEntries.size > 1
                 displayEntries.forEachIndexed { index, entry ->
                     key(entry.key) {
+                        val canReorder = displayEntries.size > 1 && !entry.isActive
                         val isDraggingThis = draggingIndex == index
                         val targetShiftY = when {
                             draggingIndex == null || currentTargetIndex == null || isDraggingThis -> 0f
@@ -4305,7 +4119,11 @@ private fun PlansListDialog(
                             onLongPressDragDelta = { dy ->
                                 val currIdx = displayEntries.indexOfFirst { it.key == entry.key }
                                 if (canReorder && draggingEntryKey == entry.key && currIdx >= 0) {
-                                    val minDrag = -topOfIndex(currIdx) - cardSpacingPx * 0.5f
+                                    val minDrag = if (currIdx > minReorderIndex) {
+                                        -(topOfIndex(currIdx) - topOfIndex(minReorderIndex)) - cardSpacingPx * 0.5f
+                                    } else {
+                                        0f
+                                    }
                                     val maxDrag = (topOfIndex(displayEntries.lastIndex) - topOfIndex(currIdx)) + cardSpacingPx * 0.5f
                                     dragDeltaY = (dragDeltaY + dy).coerceIn(minDrag, maxDrag)
                                 }
@@ -4314,6 +4132,7 @@ private fun PlansListDialog(
                                 val fromIdx = displayEntries.indexOfFirst { it.key == entry.key }
                                 if (fromIdx >= 0 && draggingEntryKey == entry.key) {
                                     val toIdx = computeTargetIndex(fromIdx, dragDeltaY)
+                                        .coerceAtLeast(minReorderIndex)
                                     draggingEntryKey = null
                                     dragDeltaY = 0f
                                     if (toIdx != fromIdx) {
@@ -4462,6 +4281,7 @@ private fun PlanListItemCard(
     val density = LocalDensity.current
     val maxRevealPx = with(density) { 96.dp.toPx() }
     val activateThresholdPx = with(density) { 64.dp.toPx() }
+    val deleteThresholdPx = with(density) { 64.dp.toPx() }
     val peekRevealPx = with(density) { 44.dp.toPx() }
     val offsetX = remember { Animatable(0f) }
     val canSwipeToActivate = onPrimaryAction != null
@@ -4476,6 +4296,7 @@ private fun PlanListItemCard(
     } else {
         MaterialTheme.colorScheme.surfaceContainerLow
     }
+    val deleteRed = Color(0xFFEF5350)
     val dragScale by animateFloatAsState(
         targetValue = if (isDragging) 1.02f else 1f,
         animationSpec = tween(durationMillis = 120),
@@ -4486,12 +4307,32 @@ private fun PlanListItemCard(
     val currentOnLongPressDragEnd by rememberUpdatedState(onLongPressDragEnd)
     val currentOnMeasuredHeight by rememberUpdatedState(onMeasuredHeight)
 
-    // نستخدم تخطيط LTR فيزيائي للبطاقة الخارجية حتى يكون شريط التفعيل في أقصى اليسار
-    // ويكون السحب لليمين دائمًا لتفعيل الباقة، تمامًا مثل شريط الحذف في الباقات الإضافية.
+    // نستخدم تخطيط LTR فيزيائي للبطاقة الخارجية حتى يكون شريط الحذف الأحمر في أقصى اليسار
+    // وشريط التفعيل الأزرق في أقصى اليمين، مع استدارة أقل في طرفي الشريطين.
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-        val currentOffsetDp = with(density) { offsetX.value.coerceAtLeast(0f).toDp() }
-        val restingStripWidthDp = if (canSwipeToActivate) 5.dp else 0.dp
-        val activateBarWidthDp = restingStripWidthDp + currentOffsetDp
+        val positiveOffsetDp = with(density) { offsetX.value.coerceAtLeast(0f).toDp() }
+        val negativeOffsetDp = with(density) { (-offsetX.value).coerceAtLeast(0f).toDp() }
+        val restingStripWidthDp = 5.dp
+        val deleteBarWidthDp = restingStripWidthDp + positiveOffsetDp
+        val activateBarWidthDp = if (canSwipeToActivate) {
+            restingStripWidthDp + negativeOffsetDp
+        } else {
+            0.dp
+        }
+        val barCornerDp = 10.dp
+        val cardEdgeCornerDp = 4.dp
+        val outerShape = AbsoluteRoundedCornerShape(
+            topLeft = barCornerDp,
+            bottomLeft = barCornerDp,
+            topRight = if (canSwipeToActivate) barCornerDp else 16.dp,
+            bottomRight = if (canSwipeToActivate) barCornerDp else 16.dp,
+        )
+        val innerCardShape = AbsoluteRoundedCornerShape(
+            topLeft = cardEdgeCornerDp,
+            bottomLeft = cardEdgeCornerDp,
+            topRight = if (canSwipeToActivate) cardEdgeCornerDp else 16.dp,
+            bottomRight = if (canSwipeToActivate) cardEdgeCornerDp else 16.dp,
+        )
 
         // حاوية خارجية ثابتة لاستقبال الضغط المطول وإعادة الترتيب دون أن تتأثر إحداثيات اللمس بـ translationY
         Box(
@@ -4529,93 +4370,100 @@ private fun PlanListItemCard(
                         scaleX = dragScale
                         scaleY = dragScale
                         shadowElevation = if (isDragging) 8.dp.toPx() else 0f
-                        shape = RoundedCornerShape(16.dp)
+                        shape = outerShape
                         clip = true
                     }
-                    .background(if (canSwipeToActivate) activateBarColor else cardBackgroundColor)
-                    .then(
-                        if (canSwipeToActivate) {
-                            Modifier.pointerInput(plan.id) {
-                                detectHorizontalDragGestures(
-                                    onHorizontalDrag = { change, dragAmount ->
-                                        change.consume()
-                                        val next = (offsetX.value + dragAmount).coerceIn(0f, maxRevealPx * 1.15f)
-                                        scope.launch { offsetX.snapTo(next) }
-                                    },
-                                    onDragEnd = {
-                                        val triggered = offsetX.value >= activateThresholdPx
-                                        scope.launch {
-                                            offsetX.animateTo(
-                                                targetValue = 0f,
-                                                animationSpec = spring(
-                                                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                                                    stiffness = Spring.StiffnessMediumLow,
-                                                ),
-                                            )
-                                        }
-                                        if (triggered) {
-                                            onPrimaryAction?.invoke()
-                                        }
-                                    },
-                                    onDragCancel = {
-                                        scope.launch {
-                                            offsetX.animateTo(
-                                                targetValue = 0f,
-                                                animationSpec = spring(
-                                                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                                                    stiffness = Spring.StiffnessMediumLow,
-                                                ),
-                                            )
-                                        }
-                                    },
-                                )
-                            }
-                        } else {
-                            Modifier
-                        },
-                    ),
-            ) {
-                if (canSwipeToActivate) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.CenterStart)
-                            .width(activateBarWidthDp.coerceAtLeast(14.dp))
-                            .matchParentSize()
-                            .clickable(role = Role.Button) {
-                                if (offsetX.value >= activateThresholdPx * 0.7f) {
-                                    scope.launch {
-                                        offsetX.animateTo(
-                                            targetValue = 0f,
-                                            animationSpec = spring(
-                                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                                stiffness = Spring.StiffnessLow,
-                                            ),
-                                        )
-                                    }
-                                    onPrimaryAction?.invoke()
-                                } else {
-                                    scope.launch {
-                                        offsetX.animateTo(
-                                            targetValue = peekRevealPx,
-                                            animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing),
-                                        )
-                                        offsetX.animateTo(
-                                            targetValue = 0f,
-                                            animationSpec = spring(
-                                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                                stiffness = Spring.StiffnessLow,
-                                            ),
-                                        )
-                                    }
+                    .background(cardBackgroundColor)
+                    .pointerInput(plan.id, canSwipeToActivate) {
+                        detectHorizontalDragGestures(
+                            onHorizontalDrag = { change, dragAmount ->
+                                change.consume()
+                                var next = (offsetX.value + dragAmount)
+                                    .coerceIn(-maxRevealPx * 1.15f, maxRevealPx * 1.15f)
+                                if (!canSwipeToActivate) {
+                                    next = next.coerceAtLeast(0f)
+                                }
+                                scope.launch { offsetX.snapTo(next) }
+                            },
+                            onDragEnd = {
+                                val deleteTriggered = offsetX.value >= deleteThresholdPx
+                                val activateTriggered =
+                                    canSwipeToActivate && offsetX.value <= -activateThresholdPx
+                                scope.launch {
+                                    offsetX.animateTo(
+                                        targetValue = 0f,
+                                        animationSpec = spring(
+                                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                                            stiffness = Spring.StiffnessMediumLow,
+                                        ),
+                                    )
+                                }
+                                when {
+                                    deleteTriggered -> onDeleteClick()
+                                    activateTriggered -> onPrimaryAction?.invoke()
                                 }
                             },
-                        contentAlignment = Alignment.CenterStart,
+                            onDragCancel = {
+                                scope.launch {
+                                    offsetX.animateTo(
+                                        targetValue = 0f,
+                                        animationSpec = spring(
+                                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                                            stiffness = Spring.StiffnessMediumLow,
+                                        ),
+                                    )
+                                }
+                            },
+                        )
+                    },
+            ) {
+                // شريط الحذف الأحمر في أقصى اليسار: يظهر عند السحب من اليسار إلى اليمين
+                Box(
+                    modifier = Modifier.matchParentSize(),
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .width(deleteBarWidthDp)
+                            .fillMaxHeight()
+                            .background(deleteRed),
+                    )
+                    if (deleteBarWidthDp > 46.dp) {
+                        val revealAlpha = (offsetX.value / peekRevealPx).coerceIn(0f, 1f)
+                        Box(
+                            modifier = Modifier
+                                .width(deleteBarWidthDp)
+                                .graphicsLayer { alpha = revealAlpha },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = stringResource(R.string.plans_action_delete),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White,
+                                maxLines = 1,
+                            )
+                        }
+                    }
+                }
+
+                // شريط التفعيل الأزرق في أقصى اليمين: يظهر عند السحب من اليمين إلى اليسار
+                if (canSwipeToActivate) {
+                    Box(
+                        modifier = Modifier.matchParentSize(),
+                        contentAlignment = Alignment.CenterEnd,
                     ) {
+                        Box(
+                            modifier = Modifier
+                                .width(activateBarWidthDp)
+                                .fillMaxHeight()
+                                .background(activateBarColor),
+                        )
                         if (activateBarWidthDp > 16.dp) {
-                            val revealAlpha = ((offsetX.value / peekRevealPx).coerceIn(0f, 1f))
+                            val revealAlpha = (-offsetX.value / peekRevealPx).coerceIn(0f, 1f)
                             Column(
                                 modifier = Modifier
                                     .width(activateBarWidthDp)
+                                    .fillMaxHeight()
                                     .graphicsLayer { alpha = revealAlpha },
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.Center,
@@ -4639,22 +4487,11 @@ private fun PlanListItemCard(
                     }
                 }
 
-                val innerCardShape = if (canSwipeToActivate) {
-                    AbsoluteRoundedCornerShape(
-                        topLeft = 8.dp,
-                        bottomLeft = 8.dp,
-                        topRight = 16.dp,
-                        bottomRight = 16.dp,
-                    )
-                } else {
-                    RoundedCornerShape(16.dp)
-                }
-
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(end = activateBarWidthDp)
+                            .absolutePadding(left = deleteBarWidthDp, right = activateBarWidthDp)
                             .clip(innerCardShape)
                             .background(cardBackgroundColor)
                             .padding(horizontal = 10.dp, vertical = 6.dp),
@@ -4777,17 +4614,6 @@ private fun PlanListItemCard(
                                         )
                                     }
 
-                                    IconButton(
-                                        onClick = onDeleteClick,
-                                        modifier = Modifier.size(30.dp),
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Delete,
-                                            contentDescription = stringResource(R.string.plans_action_delete),
-                                            tint = MaterialTheme.colorScheme.error,
-                                            modifier = Modifier.size(18.dp),
-                                        )
-                                    }
                                 }
                             }
                         }
@@ -4831,17 +4657,6 @@ private fun PlanListItemCard(
                                     )
                                 }
 
-                                IconButton(
-                                    onClick = onDeleteClick,
-                                    modifier = Modifier.size(30.dp),
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Delete,
-                                        contentDescription = stringResource(R.string.plans_action_delete),
-                                        tint = MaterialTheme.colorScheme.error,
-                                        modifier = Modifier.size(18.dp),
-                                    )
-                                }
                             }
                         }
                     }

@@ -116,6 +116,7 @@
     <string name="plan_duration_label">المدة</string>
     <string name="plan_type_label">نوع الباقة</string>
     <string name="plan_prevent_edit_label">امنع التعديل</string>
+    <string name="plan_prevent_edit_subtitle">منع التعديل حتى انتهاء الباقة</string>
     <string name="plan_unit_mb">ميجابايت</string>
     <string name="plan_unit_gb">جيجابايت</string>
     <string name="plan_unit_tb">تيرابايت</string>
@@ -148,7 +149,6 @@
     <string name="additional_plan_dialog_title_add">إضافة باقة إضافية</string>
     <string name="additional_plan_dialog_title_update">تحديث باقة إضافية</string>
     <string name="additional_plan_name_optional">الاسم (إختياري)</string>
-    <string name="additional_plan_prevent_edit_subtitle">منع التعديل حتي إنتهاء الباقة</string>
     <string name="additional_plan_delete_confirm_title">حذف الباقة الإضافية؟</string>
     <string name="additional_plan_delete_confirm_body">هل أنت متأكد من حذف هذه الباقة الإضافية؟</string>
     <string name="additional_plan_reorder_cd">تغيير ترتيب الباقة الإضافية</string>
