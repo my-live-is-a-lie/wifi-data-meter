@@ -16,9 +16,9 @@ import com.mywifiadata.app.core.Format
 import com.mywifiadata.app.core.SamplingIntervals
 import com.mywifiadata.app.core.TimeRange
 import com.mywifiadata.app.core.TimeRanges
+import com.mywifiadata.app.core.UsageNetwork
 import com.mywifiadata.app.data.UsageRepository
 import com.mywifiadata.app.data.model.AppSettings
-import com.mywifiadata.app.data.model.UsageNetwork
 import com.mywifiadata.app.widget.UsageWidgetUpdater
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
