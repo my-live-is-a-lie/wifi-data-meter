@@ -1,6 +1,7 @@
 package com.mywifiadata.app.ui.components
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.withInfiniteAnimationFrameMillis
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -8,13 +9,16 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -40,9 +44,11 @@ import androidx.compose.ui.unit.sp
 import com.mywifiadata.app.R
 import com.mywifiadata.app.core.ClockHandGeometry
 import com.mywifiadata.app.core.HandObstacle
+import com.mywifiadata.app.core.HandSpring
 import com.mywifiadata.app.ui.theme.LocalDownloadColor
 import com.mywifiadata.app.ui.theme.LocalUploadColor
-import java.util.Calendar
+import java.util.Locale
+import java.util.TimeZone
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -72,8 +78,8 @@ fun ClockUsageGauge(
     contentDescription: String? = null,
 ) {
     val density = LocalDensity.current
-    val numberGapPx = with(density) { 5.dp.toPx() }
-    val minHandPx = with(density) { 3.dp.toPx() }
+    val centerTextGapPx = with(density) { 10.dp.toPx() }
+    val daysTextGapPx = with(density) { 5.dp.toPx() }
 
     val contentColor = MaterialTheme.colorScheme.onSurface
     val mutedColor = MaterialTheme.colorScheme.onSurfaceVariant
@@ -96,12 +102,20 @@ fun ClockUsageGauge(
         label = "clock-usage-gauge-progress",
     )
 
-    // زوايا العقارب من وقت الجهاز؛ الثواني تُقاد بالثانية الكاملة، والدقائق
-    // والساعات تتقدم تدريجيًا معها فلا تقفز بين المواضع.
-    val clock = remember(timeMillis) { clockHandsFor(timeMillis) }
-    val clockText = remember(clock) {
-        String.format(java.util.Locale.US, "%02d:%02d", clock.hourOfDay, clock.minute)
+    // نص الساعة (الساعة:الدقيقة) يتحدّث كل ثانية، أما زوايا العقارب فتُحسب من
+    // ساعة متحركة بإطارات الشاشة كي تنساب الحركة كساعة حائط حقيقية بلا قفزات.
+    val clockText = remember(timeMillis) {
+        val clock = clockHandsFor(timeMillis)
+        String.format(Locale.US, "%02d:%02d", clock.hourOfDay, clock.minute)
     }
+    val sweepingNow = remember { mutableLongStateOf(timeMillis) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            withInfiniteAnimationFrameMillis { sweepingNow.longValue = System.currentTimeMillis() }
+        }
+    }
+    // نابض لكل عقرب: يخفف تقلّصه وتمدده عند مروره بالنصوص.
+    val handSprings = remember { List(3) { HandSpring() } }
 
     var centerBlock by remember { mutableStateOf(Rect.Zero) }
     var daysBlock by remember { mutableStateOf(Rect.Zero) }
@@ -117,7 +131,7 @@ fun ClockUsageGauge(
             modifier = Modifier.size(dialSize),
             contentAlignment = Alignment.Center,
         ) {
-            Canvas(
+                    Canvas(
                 modifier = Modifier
                     .matchParentSize()
                     .semantics {
@@ -140,12 +154,13 @@ fun ClockUsageGauge(
                     style = Stroke(width = 1.5.dp.toPx()),
                 )
 
-                // قوس الاستهلاك خارج الحلقة، من أعلى الدائرة عكس عقارب الساعة.
+                // قوس الاستهلاك خارج الحلقة: يبدأ من أسفل الدائرة ويتقدم باتجاه
+                // عقارب الساعة (نحو اليسار ثم الأعلى) كما في تصميم الصورة.
                 if (animatedProgress > 0.0005f) {
                     drawArc(
                         color = arcColor,
-                        startAngle = -90f,
-                        sweepAngle = -360f * animatedProgress,
+                        startAngle = 90f,
+                        sweepAngle = 360f * animatedProgress,
                         useCenter = false,
                         topLeft = Offset(center.x - arcRadius, center.y - arcRadius),
                         size = Size(arcRadius * 2f, arcRadius * 2f),
@@ -171,12 +186,15 @@ fun ClockUsageGauge(
                 // وموسّعة قليلًا ليبقى فراغ بين العقرب والنص.
                 val obstacles = buildList {
                     if (centerBlock.width > 0f && centerBlock.height > 0f) {
-                        add(centerBlock.toObstacle(center).inflated(numberGapPx))
+                        add(centerBlock.toObstacle(center).inflated(centerTextGapPx))
                     }
                     if (daysLeft != null && daysBlock.width > 0f && daysBlock.height > 0f) {
-                        add(daysBlock.toObstacle(center).inflated(numberGapPx))
+                        add(daysBlock.toObstacle(center).inflated(daysTextGapPx))
                     }
                 }
+
+                val nowMillis = sweepingNow.longValue
+                val clock = clockHandsFor(nowMillis)
 
                 // الأطول أولًا حتى يظهر الأقصر فوقه: الدقائق ثم الساعات ثم الثواني.
                 drawHand(
@@ -186,7 +204,8 @@ fun ClockUsageGauge(
                     color = minuteHandColor,
                     center = center,
                     obstacles = obstacles,
-                    minLength = minHandPx,
+                    spring = handSprings[0],
+                    nowMillis = nowMillis,
                 )
                 drawHand(
                     angleDeg = clock.hourAngle,
@@ -195,7 +214,8 @@ fun ClockUsageGauge(
                     color = hourHandColor,
                     center = center,
                     obstacles = obstacles,
-                    minLength = minHandPx,
+                    spring = handSprings[1],
+                    nowMillis = nowMillis,
                 )
                 drawHand(
                     angleDeg = clock.secondAngle,
@@ -204,7 +224,8 @@ fun ClockUsageGauge(
                     color = secondHandColor,
                     center = center,
                     obstacles = obstacles,
-                    minLength = minHandPx,
+                    spring = handSprings[2],
+                    nowMillis = nowMillis,
                 )
             }
 
@@ -268,9 +289,10 @@ fun ClockUsageGauge(
                     )
                     Text(
                         text = daysUnit,
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.labelSmall.copy(lineHeight = 11.sp),
                         color = mutedColor,
                         maxLines = 1,
+                        modifier = Modifier.offset(y = (-3).dp),
                     )
                 }
             }
@@ -291,18 +313,27 @@ private data class ClockHands(
 )
 
 private fun clockHandsFor(timeMillis: Long): ClockHands {
-    val calendar = Calendar.getInstance().apply { timeInMillis = timeMillis }
-    val second = calendar.get(Calendar.SECOND).toFloat()
-    val minute = calendar.get(Calendar.MINUTE) + second / 60f
-    val hourOfDay = calendar.get(Calendar.HOUR_OF_DAY) + minute / 60f
+    // نحسب زمن اليوم (بتوقيت الجهاز) مباشرة من المللي ثانية بلا كائنات إضافية،
+    // لأن هذه الدالة تُستدعى في كل إطار رسم. نضيف أجزاء الثانية إلى الزوايا
+    // فتنساب العقارب بلا قفزات كما في ساعة حائط ميكانيكية.
+    val timeZoneOffset = TimeZone.getDefault().getOffset(timeMillis).toLong()
+    val dayMillis = Math.floorMod(timeMillis + timeZoneOffset, MILLIS_PER_DAY)
+    val second = (dayMillis % MILLIS_PER_MINUTE) / 1000f
+    val minuteOfDay = dayMillis % MILLIS_PER_HOUR / MILLIS_PER_MINUTE
+    val minute = minuteOfDay + second / 60f
+    val hourOfDay = dayMillis / MILLIS_PER_HOUR + minute / 60f
     return ClockHands(
         hourAngle = (hourOfDay % 12f) * 30f,
         minuteAngle = minute * 6f,
         secondAngle = second * 6f,
-        hourOfDay = calendar.get(Calendar.HOUR_OF_DAY),
-        minute = calendar.get(Calendar.MINUTE),
+        hourOfDay = (dayMillis / MILLIS_PER_HOUR).toInt(),
+        minute = minuteOfDay.toInt(),
     )
 }
+
+private const val MILLIS_PER_MINUTE = 60_000L
+private const val MILLIS_PER_HOUR = 3_600_000L
+private const val MILLIS_PER_DAY = 86_400_000L
 
 /** يحوّل مستطيلًا في إحداثيات الأب إلى مستطيل نسبي إلى مركز الميناء. */
 private fun Rect.toObstacle(center: Offset): HandObstacle = HandObstacle(
@@ -312,7 +343,10 @@ private fun Rect.toObstacle(center: Offset): HandObstacle = HandObstacle(
     bottom = bottom - center.y,
 )
 
-/** يرسم عقربًا واحدًا من المركز إلى الخارج بعد تقليصه عند النصوص التي تعترضه. */
+/**
+ * يرسم عقربًا واحدًا من المركز إلى الخارج بعد تقليصه عند النصوص التي تعترضه،
+ * مع نابض يخفف تغيّر طوله فيبدو التقلص والتمدد مطاطيًا ومريحًا للعين.
+ */
 private fun DrawScope.drawHand(
     angleDeg: Float,
     endRadius: Float,
@@ -320,14 +354,18 @@ private fun DrawScope.drawHand(
     color: Color,
     center: Offset,
     obstacles: List<HandObstacle>,
-    minLength: Float,
+    spring: HandSpring,
+    nowMillis: Long,
 ) {
     val segment = ClockHandGeometry.visibleSegment(
         angleDeg = angleDeg,
         endRadius = endRadius,
         obstacles = obstacles,
-        minLength = minLength,
-    ) ?: return
+        minLength = 0f,
+    )
+    val targetLength = segment?.let { it.second - it.first } ?: 0f
+    val visibleLength = spring.advance(targetLength, nowMillis)
+    if (segment == null || visibleLength <= 0.5f) return
 
     val radians = Math.toRadians(angleDeg.toDouble() - 90.0)
     val dx = cos(radians).toFloat()
@@ -335,7 +373,10 @@ private fun DrawScope.drawHand(
     drawLine(
         color = color,
         start = Offset(center.x + dx * segment.first, center.y + dy * segment.first),
-        end = Offset(center.x + dx * segment.second, center.y + dy * segment.second),
+        end = Offset(
+            center.x + dx * (segment.first + visibleLength),
+            center.y + dy * (segment.first + visibleLength),
+        ),
         strokeWidth = width,
         cap = StrokeCap.Round,
     )

@@ -118,3 +118,49 @@ object ClockHandGeometry {
         return if (enter <= exit) enter to exit else null
     }
 }
+
+/**
+ * نابض يخفف تغيّر طول العقرب عند اقترابه من النصوص أو تجاوزه لها،
+ * فيتقلّص ويتمدد بسلاسة مطاطية بدل القفز بين طولين.
+ *
+ * لا يتمدد العقرب فوق الطول المسموح أبدًا حتى لا يغطي أي نص، بينما يتقلّص
+ * نحوه بسلاسة خلال عدة إطارات بدل القفز، فيبدو التقليص مطاطيًا ومريحًا للعين.
+ */
+class HandSpring(
+    private val stiffness: Float = 180f,
+    private val dampingRatio: Float = 0.8f,
+) {
+    private var velocity: Float = 0f
+    private var length: Float = Float.NaN
+    private var lastUpdateMillis: Long = 0L
+
+    /** يحدّث الطول المعروض نحو [targetLength] ويعيده بالبكسل. */
+    fun advance(targetLength: Float, nowMillis: Long): Float {
+        if (length.isNaN()) {
+            length = targetLength
+            lastUpdateMillis = nowMillis
+            return length
+        }
+
+        // نحدّ الخطوة الزمنية كي لا يقفز النابض بعد توقف الرسم (شاشة مطفأة مثلًا).
+        val deltaSeconds = ((nowMillis - lastUpdateMillis).coerceIn(0L, 50L)) / 1000f
+        lastUpdateMillis = nowMillis
+        if (deltaSeconds <= 0f) return length
+
+        val damping = 2f * dampingRatio * kotlin.math.sqrt(stiffness)
+        val acceleration = (targetLength - length) * stiffness - velocity * damping
+        velocity += acceleration * deltaSeconds
+        length += velocity * deltaSeconds
+
+        if (velocity > 0f && length > targetLength) {
+            // لا يتمدد العقرب فوق النص أبدًا، لكنه يتقلّص بسلاسة إذا كان أطول من المسموح.
+            length = targetLength
+            velocity = 0f
+        }
+        if (length < 0f) {
+            length = 0f
+            velocity = 0f
+        }
+        return length
+    }
+}
