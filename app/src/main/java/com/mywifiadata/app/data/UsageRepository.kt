@@ -215,7 +215,13 @@ class UsageRepository(
     ): List<HistoryYearMonth> = withContext(Dispatchers.IO) {
         if (!statsReader.hasUsageAccess()) return@withContext emptyList()
         val currentYm = TimeRanges.currentYearMonth(now)
-        val oldestYear = currentYm.year - HISTORY_SCAN_YEARS_BACK
+        // نحسب بداية النافذة أولًا كي لا نمسح أشهرًا ستُستبعد أصلًا من السجل.
+        val retention = HistoryRetention.retentionMillis(settingsStore.current.historyRetentionMonths)
+        val oldestAllowed = if (retention > 0L) TimeRanges.currentYearMonth(now - retention) else null
+        val oldestYear = maxOf(
+            currentYm.year - HISTORY_SCAN_YEARS_BACK,
+            oldestAllowed?.year ?: (currentYm.year - HISTORY_SCAN_YEARS_BACK),
+        )
         val result = mutableListOf<HistoryYearMonth>()
 
         recordedMonthsMutex.withLock {
@@ -224,7 +230,8 @@ class UsageRepository(
                 val yearRange = TimeRanges.yearRange(year, now)
                 if (yearRange.endMillis <= yearRange.startMillis) continue
                 val maxMonth = if (year == currentYm.year) currentYm.month else 12
-                val allCached = year < currentYm.year && (1..maxMonth).all { month ->
+                val firstMonth = if (oldestAllowed != null && year == oldestAllowed.year) oldestAllowed.month else 1
+                val allCached = year < currentYm.year && (firstMonth..maxMonth).all { month ->
                     completedMonthsUsageCache.containsKey(network to HistoryYearMonth(year, month))
                 }
                 if (!allCached) {
@@ -238,7 +245,7 @@ class UsageRepository(
                         continue
                     }
                 }
-                for (month in 1..maxMonth) {
+                for (month in firstMonth..maxMonth) {
                     currentCoroutineContext().ensureActive()
                     val ym = HistoryYearMonth(year, month)
                     val isCompletedMonth = ym < currentYm
@@ -260,9 +267,7 @@ class UsageRepository(
             }
         }
         // «السجل» لا يعرض أشهرًا أقدم من مدة الاحتفاظ المختارة، و«لا محدود» يبقي المسح أربع سنوات.
-        val retention = HistoryRetention.retentionMillis(settingsStore.current.historyRetentionMonths)
-        if (retention <= 0L) return@withContext result
-        val oldestAllowed = TimeRanges.currentYearMonth(now - retention)
+        if (oldestAllowed == null) return@withContext result
         result.filter { it >= oldestAllowed }
     }
 

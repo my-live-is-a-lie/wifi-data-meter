@@ -180,7 +180,7 @@ class AppUsageArchive(
         }
     }
 
-    /** سقف الملفات يتّسع للمدة المختارة، مع حد أمان أعلى عند «بلا حد». */
+    /** سقف الملفات يتّسع للمدة المختارة، مع حد أمان أعلى عند «لا محدود». */
     private fun maxFilesFor(retention: Long): Int {
         if (retention <= 0L) return MAX_FILES_UNLIMITED
         val days = retention / DAY
@@ -241,7 +241,7 @@ class AppUsageArchive(
         slots.keys.filter { slotEnd(it) < cutoff }.forEach { expired += it }
         expired.forEach { slots.remove(it) }
 
-        // حد أمان للعدد حتى مع «بلا حد»، مع إبقاء الأحدث.
+        // حد أمان للعدد حتى مع «لا محدود»، مع إبقاء الأحدث.
         val limit = maxFilesFor(retention)
         val remaining = directory.listFiles()?.filter { it.isFile && it.extension == "usage" }.orEmpty()
         if (remaining.size <= limit) return
