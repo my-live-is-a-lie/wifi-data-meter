@@ -31,6 +31,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -1151,7 +1153,7 @@ private fun FullUsageCard(
 ) {
     val hasQuota = state.hasQuota
     val progress = usageCardProgress(state)
-    val traffic = if (hasQuota) state.cycle else state.today
+    val traffic = if (hasQuota) state.activeCycle else state.today
     val downloadColor = LocalDownloadColor.current
     val uploadColor = LocalUploadColor.current
     val usageValue = if (hasQuota) {
@@ -1160,7 +1162,7 @@ private fun FullUsageCard(
         Format.bytes(state.today.totalBytes)
     }
     val usageLabel = stringResource(if (hasQuota) R.string.label_used else R.string.label_today)
-    val usedValue = Format.bytes(if (hasQuota) state.cycle.totalBytes else state.today.totalBytes)
+    val usedValue = Format.bytes(if (hasQuota) state.activeCycle.totalBytes else state.today.totalBytes)
     val gaugeStartColor = if (state.quotaExceeded) {
         MaterialTheme.colorScheme.error
     } else {
@@ -1286,8 +1288,8 @@ private fun FullUsageCard(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 QuotaBar(
-                    progress = if (state.cycle.totalBytes > 0L) {
-                        state.today.totalBytes.toFloat() / state.cycle.totalBytes.toFloat()
+                    progress = if (state.activeCycle.totalBytes > 0L) {
+                        state.today.totalBytes.toFloat() / state.activeCycle.totalBytes.toFloat()
                     } else {
                         0f
                     },
@@ -1524,8 +1526,8 @@ private fun Modifier.scaleCarouselContent(scale: Float): Modifier = layout { mea
 
 private fun usageCardProgress(state: UiState): Float = when {
     state.hasQuota -> state.quotaProgress
-    state.cycle.totalBytes > 0L -> {
-        state.today.totalBytes.toFloat() / state.cycle.totalBytes.toFloat()
+    state.activeCycle.totalBytes > 0L -> {
+        state.today.totalBytes.toFloat() / state.activeCycle.totalBytes.toFloat()
     }
     else -> 0f
 }
@@ -2510,6 +2512,7 @@ private fun TrafficTilesRow(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SessionCard(state: UiState, onResetSession: () -> Unit, isEditing: Boolean) {
     ExpressiveCard(
@@ -2527,9 +2530,11 @@ private fun SessionCard(state: UiState, onResetSession: () -> Unit, isEditing: B
                     .padding(horizontal = 4.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Row(
+                FlowRow(
                     modifier = Modifier.weight(1f),
-                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    itemVerticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
                         text = stringResource(R.string.label_session),
@@ -2538,7 +2543,6 @@ private fun SessionCard(state: UiState, onResetSession: () -> Unit, isEditing: B
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = stringResource(
                             R.string.session_since,
@@ -2550,13 +2554,17 @@ private fun SessionCard(state: UiState, onResetSession: () -> Unit, isEditing: B
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
+                Spacer(modifier = Modifier.width(8.dp))
                 TextButton(
                     onClick = onResetSession,
                     enabled = !isEditing,
                     shape = AppButtonShape,
-                    modifier = Modifier.absoluteOffset(x = (-20).dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                 ) {
-                    Text(text = stringResource(R.string.action_reset_session))
+                    Text(
+                        text = stringResource(R.string.action_reset_session),
+                        maxLines = 1,
+                    )
                 }
             }
             Spacer(modifier = Modifier.height(12.dp))

@@ -25,6 +25,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -33,6 +34,8 @@ import androidx.compose.ui.unit.dp
 import com.mywifiadata.app.R
 import com.mywifiadata.app.core.AppsSortOrder
 import com.mywifiadata.app.core.AppsUsageScope
+import com.mywifiadata.app.core.Format
+import com.mywifiadata.app.core.HistoryPlanSortOrder
 import com.mywifiadata.app.core.UsageNetwork
 import com.mywifiadata.app.core.appsCountOptions
 
@@ -95,27 +98,124 @@ fun AppsUsageFilterBar(
     }
 }
 
+/** شريط فلاتر شاشة السجل: نوع الشبكة، الشهر، والسنة. */
+@Composable
+fun HistoryUsageFilterBar(
+    network: UsageNetwork,
+    selectedMonth: Int,
+    selectedYear: Int,
+    availableMonths: List<Int>,
+    availableYears: List<Int>,
+    onNetworkChange: (UsageNetwork) -> Unit,
+    onMonthChange: (Int) -> Unit,
+    onYearChange: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(modifier = modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+        ) {
+            FilterMenu(
+                title = stringResource(R.string.apps_network_filter),
+                selected = network,
+                options = UsageNetwork.entries.map {
+                    it to stringResource(if (it == UsageNetwork.WIFI) R.string.apps_network_wifi else R.string.apps_network_mobile)
+                },
+                onSelect = onNetworkChange,
+            )
+            FilterMenu(
+                title = stringResource(R.string.history_month_filter),
+                selected = selectedMonth,
+                selectedLabelOverride = Format.monthName(selectedMonth, selectedYear),
+                options = availableMonths.map { month ->
+                    month to Format.monthName(month, selectedYear)
+                },
+                onSelect = onMonthChange,
+            )
+            FilterMenu(
+                title = stringResource(R.string.history_year_filter),
+                selected = selectedYear,
+                selectedLabelOverride = selectedYear.toString(),
+                options = availableYears.map { year ->
+                    year to year.toString()
+                },
+                onSelect = onYearChange,
+            )
+        }
+    }
+}
+
+/** شريط فلاتر قسم «الباقة» في شاشة السجل: نوع الشبكة (واي فاي / بيانات الهاتف) والترتيب (الأحدث / الأقدم). */
+@Composable
+fun HistoryPlanFilterBar(
+    network: UsageNetwork,
+    sortOrder: HistoryPlanSortOrder,
+    onNetworkChange: (UsageNetwork) -> Unit,
+    onSortOrderChange: (HistoryPlanSortOrder) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(modifier = modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+        ) {
+            FilterMenu(
+                title = stringResource(R.string.apps_network_filter),
+                selected = network,
+                options = UsageNetwork.entries.map {
+                    it to stringResource(
+                        if (it == UsageNetwork.WIFI) R.string.apps_network_wifi else R.string.apps_network_mobile,
+                    )
+                },
+                onSelect = onNetworkChange,
+            )
+            FilterMenu(
+                title = stringResource(R.string.apps_sort_filter),
+                selected = sortOrder,
+                options = HistoryPlanSortOrder.entries.map {
+                    it to stringResource(
+                        if (it == HistoryPlanSortOrder.NEWEST_FIRST) {
+                            R.string.history_plan_sort_newest
+                        } else {
+                            R.string.history_plan_sort_oldest
+                        },
+                    )
+                },
+                onSelect = onSortOrderChange,
+            )
+        }
+    }
+}
+
 @Composable
 private fun <T> FilterMenu(
     title: String,
     selected: T,
     options: List<Pair<T, String>>,
     onSelect: (T) -> Unit,
+    selectedLabelOverride: String? = null,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val selectedLabel = options.first { it.first == selected }.second
-    Column {
+    val selectedLabel = selectedLabelOverride ?: options.firstOrNull { it.first == selected }?.second.orEmpty()
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(text = title, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Box {
             OutlinedButton(
-                onClick = { expanded = !expanded },
+                onClick = { if (options.isNotEmpty()) expanded = !expanded },
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                 modifier = Modifier.semantics { contentDescription = "$title: $selectedLabel" },
             ) {
                 Text(text = selectedLabel, maxLines = 1)
                 Icon(imageVector = Icons.Rounded.ArrowDropDown, contentDescription = null, modifier = Modifier.size(20.dp))
             }
-            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenu(expanded = expanded && options.isNotEmpty(), onDismissRequest = { expanded = false }) {
                 options.forEach { (value, label) ->
                     DropdownMenuItem(
                         text = { Text(label) },

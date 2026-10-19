@@ -121,4 +121,47 @@ object TimeRanges {
         val end = Instant.ofEpochMilli(range.endMillis).atZone(zone).toLocalDate()
         return java.time.temporal.ChronoUnit.DAYS.between(today, end).toInt().coerceAtLeast(0)
     }
+
+    /** الشهر والسنة الحاليان حسب التوقيت المحلي. */
+    fun currentYearMonth(now: Long = System.currentTimeMillis()): HistoryYearMonth {
+        val today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
+        return HistoryYearMonth(year = today.year, month = today.monthValue)
+    }
+
+    /** نطاق سنة ميلادية كاملة (مقصوص عند [now] إن كانت السنة الحالية). */
+    fun yearRange(year: Int, now: Long = System.currentTimeMillis()): TimeRange {
+        val start = startOfDay(LocalDate.of(year, 1, 1))
+        val end = minOf(startOfDay(LocalDate.of(year + 1, 1, 1)), now).coerceAtLeast(start)
+        return TimeRange(start, end)
+    }
+
+    /** نطاق شهر ميلادي محدد (مقصوص عند [now] إن كان الشهر الحالي). */
+    fun monthRange(year: Int, month: Int, now: Long = System.currentTimeMillis()): TimeRange {
+        val safeMonth = month.coerceIn(1, 12)
+        val firstDay = LocalDate.of(year, safeMonth, 1)
+        val start = startOfDay(firstDay)
+        val end = minOf(startOfDay(firstDay.plusMonths(1)), now).coerceAtLeast(start)
+        return TimeRange(start, end)
+    }
+
+    /**
+     * أيام الشهر الميلادي المحدد (الأقدم أولاً: من يوم 1 حتى نهاية الشهر،
+     * أو حتى اليوم الحالي إذا كان الشهر المحدد هو الشهر الجاري).
+     */
+    fun daysOfMonth(year: Int, month: Int, now: Long = System.currentTimeMillis()): List<TimeRange> {
+        val safeMonth = month.coerceIn(1, 12)
+        val today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
+        val firstDay = LocalDate.of(year, safeMonth, 1)
+        if (firstDay.isAfter(today)) return emptyList()
+        val lastDayOfMonth = firstDay.lengthOfMonth()
+        val lastDay = if (today.year == year && today.monthValue == safeMonth) {
+            today.dayOfMonth
+        } else {
+            lastDayOfMonth
+        }
+        return (1..lastDay).map { dayOfMonth ->
+            val day = LocalDate.of(year, safeMonth, dayOfMonth)
+            TimeRange(startOfDay(day), startOfDay(day.plusDays(1)))
+        }
+    }
 }

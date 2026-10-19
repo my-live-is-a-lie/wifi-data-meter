@@ -162,7 +162,7 @@ class MonitorService : Service() {
 
         val now = System.currentTimeMillis()
         val today = repository.todayTotals(now)
-        val cycle = repository.cycleTotals(settings.cycleStartDay, now)
+        val cycle = repository.planTotals(settings, now)
         val session = repository.deviceTotals(TimeRange(settings.sessionStartMillis, now))
         UsageWidgetUpdater.publish(
             context = this,

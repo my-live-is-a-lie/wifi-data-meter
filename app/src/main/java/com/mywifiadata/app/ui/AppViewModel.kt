@@ -7,10 +7,17 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.mywifiadata.app.core.AppsSortOrder
 import com.mywifiadata.app.core.AppsUsageScope
+import com.mywifiadata.app.core.HistoryPlanSortOrder
+import com.mywifiadata.app.core.HistorySection
+import com.mywifiadata.app.core.HistoryYearMonth
 import com.mywifiadata.app.core.UsageNetwork
 import com.mywifiadata.app.core.appsCountOptions
 import com.mywifiadata.app.core.appsUsageRange
+import com.mywifiadata.app.core.availableHistoryMonths
+import com.mywifiadata.app.core.availableHistoryYears
 import com.mywifiadata.app.core.filterApps
+import com.mywifiadata.app.core.isCustomHistoryMonth
+import com.mywifiadata.app.core.resolveHistoryMonthForYear
 import com.mywifiadata.app.core.within
 import com.mywifiadata.app.core.AppLanguage
 import com.mywifiadata.app.core.historyApps
@@ -24,11 +31,17 @@ import com.mywifiadata.app.core.UsagePeriod
 import com.mywifiadata.app.data.AppSearchHistory
 import com.mywifiadata.app.data.UsageRepository
 import com.mywifiadata.app.data.model.AccentColor
+import com.mywifiadata.app.data.model.AdditionalPlanDraft
+import com.mywifiadata.app.data.model.AppLayoutDirection
 import com.mywifiadata.app.data.model.AppSettings
 import com.mywifiadata.app.data.model.AppUsage
 import com.mywifiadata.app.data.model.AppsFilter
+import com.mywifiadata.app.data.model.CompletedPlanRecord
 import com.mywifiadata.app.data.model.DayUsage
 import com.mywifiadata.app.data.model.DashboardLayout
+import com.mywifiadata.app.data.model.DataPlan
+import com.mywifiadata.app.data.model.PlanDraft
+import com.mywifiadata.app.data.model.PlanNetworkType
 import com.mywifiadata.app.data.model.SpeedSample
 import com.mywifiadata.app.data.model.SpeedTestRecord
 import com.mywifiadata.app.data.model.ThemeMode
@@ -92,6 +105,8 @@ data class UiState(
     val wifi: WifiStatus = WifiStatus(),
     val today: TrafficTotals = TrafficTotals.Empty,
     val cycle: TrafficTotals = TrafficTotals.Empty,
+    val wifiPlanUsage: TrafficTotals? = null,
+    val mobileCycle: TrafficTotals = TrafficTotals.Empty,
     val session: TrafficTotals = TrafficTotals.Empty,
     val samples: List<SpeedSample> = emptyList(),
     val speedTest: SpeedTestState = SpeedTestState.Idle,
@@ -111,6 +126,14 @@ data class UiState(
     val isAppsLoading: Boolean = false,
     val appsPeriod: UsagePeriod = UsagePeriod.MONTH,
     val historyPeriod: UsagePeriod = UsagePeriod.MONTH,
+    val historySection: HistorySection = HistorySection.NETWORK,
+    val historyNetwork: UsageNetwork = UsageNetwork.WIFI,
+    val historyPlanNetwork: UsageNetwork = UsageNetwork.WIFI,
+    val historyPlanSortOrder: HistoryPlanSortOrder = HistoryPlanSortOrder.NEWEST_FIRST,
+    val selectedCompletedPlan: CompletedPlanDetailState? = null,
+    val historyYear: Int = TimeRanges.currentYearMonth(now).year,
+    val historyMonth: Int = TimeRanges.currentYearMonth(now).month,
+    val historyRecordedMonths: List<HistoryYearMonth> = emptyList(),
     val selectedDayIndex: Int? = null,
     val selectedDayApps: List<AppUsage> = emptyList(),
     val isSelectedDayAppsLoading: Boolean = false,
@@ -133,35 +156,82 @@ data class UiState(
     val appsSlice: TimeRange? = null,
     val appDetail: AppDetailState? = null,
 ) {
-    val quotaBytes: Long get() = settings.quotaBytes
+    /** الشبكة النشطة لعرض الباقة: الواي فاي عند تفعيله، وبيانات الهاتف عند تفعيلها دون واي فاي. */
+    val activePlanNetwork: UsageNetwork
+        get() = if (wifi.isMobileConnected && !wifi.isWifiConnected) {
+            UsageNetwork.MOBILE
+        } else {
+            UsageNetwork.WIFI
+        }
 
-    val hasQuota: Boolean get() = settings.quotaBytes > 0L
+    val activePlan: DataPlan
+        get() = settings.planFor(activePlanNetwork)
+
+    val activeCycle: TrafficTotals
+        get() = planUsage(activePlanNetwork)
+
+    val quotaBytes: Long get() = activePlan.quotaBytes
+
+    val hasQuota: Boolean get() = activePlan.hasQuota
 
     val quotaProgress: Float
         get() = if (hasQuota) {
-            (cycle.totalBytes.toFloat() / settings.quotaBytes.toFloat()).coerceIn(0f, 1f)
+            (activeCycle.totalBytes.toFloat() / activePlan.quotaBytes.toFloat()).coerceIn(0f, 1f)
         } else {
             0f
         }
 
-    val quotaExceeded: Boolean get() = hasQuota && cycle.totalBytes > settings.quotaBytes
+    val quotaExceeded: Boolean get() = hasQuota && activeCycle.totalBytes > activePlan.quotaBytes
 
-    val remainingBytes: Long get() = (settings.quotaBytes - cycle.totalBytes).coerceAtLeast(0L)
+    val remainingBytes: Long get() = planRemainingBytes(activePlanNetwork)
 
-    val cycleDays: Int get() = TimeRanges.daysBetween(cycleStartMillis, cycleEndMillis)
+    val cycleDays: Int
+        get() = planTotalDays(activePlanNetwork)
 
     val elapsedDays: Int
         get() = TimeRanges.daysBetween(TimeRanges.cycleRange(settings.cycleStartDay, now).startMillis, now)
 
-    val daysLeft: Int get() = TimeRanges.daysLeftInCycle(settings.cycleStartDay, now)
+    val daysLeft: Int
+        get() = planDaysLeft(activePlanNetwork)
 
     private val cycleStartMillis: Long get() = TimeRanges.cycleRange(settings.cycleStartDay, now).startMillis
 
     private val cycleEndMillis: Long get() = TimeRanges.cycleRange(settings.cycleStartDay, now).endMillis
 
+    fun planFor(network: UsageNetwork): DataPlan = settings.planFor(network)
+
+    fun planUsage(network: UsageNetwork): TrafficTotals = when (network) {
+        UsageNetwork.WIFI -> wifiPlanUsage ?: if (settings.planPendingActivation) TrafficTotals.Empty else cycle
+        UsageNetwork.MOBILE -> mobileCycle
+    }
+
+    fun planRemainingBytes(network: UsageNetwork): Long {
+        val plan = settings.planFor(network)
+        return (plan.quotaBytes - planUsage(network).totalBytes).coerceAtLeast(0L)
+    }
+
+    fun planDaysLeft(network: UsageNetwork): Int {
+        val plan = settings.planFor(network)
+        return when {
+            plan.pendingActivation -> plan.totalDays
+            plan.activatedAtMillis > 0L -> plan.daysLeft(now)
+            network == UsageNetwork.MOBILE -> plan.daysLeft(now)
+            else -> TimeRanges.daysLeftInCycle(settings.cycleStartDay, now)
+        }
+    }
+
+    fun planTotalDays(network: UsageNetwork): Int {
+        val plan = settings.planFor(network)
+        return if (plan.pendingActivation || plan.activatedAtMillis > 0L || network == UsageNetwork.MOBILE) {
+            plan.totalDays
+        } else {
+            TimeRanges.daysBetween(cycleStartMillis, cycleEndMillis)
+        }
+    }
+
     val averagePerDay: Long get() = cycle.totalBytes / elapsedDays.coerceAtLeast(1)
 
-    val projectedBytes: Long get() = averagePerDay * cycleDays
+    val projectedBytes: Long get() = averagePerDay * TimeRanges.daysBetween(cycleStartMillis, cycleEndMillis)
 
     val currentSpeed: SpeedSample? get() = samples.lastOrNull()
 
@@ -192,6 +262,44 @@ data class UiState(
         get() = historyApps(selectedDayApps, historySearchActive, historySearchQuery, historyAppsSortOrder)
 
     val historyDays: Int get() = TimeRanges.daysOf(historyPeriod)
+
+    val currentHistoryYearMonth: HistoryYearMonth
+        get() = TimeRanges.currentYearMonth(now)
+
+    val isCustomHistoryDate: Boolean
+        get() = isCustomHistoryMonth(historyYear, historyMonth, currentHistoryYearMonth)
+
+    val availableHistoryYears: List<Int>
+        get() = availableHistoryYears(historyRecordedMonths)
+
+    val availableHistoryMonths: List<Int>
+        get() = availableHistoryMonths(historyRecordedMonths, historyYear)
+
+    val visibleCompletedPlans: List<CompletedPlanRecord>
+        get() {
+            val list = settings.completedPlansFor(historyPlanNetwork)
+            return when (historyPlanSortOrder) {
+                HistoryPlanSortOrder.NEWEST_FIRST -> list.sortedByDescending { it.endMillis }
+                HistoryPlanSortOrder.OLDEST_FIRST -> list.sortedBy { it.endMillis }
+            }
+        }
+}
+
+/**
+ * حالة صفحة إحصائيات استهلاك التطبيقات لباقة منتهية محددة.
+ */
+data class CompletedPlanDetailState(
+    val record: CompletedPlanRecord,
+    val network: UsageNetwork = UsageNetwork.WIFI,
+    val isLoading: Boolean = true,
+    val totals: TrafficTotals = TrafficTotals.Empty,
+    val apps: List<AppUsage> = emptyList(),
+    val searchActive: Boolean = false,
+    val searchQuery: String = "",
+    val sortOrder: AppsSortOrder = AppsSortOrder.HIGHEST_USAGE,
+) {
+    val visibleApps: List<AppUsage>
+        get() = historyApps(apps, searchActive, searchQuery, sortOrder)
 }
 
 /**
@@ -232,9 +340,11 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
     private var todayAppsLoadedRangeStartMillis: Long = 0L
     private var todayAppsJob: Job? = null
     private var selectedDayAppsJob: Job? = null
+    private var historyRequestId = 0L
     private var dailyLoadedAt: Long = 0L
-    private var dailyLoadedDays: Int = 0
-    private var monthPeakLoadedAt: Long = 0L
+    private var dailyLoadedNetwork: UsageNetwork? = null
+    private var dailyLoadedYear: Int = 0
+    private var dailyLoadedMonth: Int = 0
 
     init {
         viewModelScope.launch {
@@ -257,7 +367,7 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
     /** تحديث القراءات (الإجماليات، الشبكة، الحالة). */
     suspend fun refresh(force: Boolean = false) {
         val now = System.currentTimeMillis()
-        val settings = repository.settingsStore.current
+        var settings = repository.settingsStore.current
         val hasAccess = repository.hasUsageAccess()
 
         val wifi = repository.wifiStatus()
@@ -267,6 +377,29 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         } else {
             TrafficTotals.Empty
         }
+        var wifiPlanUsage = if (hasAccess) {
+            repository.planTotals(settings, now)
+        } else {
+            TrafficTotals.Empty
+        }
+        var mobileCycle = if (hasAccess) {
+            repository.mobilePlanTotals(settings, now)
+        } else {
+            TrafficTotals.Empty
+        }
+
+        val promotedSettings = settings.promoteExpiredPlansIfNeeded(
+            wifiUsedBytes = wifiPlanUsage.totalBytes,
+            mobileUsedBytes = mobileCycle.totalBytes,
+            now = now,
+        )
+        if (promotedSettings != settings) {
+            repository.settingsStore.update { promotedSettings }
+            settings = repository.settingsStore.current
+            wifiPlanUsage = if (hasAccess) repository.planTotals(settings, now) else TrafficTotals.Empty
+            mobileCycle = if (hasAccess) repository.mobilePlanTotals(settings, now) else TrafficTotals.Empty
+        }
+
         val session = if (hasAccess) {
             repository.deviceTotals(
                 com.mywifiadata.app.core.TimeRange(settings.sessionStartMillis, now),
@@ -278,6 +411,8 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         val sample = buildSample(now, today)
 
         _uiState.update { state ->
+            val currentYm = TimeRanges.currentYearMonth(now)
+            val keepCustomDate = state.isCustomHistoryDate
             state.copy(
                 now = now,
                 isLoading = false,
@@ -287,26 +422,29 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
                 wifi = wifi,
                 today = today,
                 cycle = cycle,
+                wifiPlanUsage = wifiPlanUsage,
+                mobileCycle = mobileCycle,
                 session = session,
+                historyYear = if (keepCustomDate) state.historyYear else currentYm.year,
+                historyMonth = if (keepCustomDate) state.historyMonth else currentYm.month,
                 samples = if (sample == null) state.samples else (state.samples + sample).takeLast(MAX_SAMPLES),
             )
         }
+        val currentState = _uiState.value
         UsageWidgetUpdater.publish(
             context = repository.context,
             todayDownload = today.rxBytes,
             todayUpload = today.txBytes,
-            cycleUsage = cycle.totalBytes,
-            quota = settings.quotaBytes,
+            cycleUsage = currentState.activeCycle.totalBytes,
+            quota = currentState.quotaBytes,
         )
 
-        val historyDays = TimeRanges.daysOf(_uiState.value.historyPeriod)
-        if (hasAccess && (force || now - dailyLoadedAt > DAILY_TTL_MILLIS || dailyLoadedDays != historyDays)) {
-            val daily = repository.dailyUsage(historyDays)
-            dailyLoadedAt = now
-            dailyLoadedDays = historyDays
-            _uiState.update { it.copy(daily = daily) }
+        val sameHistorySelection = dailyLoadedNetwork == currentState.historyNetwork &&
+            dailyLoadedYear == currentState.historyYear &&
+            dailyLoadedMonth == currentState.historyMonth
+        if (hasAccess && (force || now - dailyLoadedAt > DAILY_TTL_MILLIS || !sameHistorySelection)) {
+            loadHistory(now = now)
         }
-        loadMonthPeak(hasAccess, force, now)
 
         if (hasAccess && (force || now - appsLoadedAt > APPS_TTL_MILLIS)) {
             loadApps()
@@ -316,25 +454,49 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
     }
 
     /**
-     * يحمّل آخر 30 يومًا ويستخرج أعلى يوم استهلاكًا لعرضه في بطاقة «سجل
-     * الاستهلاك» كمرجع للمقارنة، حتى لو كانت الفترة المعروضة يومًا واحدًا
-     * (فلا يعود «أعلى يوم» مساويًا لاستهلاك اليوم نفسه).
-     *
-     * إن كانت الفترة المختارة شهرًا بالفعل نُعيد استخدام بياناتها بلا استعلام جديد.
+     * يحمّل إحصاءات أيام الشهر والسنة المحددين في شاشة السجل مع الأشهر والسنوات
+     * التي سُجّل فيها استهلاك فعلي للشبكة المختارة.
      */
-    private suspend fun loadMonthPeak(hasAccess: Boolean, force: Boolean, now: Long) {
-        if (!hasAccess) return
-        if (!force && now - monthPeakLoadedAt <= MONTH_PEAK_TTL_MILLIS) return
+    private suspend fun loadHistory(
+        now: Long = System.currentTimeMillis(),
+        adjustSelectionToRecorded: Boolean = false,
+    ) {
+        val requestId = ++historyRequestId
+        val selection = _uiState.value
+        val network = selection.historyNetwork
+        val recorded = repository.recordedHistoryMonths(network, now)
+        val currentYm = TimeRanges.currentYearMonth(now)
+        var targetYear = selection.historyYear
+        var targetMonth = selection.historyMonth
 
-        val loadedDays = dailyLoadedDays
-        val monthDaily = if (loadedDays >= MONTH_DAYS) {
-            _uiState.value.daily
-        } else {
-            repository.dailyUsage(MONTH_DAYS)
+        if (adjustSelectionToRecorded && isCustomHistoryMonth(targetYear, targetMonth, currentYm)) {
+            if (HistoryYearMonth(targetYear, targetMonth) !in recorded) {
+                targetYear = currentYm.year
+                targetMonth = currentYm.month
+            }
         }
-        monthPeakLoadedAt = now
+
+        val daily = repository.dailyUsageForMonth(targetYear, targetMonth, network, now)
+        val targetYm = HistoryYearMonth(targetYear, targetMonth)
+        val finalRecorded = if (daily.any { it.totals.totalBytes > 0L } && targetYm !in recorded) {
+            (recorded + targetYm).sorted()
+        } else {
+            recorded
+        }
+
+        if (requestId != historyRequestId || _uiState.value.historyNetwork != network) return
+        dailyLoadedAt = System.currentTimeMillis()
+        dailyLoadedNetwork = network
+        dailyLoadedYear = targetYear
+        dailyLoadedMonth = targetMonth
         _uiState.update { state ->
-            state.copy(monthPeak = monthDaily.maxByOrNull { it.totals.totalBytes })
+            state.copy(
+                historyYear = targetYear,
+                historyMonth = targetMonth,
+                historyRecordedMonths = finalRecorded,
+                daily = daily,
+                monthPeak = daily.maxByOrNull { it.totals.totalBytes },
+            )
         }
     }
 
@@ -508,9 +670,197 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         }
     }
 
+    fun setHistorySection(section: HistorySection) {
+        if (section == _uiState.value.historySection) return
+        _uiState.update {
+            it.copy(
+                historySection = section,
+                selectedCompletedPlan = if (section == HistorySection.PLAN) it.selectedCompletedPlan else null,
+                historySearchActive = if (section == HistorySection.NETWORK) it.historySearchActive else false,
+                historySearchQuery = if (section == HistorySection.NETWORK) it.historySearchQuery else "",
+            )
+        }
+    }
+
+    fun setHistoryPlanNetwork(network: UsageNetwork) {
+        if (network == _uiState.value.historyPlanNetwork) return
+        _uiState.update {
+            it.copy(
+                historyPlanNetwork = network,
+                selectedCompletedPlan = null,
+            )
+        }
+    }
+
+    fun setHistoryPlanSortOrder(sortOrder: HistoryPlanSortOrder) {
+        if (sortOrder == _uiState.value.historyPlanSortOrder) return
+        _uiState.update {
+            it.copy(historyPlanSortOrder = sortOrder)
+        }
+    }
+
+    fun openCompletedPlanDetail(record: CompletedPlanRecord) {
+        val network = _uiState.value.historyPlanNetwork
+        _uiState.update {
+            it.copy(
+                selectedCompletedPlan = CompletedPlanDetailState(
+                    record = record,
+                    network = network,
+                    isLoading = true,
+                ),
+            )
+        }
+        viewModelScope.launch {
+            val range = TimeRange(
+                startMillis = record.startMillis,
+                endMillis = record.endMillis.coerceAtLeast(record.startMillis),
+            )
+            val totals = if (range.endMillis > range.startMillis) {
+                repository.deviceTotals(range, network)
+            } else {
+                TrafficTotals.Empty
+            }
+            val apps = if (range.endMillis > range.startMillis) {
+                repository.perAppUsage(range, network)
+            } else {
+                emptyList()
+            }
+            _uiState.update { state ->
+                val current = state.selectedCompletedPlan
+                if (current == null || current.record.id != record.id || current.network != network) {
+                    state
+                } else {
+                    state.copy(
+                        selectedCompletedPlan = current.copy(
+                            isLoading = false,
+                            totals = totals,
+                            apps = apps,
+                        ),
+                    )
+                }
+            }
+        }
+    }
+
+    fun closeCompletedPlanDetail() {
+        _uiState.update { it.copy(selectedCompletedPlan = null) }
+    }
+
+    fun setCompletedPlanSearchActive(active: Boolean) {
+        _uiState.update { state ->
+            val current = state.selectedCompletedPlan ?: return@update state
+            state.copy(
+                selectedCompletedPlan = current.copy(
+                    searchActive = active,
+                    searchQuery = if (active) current.searchQuery else "",
+                ),
+            )
+        }
+    }
+
+    fun setCompletedPlanSearchQuery(query: String) {
+        _uiState.update { state ->
+            val current = state.selectedCompletedPlan ?: return@update state
+            state.copy(
+                selectedCompletedPlan = current.copy(searchQuery = query),
+            )
+        }
+    }
+
+    fun reverseCompletedPlanAppsSortOrder() {
+        _uiState.update { state ->
+            val current = state.selectedCompletedPlan ?: return@update state
+            state.copy(
+                selectedCompletedPlan = current.copy(
+                    sortOrder = current.sortOrder.reversed(),
+                ),
+            )
+        }
+    }
+
+    fun setHistoryNetwork(network: UsageNetwork) {
+        if (network == _uiState.value.historyNetwork) return
+        selectedDayAppsJob?.cancel()
+        _uiState.update {
+            it.copy(
+                historyNetwork = network,
+                selectedDayIndex = null,
+                selectedDayApps = emptyList(),
+                isSelectedDayAppsLoading = false,
+                historySearchActive = false,
+                historySearchQuery = "",
+            )
+        }
+        viewModelScope.launch {
+            loadHistory(adjustSelectionToRecorded = true)
+        }
+    }
+
+    fun setHistoryMonth(month: Int) {
+        val safeMonth = month.coerceIn(1, 12)
+        if (safeMonth == _uiState.value.historyMonth) return
+        selectedDayAppsJob?.cancel()
+        _uiState.update {
+            it.copy(
+                historyMonth = safeMonth,
+                selectedDayIndex = null,
+                selectedDayApps = emptyList(),
+                isSelectedDayAppsLoading = false,
+                historySearchActive = false,
+                historySearchQuery = "",
+            )
+        }
+        viewModelScope.launch {
+            loadHistory()
+        }
+    }
+
+    fun setHistoryYear(year: Int) {
+        if (year == _uiState.value.historyYear) return
+        selectedDayAppsJob?.cancel()
+        val targetMonth = resolveHistoryMonthForYear(
+            recordedMonths = _uiState.value.historyRecordedMonths,
+            targetYear = year,
+            currentSelectedMonth = _uiState.value.historyMonth,
+        )
+        _uiState.update {
+            it.copy(
+                historyYear = year,
+                historyMonth = targetMonth,
+                selectedDayIndex = null,
+                selectedDayApps = emptyList(),
+                isSelectedDayAppsLoading = false,
+                historySearchActive = false,
+                historySearchQuery = "",
+            )
+        }
+        viewModelScope.launch {
+            loadHistory()
+        }
+    }
+
+    fun resetHistoryDate() {
+        val currentYm = TimeRanges.currentYearMonth(System.currentTimeMillis())
+        if (_uiState.value.historyYear == currentYm.year && _uiState.value.historyMonth == currentYm.month) return
+        selectedDayAppsJob?.cancel()
+        _uiState.update {
+            it.copy(
+                historyYear = currentYm.year,
+                historyMonth = currentYm.month,
+                selectedDayIndex = null,
+                selectedDayApps = emptyList(),
+                isSelectedDayAppsLoading = false,
+                historySearchActive = false,
+                historySearchQuery = "",
+            )
+        }
+        viewModelScope.launch {
+            loadHistory()
+        }
+    }
+
     fun setHistoryPeriod(period: UsagePeriod) {
         if (period == _uiState.value.historyPeriod) return
-        val days = TimeRanges.daysOf(period)
         selectedDayAppsJob?.cancel()
         _uiState.update {
             it.copy(
@@ -519,15 +869,7 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
             )
         }
         viewModelScope.launch {
-            val daily = repository.dailyUsage(days)
-            if (_uiState.value.historyPeriod != period) return@launch
-            dailyLoadedDays = days
-            dailyLoadedAt = System.currentTimeMillis()
-            _uiState.update { it.copy(daily = daily) }
-            // عرض «اليوم» = يوم واحد فقط، فنفتح تفاصيله مباشرة ليرى المستخدم استهلاكه وأكثر التطبيقات.
-            if (period == UsagePeriod.TODAY && daily.isNotEmpty()) {
-                selectDay(daily.lastIndex)
-            }
+            loadHistory()
         }
     }
 
@@ -578,7 +920,9 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
     }
 
     fun selectDay(index: Int?) {
-        val day = index?.let { _uiState.value.daily.getOrNull(it) }
+        val stateSnapshot = _uiState.value
+        val day = index?.let { stateSnapshot.daily.getOrNull(it) }
+        val network = stateSnapshot.historyNetwork
         selectedDayAppsJob?.cancel()
         // Never search the previous day's rows while the new selection is still loading.
         _uiState.update {
@@ -591,10 +935,14 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         selectedDayAppsJob = viewModelScope.launch {
             val apps = repository.perAppUsage(
                 com.mywifiadata.app.core.TimeRange(day.startMillis, day.endMillis),
+                network,
             )
             _uiState.update { state ->
                 val currentDay = state.selectedDayIndex?.let { state.daily.getOrNull(it) }
-                if (currentDay?.startMillis == day.startMillis && currentDay.endMillis == day.endMillis) {
+                if (state.historyNetwork == network &&
+                    currentDay?.startMillis == day.startMillis &&
+                    currentDay.endMillis == day.endMillis
+                ) {
                     state.copy(selectedDayApps = apps, isSelectedDayAppsLoading = false)
                 } else state
             }
@@ -701,6 +1049,159 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         refreshNow()
     }
 
+    fun savePlan(draft: PlanDraft) {
+        val targetNetworks = when (draft.networkType) {
+            PlanNetworkType.WIFI -> listOf(UsageNetwork.WIFI)
+            PlanNetworkType.MOBILE -> listOf(UsageNetwork.MOBILE)
+            PlanNetworkType.BOTH -> listOf(UsageNetwork.WIFI, UsageNetwork.MOBILE)
+        }
+        repository.settingsStore.update { settings ->
+            var updated = settings.copy(planNetworkType = draft.networkType)
+            for (network in targetNetworks) {
+                val currentPlan = updated.planFor(network)
+                val isLockedUpdate = currentPlan.hasQuota && currentPlan.preventEdit
+                val nextPlan = if (isLockedUpdate) {
+                    currentPlan.copy(
+                        name = draft.name.trim(),
+                        logoPath = draft.logoPath,
+                    )
+                } else {
+                    val newQuotaBytes = draft.quotaBytes
+                    val safeDuration = draft.durationValue.coerceAtLeast(1)
+                    val isNewOrChangedPlan = !currentPlan.hasQuota ||
+                        currentPlan.quotaBytes != newQuotaBytes ||
+                        currentPlan.durationValue != safeDuration ||
+                        currentPlan.durationUnit != draft.durationUnit
+                    DataPlan(
+                        id = currentPlan.id.ifBlank { java.util.UUID.randomUUID().toString() },
+                        name = draft.name.trim(),
+                        logoPath = draft.logoPath,
+                        quotaBytes = newQuotaBytes,
+                        capacityUnit = draft.capacityUnit,
+                        durationValue = safeDuration,
+                        durationUnit = draft.durationUnit,
+                        preventEdit = if (newQuotaBytes > 0L) draft.preventEdit else false,
+                        pendingActivation = when {
+                            newQuotaBytes <= 0L -> false
+                            isNewOrChangedPlan -> true
+                            else -> currentPlan.pendingActivation
+                        },
+                        activatedAtMillis = when {
+                            newQuotaBytes <= 0L || isNewOrChangedPlan -> 0L
+                            else -> currentPlan.activatedAtMillis
+                        },
+                        additionalPlans = if (newQuotaBytes > 0L) currentPlan.additionalPlans else emptyList(),
+                    )
+                }
+                updated = updated.withPlanFor(network, nextPlan)
+            }
+            updated
+        }
+        refreshNow()
+    }
+
+    fun activatePlan(network: UsageNetwork = UsageNetwork.WIFI) {
+        val now = System.currentTimeMillis()
+        repository.settingsStore.update { settings ->
+            val currentPlan = settings.planFor(network)
+            settings.withPlanFor(
+                network = network,
+                plan = currentPlan.copy(
+                    pendingActivation = false,
+                    activatedAtMillis = now,
+                ),
+            )
+        }
+        refreshNow()
+    }
+
+    fun addPlanToSavedList(draft: PlanDraft) {
+        repository.settingsStore.update { settings ->
+            settings.addOrSavePlanFromList(draft)
+        }
+        refreshNow()
+    }
+
+    fun updateSavedPlan(network: UsageNetwork, planId: String, draft: PlanDraft) {
+        repository.settingsStore.update { settings ->
+            settings.updateSavedPlan(network, planId, draft)
+        }
+        refreshNow()
+    }
+
+    fun switchToSavedPlan(network: UsageNetwork, planId: String) {
+        val now = System.currentTimeMillis()
+        repository.settingsStore.update { settings ->
+            settings.switchToSavedPlan(network, planId, now)
+        }
+        refreshNow()
+    }
+
+    fun deletePlan(network: UsageNetwork, planId: String) {
+        repository.settingsStore.update { settings ->
+            settings.deletePlan(network, planId)
+        }
+        refreshNow()
+    }
+
+    fun addAdditionalPlan(network: UsageNetwork, draft: AdditionalPlanDraft) {
+        repository.settingsStore.update { settings ->
+            settings.addAdditionalPlan(network, draft)
+        }
+        refreshNow()
+    }
+
+    fun updateAdditionalPlan(
+        network: UsageNetwork,
+        additionalPlanId: String,
+        draft: AdditionalPlanDraft,
+    ) {
+        repository.settingsStore.update { settings ->
+            settings.updateAdditionalPlan(network, additionalPlanId, draft)
+        }
+        refreshNow()
+    }
+
+    fun deleteAdditionalPlan(network: UsageNetwork, additionalPlanId: String) {
+        repository.settingsStore.update { settings ->
+            settings.deleteAdditionalPlan(network, additionalPlanId)
+        }
+        refreshNow()
+    }
+
+    fun reorderAdditionalPlans(network: UsageNetwork, fromIndex: Int, toIndex: Int) {
+        repository.settingsStore.update { settings ->
+            settings.reorderAdditionalPlans(network, fromIndex, toIndex)
+        }
+    }
+
+    fun reorderSavedPlans(network: UsageNetwork, fromIndex: Int, toIndex: Int) {
+        repository.settingsStore.update { settings ->
+            settings.reorderSavedPlans(network, fromIndex, toIndex)
+        }
+    }
+
+    fun resetActivePlan(network: UsageNetwork) {
+        repository.settingsStore.update { settings ->
+            settings.resetActivePlan(network)
+        }
+        refreshNow()
+    }
+
+    fun resetSavedPlan(network: UsageNetwork, planId: String) {
+        repository.settingsStore.update { settings ->
+            settings.resetSavedPlan(network, planId)
+        }
+        refreshNow()
+    }
+
+    fun resetAdditionalPlan(network: UsageNetwork, additionalPlanId: String) {
+        repository.settingsStore.update { settings ->
+            settings.resetAdditionalPlan(network, additionalPlanId)
+        }
+        refreshNow()
+    }
+
     fun setUsageCardStyle(styleIndex: Int) {
         repository.settingsStore.update {
             it.copy(
@@ -767,6 +1268,10 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         repository.settingsStore.update { it.copy(themeMode = mode) }
     }
 
+    fun setLayoutDirection(direction: AppLayoutDirection) {
+        repository.settingsStore.update { it.copy(layoutDirection = direction) }
+    }
+
     fun clearData() {
         selectedDayAppsJob?.cancel()
         selectedDayAppsJob = null
@@ -774,6 +1279,10 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         todayAppsJob = null
         todayAppsLoadedAt = 0L
         todayAppsLoadedRangeStartMillis = 0L
+        dailyLoadedAt = 0L
+        dailyLoadedNetwork = null
+        dailyLoadedYear = 0
+        dailyLoadedMonth = 0
         LauncherIconVisibility.setVisible(repository.context, visible = true)
         stopTracking()
         repository.settingsStore.clearAll()
