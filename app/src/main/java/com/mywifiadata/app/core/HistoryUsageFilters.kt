@@ -3,6 +3,9 @@ package com.mywifiadata.app.core
 /** التبويب الفرعي المختار في شاشة السجل (الشبكة أو الباقة). */
 enum class HistorySection { NETWORK, PLAN }
 
+/** ترتيب الباقات المنتهية في تبويب «الباقة» داخل شاشة السجل (الأحدث أو الأقدم). */
+enum class HistoryPlanSortOrder { NEWEST_FIRST, OLDEST_FIRST }
+
 /** شهر وسنة في سجل الاستهلاك (الشهر من 1 إلى 12). */
 data class HistoryYearMonth(
     val year: Int,

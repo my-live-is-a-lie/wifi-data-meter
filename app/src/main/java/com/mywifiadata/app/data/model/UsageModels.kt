@@ -250,6 +250,26 @@ data class DataPlan(
     }
 }
 
+/**
+ * سجل باقة منتهية (سواء بانتهاء المدة الزمنية أو نفاد السعة 100%) لعرضه في قسم «الباقة» داخل شاشة السجل.
+ */
+data class CompletedPlanRecord(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val planId: String = "",
+    val name: String = "",
+    val logoPath: String = "",
+    val quotaBytes: Long = 0L,
+    val capacityUnit: PlanCapacityUnit = PlanCapacityUnit.GB,
+    val durationValue: Int = 28,
+    val durationUnit: PlanDurationUnit = PlanDurationUnit.DAY,
+    val startMillis: Long = 0L,
+    val endMillis: Long = 0L,
+    val usedBytes: Long = 0L,
+) {
+    val totalDays: Int
+        get() = (durationValue.coerceAtLeast(1) * durationUnit.daysPerUnit).coerceAtLeast(1)
+}
+
 /** بيانات الباقة المُدخلة من نافذة إضافة/تحديث الباقة. */
 data class PlanDraft(
     val name: String = "",
@@ -299,6 +319,10 @@ data class AppSettings(
     val mobilePlan: DataPlan = DataPlan(id = "mobile-active"),
     val savedWifiPlans: List<DataPlan> = emptyList(),
     val savedMobilePlans: List<DataPlan> = emptyList(),
+    val wifiActivePlanIndex: Int = 0,
+    val mobileActivePlanIndex: Int = 0,
+    val completedWifiPlans: List<CompletedPlanRecord> = emptyList(),
+    val completedMobilePlans: List<CompletedPlanRecord> = emptyList(),
     val notificationsEnabled: Boolean = true,
     val alertThresholdPercent: Int = 80,
     /** فهرس خيار المدة في [SamplingIntervals]؛ يحفظ الوحدة حتى مع تساوي المدد. */
@@ -383,14 +407,57 @@ data class AppSettings(
     }
 
     fun withSavedPlansFor(network: UsageNetwork, plans: List<DataPlan>): AppSettings = when (network) {
-        UsageNetwork.WIFI -> copy(savedWifiPlans = plans)
-        UsageNetwork.MOBILE -> copy(savedMobilePlans = plans)
+        UsageNetwork.WIFI -> copy(
+            savedWifiPlans = plans,
+            wifiActivePlanIndex = wifiActivePlanIndex.coerceIn(0, plans.size),
+        )
+        UsageNetwork.MOBILE -> copy(
+            savedMobilePlans = plans,
+            mobileActivePlanIndex = mobileActivePlanIndex.coerceIn(0, plans.size),
+        )
+    }
+
+    fun activePlanIndexFor(network: UsageNetwork): Int = when (network) {
+        UsageNetwork.WIFI -> wifiActivePlanIndex
+        UsageNetwork.MOBILE -> mobileActivePlanIndex
+    }.coerceIn(0, savedPlansFor(network).size)
+
+    fun withActivePlanIndexFor(network: UsageNetwork, index: Int): AppSettings {
+        val coerced = index.coerceIn(0, savedPlansFor(network).size)
+        return when (network) {
+            UsageNetwork.WIFI -> copy(wifiActivePlanIndex = coerced)
+            UsageNetwork.MOBILE -> copy(mobileActivePlanIndex = coerced)
+        }
     }
 
     /**
-     * عند انتهاء مدة الباقة النشطة أو نفاد سعتها مع وجود باقات إضافية، تحل الباقة
-     * الإضافية الأولى مكان الباقة الرئيسية (بانتظار التفعيل اليدوي) وتُحفظ الباقة
-     * السابقة ضمن قائمة الباقات المحفوظة.
+     * قائمة جميع الباقات المعروضة في نافذة «الباقات» بالترتيب الذي اختاره المستخدم،
+     * بما في ذلك الباقة المفعلة والباقات المحفوظة.
+     */
+    fun allPlansFor(network: UsageNetwork): List<DataPlan> {
+        val active = planFor(network)
+        val saved = savedPlansFor(network)
+        if (!active.hasQuota) return saved
+        val list = saved.toMutableList()
+        val insertIndex = activePlanIndexFor(network).coerceIn(0, list.size)
+        list.add(insertIndex, active)
+        return list
+    }
+
+    fun completedPlansFor(network: UsageNetwork): List<CompletedPlanRecord> = when (network) {
+        UsageNetwork.WIFI -> completedWifiPlans
+        UsageNetwork.MOBILE -> completedMobilePlans
+    }
+
+    fun withCompletedPlansFor(network: UsageNetwork, records: List<CompletedPlanRecord>): AppSettings = when (network) {
+        UsageNetwork.WIFI -> copy(completedWifiPlans = records)
+        UsageNetwork.MOBILE -> copy(completedMobilePlans = records)
+    }
+
+    /**
+     * عند انتهاء مدة الباقة النشطة أو نفاد سعتها، تُسجّل في سجل الباقات المنتهية،
+     * وإذا وُجدت باقات إضافية تحل الباقة الإضافية الأولى مكان الباقة الرئيسية
+     * (بانتظار التفعيل اليدوي) وتُحفظ الباقة السابقة ضمن قائمة الباقات المحفوظة.
      */
     fun promoteExpiredPlanForNetwork(
         network: UsageNetwork,
@@ -399,7 +466,30 @@ data class AppSettings(
     ): AppSettings {
         val currentPlan = planFor(network)
         if (!currentPlan.isExpiredOrDepleted(usedBytes, now)) return this
-        val firstAdditional = currentPlan.additionalPlans.firstOrNull() ?: return this
+        val startMillis = currentPlan.activatedAtMillis
+        val scheduledEndMillis = startMillis + currentPlan.totalDays.toLong() * 86_400_000L
+        val effectiveEndMillis = minOf(now, scheduledEndMillis).coerceAtLeast(startMillis)
+        val recordId = "${currentPlan.id}_$startMillis"
+        val existingCompleted = completedPlansFor(network)
+        val updatedWithRecord = if (existingCompleted.any { it.id == recordId }) {
+            this
+        } else {
+            val completedRecord = CompletedPlanRecord(
+                id = recordId,
+                planId = currentPlan.id,
+                name = currentPlan.name,
+                logoPath = currentPlan.logoPath,
+                quotaBytes = currentPlan.quotaBytes,
+                capacityUnit = currentPlan.capacityUnit,
+                durationValue = currentPlan.durationValue,
+                durationUnit = currentPlan.durationUnit,
+                startMillis = startMillis,
+                endMillis = effectiveEndMillis,
+                usedBytes = usedBytes,
+            )
+            withCompletedPlansFor(network, existingCompleted + completedRecord)
+        }
+        val firstAdditional = currentPlan.additionalPlans.firstOrNull() ?: return updatedWithRecord
         val remainingAdditional = currentPlan.additionalPlans.drop(1)
         val archivedCurrent = currentPlan.copy(
             id = currentPlan.id.ifBlank { java.util.UUID.randomUUID().toString() },
@@ -411,9 +501,9 @@ data class AppSettings(
             additional = firstAdditional,
             remainingAdditional = remainingAdditional,
         )
-        val updatedSaved = savedPlansFor(network)
+        val updatedSaved = updatedWithRecord.savedPlansFor(network)
             .filterNot { it.id == archivedCurrent.id } + archivedCurrent
-        return withPlanFor(network, promotedPlan)
+        return updatedWithRecord.withPlanFor(network, promotedPlan)
             .withSavedPlansFor(network, updatedSaved)
     }
 
@@ -495,23 +585,34 @@ data class AppSettings(
         val savedList = savedPlansFor(network)
         val targetPlan = savedList.firstOrNull { it.id == planId } ?: return this
         val currentActive = planFor(network)
-        val remainingSaved = savedList.filterNot { it.id == planId }
-        val updatedSaved = if (currentActive.hasQuota) {
-            val resetPrevious = currentActive.copy(
-                id = currentActive.id.ifBlank { java.util.UUID.randomUUID().toString() },
-                pendingActivation = true,
-                activatedAtMillis = 0L,
-            )
-            remainingSaved + resetPrevious
-        } else {
-            remainingSaved
-        }
         val activatedTarget = targetPlan.copy(
             pendingActivation = false,
             activatedAtMillis = now,
         )
+        if (!currentActive.hasQuota) {
+            val remainingSaved = savedList.filterNot { it.id == planId }
+            val targetIdx = savedList.indexOfFirst { it.id == planId }.coerceIn(0, remainingSaved.size)
+            return withPlanFor(network, activatedTarget)
+                .withSavedPlansFor(network, remainingSaved)
+                .withActivePlanIndexFor(network, targetIdx)
+        }
+        val resetPrevious = currentActive.copy(
+            id = currentActive.id.ifBlank { java.util.UUID.randomUUID().toString() },
+            pendingActivation = true,
+            activatedAtMillis = 0L,
+        )
+        val combined = allPlansFor(network)
+        val newActiveIdx = combined.indexOfFirst { it.id == planId }.coerceAtLeast(0)
+        val updatedSaved = combined.mapNotNull { item ->
+            when (item.id) {
+                planId -> null
+                currentActive.id -> resetPrevious
+                else -> item
+            }
+        }
         return withPlanFor(network, activatedTarget)
             .withSavedPlansFor(network, updatedSaved)
+            .withActivePlanIndexFor(network, newActiveIdx)
     }
 
     fun deletePlan(
@@ -636,5 +737,35 @@ data class AppSettings(
             network = network,
             plan = currentActive.copy(additionalPlans = list),
         )
+    }
+
+    fun reorderSavedPlans(
+        network: UsageNetwork,
+        fromIndex: Int,
+        toIndex: Int,
+    ): AppSettings {
+        val active = planFor(network)
+        val saved = savedPlansFor(network)
+        if (!active.hasQuota) {
+            val list = saved.toMutableList()
+            if (fromIndex !in list.indices || toIndex !in list.indices || fromIndex == toIndex) {
+                return this
+            }
+            val moved = list.removeAt(fromIndex)
+            list.add(toIndex, moved)
+            return withSavedPlansFor(network, list)
+        }
+        val activeIndex = activePlanIndexFor(network).coerceIn(0, saved.size)
+        val tagged = saved.map { it to false }.toMutableList()
+        tagged.add(activeIndex, active to true)
+        if (fromIndex !in tagged.indices || toIndex !in tagged.indices || fromIndex == toIndex) {
+            return this
+        }
+        val moved = tagged.removeAt(fromIndex)
+        tagged.add(toIndex, moved)
+        val newActiveIndex = tagged.indexOfFirst { it.second }.coerceAtLeast(0)
+        val newSaved = tagged.filterNot { it.second }.map { it.first }
+        return withSavedPlansFor(network, newSaved)
+            .withActivePlanIndexFor(network, newActiveIndex)
     }
 }

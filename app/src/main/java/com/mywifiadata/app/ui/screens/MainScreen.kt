@@ -106,6 +106,7 @@ import com.mywifiadata.app.monitor.MonitoringTileService
 import com.mywifiadata.app.ui.components.DragNavigationBar
 import com.mywifiadata.app.ui.components.DragNavigationItem
 import com.mywifiadata.app.ui.components.AppsUsageFilterBar
+import com.mywifiadata.app.ui.components.HistoryPlanFilterBar
 import com.mywifiadata.app.ui.components.HistoryUsageFilterBar
 import com.mywifiadata.app.ui.AppViewModel
 import com.mywifiadata.app.ui.theme.AppButtonShape
@@ -417,7 +418,7 @@ fun MainScreen(
             if (currentTab != AppTab.DASHBOARD || !isDashboardEditing) {
                 TopAppBar(
                     title = {
-                        if (currentTab == AppTab.HISTORY && state.appDetail == null) {
+                        if (currentTab == AppTab.HISTORY && state.appDetail == null && state.selectedCompletedPlan == null) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -517,7 +518,7 @@ fun MainScreen(
                                 )
                             }
                         } else if (currentTab == AppTab.HISTORY && state.appDetail == null) {
-                            if (state.historySection == HistorySection.NETWORK) {
+                            if (state.historySection == HistorySection.NETWORK || state.selectedCompletedPlan == null) {
                                 IconButton(onClick = { historyFiltersExpanded = !historyFiltersExpanded }) {
                                     Icon(
                                         imageVector = Icons.Rounded.Menu,
@@ -652,6 +653,18 @@ fun MainScreen(
                                     onYearChange = viewModel::setHistoryYear,
                                 )
                             }
+                            AnimatedVisibility(
+                                visible = historyFiltersExpanded &&
+                                    state.historySection == HistorySection.PLAN &&
+                                    state.selectedCompletedPlan == null,
+                            ) {
+                                HistoryPlanFilterBar(
+                                    network = state.historyPlanNetwork,
+                                    sortOrder = state.historyPlanSortOrder,
+                                    onNetworkChange = viewModel::setHistoryPlanNetwork,
+                                    onSortOrderChange = viewModel::setHistoryPlanSortOrder,
+                                )
+                            }
                             HistoryScreen(
                                 state = state,
                                 isActive = pageTab == currentTab,
@@ -675,6 +688,12 @@ fun MainScreen(
                                 onChartTypeChange = { viewModel.setHistoryLineChartEnabled(it) },
                                 onOpenUsageAccess = { SystemActions.openUsageAccessSettings(context) },
                                 onAppClick = { viewModel.openAppDetail(it, state.historyNetwork) },
+                                onCompletedPlanClick = viewModel::openCompletedPlanDetail,
+                                onCloseCompletedPlan = viewModel::closeCompletedPlanDetail,
+                                onCompletedPlanSearchActiveChange = viewModel::setCompletedPlanSearchActive,
+                                onCompletedPlanSearchQueryChange = viewModel::setCompletedPlanSearchQuery,
+                                onReverseCompletedPlanSortOrder = viewModel::reverseCompletedPlanAppsSortOrder,
+                                onCompletedPlanAppClick = { app, network -> viewModel.openAppDetail(app, network) },
                             )
                         }
                     }
@@ -721,6 +740,9 @@ fun MainScreen(
                     },
                     onReorderAdditionalPlans = { network, fromIdx, toIdx ->
                         viewModel.reorderAdditionalPlans(network, fromIdx, toIdx)
+                    },
+                    onReorderSavedPlans = { network, fromIdx, toIdx ->
+                        viewModel.reorderSavedPlans(network, fromIdx, toIdx)
                     },
                 )
             }

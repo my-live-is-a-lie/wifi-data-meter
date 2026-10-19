@@ -1,8 +1,10 @@
 package com.mywifiadata.app.data
 
+import com.mywifiadata.app.core.HistoryPlanSortOrder
 import com.mywifiadata.app.core.UsageNetwork
 import com.mywifiadata.app.data.model.AdditionalPlanDraft
 import com.mywifiadata.app.data.model.AppSettings
+import com.mywifiadata.app.data.model.CompletedPlanRecord
 import com.mywifiadata.app.data.model.DataPlan
 import com.mywifiadata.app.data.model.PlanCapacityUnit
 import com.mywifiadata.app.data.model.PlanDraft
@@ -301,5 +303,66 @@ class UsageModelsTest {
         val encodedSaved = PlanStorageCodec.encodeSavedPlans(switched.savedPlansFor(UsageNetwork.WIFI))
         val decodedSaved = PlanStorageCodec.decodeSavedPlans(encodedSaved)
         assertEquals(switched.savedPlansFor(UsageNetwork.WIFI), decodedSaved)
+
+        // إعادة ترتيب الباقات في القائمة الموحدة (الباقة المفعلة والباقات المحفوظة)
+        val reordered = switched.reorderSavedPlans(
+            network = UsageNetwork.WIFI,
+            fromIndex = 1,
+            toIndex = 0,
+        )
+        assertEquals(
+            listOf("باقة احتياطية", "باقة أساسية"),
+            reordered.allPlansFor(UsageNetwork.WIFI).map { it.name },
+        )
+
+        // عند انتهاء الباقة بدون باقات إضافية تُسجّل في سجل الباقات المنتهية مع تاريخ البدء والانتهاء
+        val completedSettings = reordered.promoteExpiredPlansIfNeeded(
+            wifiUsedBytes = 50_000_000_000L,
+            mobileUsedBytes = 0L,
+            now = now + 5L * 86_400_000L,
+        )
+        val completedRecord = completedSettings.completedPlansFor(UsageNetwork.WIFI).single()
+        assertEquals("باقة احتياطية", completedRecord.name)
+        assertEquals(now, completedRecord.startMillis)
+        assertEquals(now + 5L * 86_400_000L, completedRecord.endMillis)
+
+        val olderRecord = CompletedPlanRecord(
+            id = "older-1",
+            planId = "old",
+            name = "باقة قديمة",
+            quotaBytes = 20_000_000_000L,
+            startMillis = now - 40L * 86_400_000L,
+            endMillis = now - 10L * 86_400_000L,
+            usedBytes = 20_000_000_000L,
+        )
+        val withTwoCompleted = completedSettings.withCompletedPlansFor(
+            UsageNetwork.WIFI,
+            listOf(olderRecord, completedRecord),
+        )
+        val encodedCompleted = PlanStorageCodec.encodeCompletedPlans(
+            withTwoCompleted.completedPlansFor(UsageNetwork.WIFI),
+        )
+        assertEquals(
+            withTwoCompleted.completedPlansFor(UsageNetwork.WIFI),
+            PlanStorageCodec.decodeCompletedPlans(encodedCompleted),
+        )
+
+        val newestFirstState = UiState(
+            settings = withTwoCompleted,
+            historyPlanNetwork = UsageNetwork.WIFI,
+            historyPlanSortOrder = HistoryPlanSortOrder.NEWEST_FIRST,
+        )
+        assertEquals(
+            listOf("باقة احتياطية", "باقة قديمة"),
+            newestFirstState.visibleCompletedPlans.map { it.name },
+        )
+
+        val oldestFirstState = newestFirstState.copy(
+            historyPlanSortOrder = HistoryPlanSortOrder.OLDEST_FIRST,
+        )
+        assertEquals(
+            listOf("باقة قديمة", "باقة احتياطية"),
+            oldestFirstState.visibleCompletedPlans.map { it.name },
+        )
     }
 }

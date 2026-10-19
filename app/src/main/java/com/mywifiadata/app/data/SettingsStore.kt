@@ -113,6 +113,14 @@ class SettingsStore(context: Context) {
         savedMobilePlans = PlanStorageCodec.decodeSavedPlans(
             prefs.getString(KEY_SAVED_MOBILE_PLANS, null),
         ),
+        wifiActivePlanIndex = prefs.getInt(KEY_WIFI_ACTIVE_PLAN_INDEX, 0).coerceAtLeast(0),
+        mobileActivePlanIndex = prefs.getInt(KEY_MOBILE_ACTIVE_PLAN_INDEX, 0).coerceAtLeast(0),
+        completedWifiPlans = PlanStorageCodec.decodeCompletedPlans(
+            prefs.getString(KEY_COMPLETED_WIFI_PLANS, null),
+        ),
+        completedMobilePlans = PlanStorageCodec.decodeCompletedPlans(
+            prefs.getString(KEY_COMPLETED_MOBILE_PLANS, null),
+        ),
         notificationsEnabled = prefs.getBoolean(KEY_NOTIFICATIONS, true),
         alertThresholdPercent = prefs.getInt(KEY_THRESHOLD, 80),
         sampleIntervalIndex = if (prefs.contains(KEY_INTERVAL_INDEX)) {
@@ -224,6 +232,16 @@ class SettingsStore(context: Context) {
             )
             .putString(KEY_SAVED_WIFI_PLANS, PlanStorageCodec.encodeSavedPlans(settings.savedWifiPlans))
             .putString(KEY_SAVED_MOBILE_PLANS, PlanStorageCodec.encodeSavedPlans(settings.savedMobilePlans))
+            .putInt(KEY_WIFI_ACTIVE_PLAN_INDEX, settings.wifiActivePlanIndex.coerceAtLeast(0))
+            .putInt(KEY_MOBILE_ACTIVE_PLAN_INDEX, settings.mobileActivePlanIndex.coerceAtLeast(0))
+            .putString(
+                KEY_COMPLETED_WIFI_PLANS,
+                PlanStorageCodec.encodeCompletedPlans(settings.completedWifiPlans),
+            )
+            .putString(
+                KEY_COMPLETED_MOBILE_PLANS,
+                PlanStorageCodec.encodeCompletedPlans(settings.completedMobilePlans),
+            )
             .putBoolean(KEY_NOTIFICATIONS, settings.notificationsEnabled)
             .putInt(KEY_THRESHOLD, settings.alertThresholdPercent)
             .putInt(KEY_INTERVAL_INDEX, intervalIndex)
@@ -286,6 +304,10 @@ class SettingsStore(context: Context) {
         private const val KEY_MOBILE_PLAN_ADDITIONAL_PLANS = "mobile_plan_additional_plans"
         private const val KEY_SAVED_WIFI_PLANS = "saved_wifi_plans"
         private const val KEY_SAVED_MOBILE_PLANS = "saved_mobile_plans"
+        private const val KEY_WIFI_ACTIVE_PLAN_INDEX = "wifi_active_plan_index"
+        private const val KEY_MOBILE_ACTIVE_PLAN_INDEX = "mobile_active_plan_index"
+        private const val KEY_COMPLETED_WIFI_PLANS = "completed_wifi_plans"
+        private const val KEY_COMPLETED_MOBILE_PLANS = "completed_mobile_plans"
         private const val KEY_NOTIFICATIONS = "notifications"
         private const val KEY_THRESHOLD = "alert_threshold"
         private const val KEY_INTERVAL_INDEX = "sample_interval_index"

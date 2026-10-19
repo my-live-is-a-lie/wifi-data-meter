@@ -2,6 +2,9 @@ package com.mywifiadata.app.ui.screens
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -21,14 +24,21 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
+import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.DateRange
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.ShowChart
@@ -44,6 +54,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -53,14 +64,19 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.mywifiadata.app.R
 import com.mywifiadata.app.core.AppsSortOrder
@@ -69,7 +85,9 @@ import com.mywifiadata.app.core.HistorySection
 import com.mywifiadata.app.core.UsageNetwork
 import com.mywifiadata.app.core.UsagePeriod
 import com.mywifiadata.app.data.model.AppUsage
+import com.mywifiadata.app.data.model.CompletedPlanRecord
 import com.mywifiadata.app.data.model.DayUsage
+import com.mywifiadata.app.ui.CompletedPlanDetailState
 import com.mywifiadata.app.ui.UiState
 import com.mywifiadata.app.ui.components.AppsFastScroller
 import com.mywifiadata.app.ui.components.AppsSearchControls
@@ -162,6 +180,12 @@ fun HistoryScreen(
     onReverseSortOrder: () -> Unit,
     onResetHistoryDate: () -> Unit = {},
     onChartTypeChange: (Boolean) -> Unit = {},
+    onCompletedPlanClick: (CompletedPlanRecord) -> Unit = {},
+    onCloseCompletedPlan: () -> Unit = {},
+    onCompletedPlanSearchActiveChange: (Boolean) -> Unit = {},
+    onCompletedPlanSearchQueryChange: (String) -> Unit = {},
+    onReverseCompletedPlanSortOrder: () -> Unit = {},
+    onCompletedPlanAppClick: (AppUsage, UsageNetwork) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(16.dp),
     listState: LazyListState = rememberLazyListState(),
@@ -169,8 +193,29 @@ fun HistoryScreen(
     isActive: Boolean = true,
 ) {
     if (state.historySection == HistorySection.PLAN) {
-        // صفحة الباقة فارغة حاليًا ريثما يُضاف محتواها مستقبلًا.
-        Box(modifier = modifier.fillMaxSize())
+        val selectedPlanDetail = state.selectedCompletedPlan
+        if (selectedPlanDetail != null) {
+            CompletedPlanAppsScreen(
+                detail = selectedPlanDetail,
+                hasUsageAccess = state.hasUsageAccess,
+                onBack = onCloseCompletedPlan,
+                onOpenUsageAccess = onOpenUsageAccess,
+                onAppClick = { app -> onCompletedPlanAppClick(app, selectedPlanDetail.network) },
+                onSearchActiveChange = onCompletedPlanSearchActiveChange,
+                onSearchQueryChange = onCompletedPlanSearchQueryChange,
+                onReverseSortOrder = onReverseCompletedPlanSortOrder,
+                modifier = modifier,
+                contentPadding = contentPadding,
+                isActive = isActive,
+            )
+        } else {
+            CompletedPlansHistoryList(
+                records = state.visibleCompletedPlans,
+                onPlanClick = onCompletedPlanClick,
+                modifier = modifier,
+                contentPadding = contentPadding,
+            )
+        }
         return
     }
 
@@ -640,3 +685,528 @@ private fun SelectedDayCard(day: DayUsage, onClose: () -> Unit) {
 
 /** سرعة الإفلات (بكسل/ثانية) التي تكفي وحدها لإغلاق بطاقة اليوم المحدد. */
 private const val FLING_VELOCITY = 900f
+
+@Composable
+private fun CompletedPlansHistoryList(
+    records: List<CompletedPlanRecord>,
+    onPlanClick: (CompletedPlanRecord) -> Unit,
+    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(16.dp),
+) {
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = contentPadding,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        if (records.isEmpty()) {
+            item(key = "completed_plans_empty") {
+                ExpressiveCard {
+                    EmptyState(
+                        icon = Icons.Rounded.ShowChart,
+                        title = stringResource(R.string.history_plan_empty_title),
+                        message = stringResource(R.string.history_plan_empty_body),
+                    )
+                }
+            }
+        } else {
+            items(items = records, key = { it.id }) { record ->
+                CompletedPlanCard(
+                    record = record,
+                    onClick = { onPlanClick(record) },
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun CompletedPlanCard(
+    record: CompletedPlanRecord,
+    onClick: () -> Unit,
+) {
+    val logoBitmap = remember(record.logoPath) { loadPlanLogoBitmap(record.logoPath) }
+    val capacityText = Format.bytes(record.quotaBytes)
+    val durationText = "${record.durationValue} ${stringResource(record.durationUnit.labelResource())}"
+    val usedText = Format.bytes(record.usedBytes)
+    val hasPlanName = record.name.isNotBlank()
+    val progress = if (record.quotaBytes > 0L) {
+        (record.usedBytes.toFloat() / record.quotaBytes.toFloat()).coerceIn(0f, 1f)
+    } else {
+        0f
+    }
+
+    ExpressiveCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(role = Role.Button, onClick = onClick),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    if (logoBitmap != null) {
+                        Image(
+                            bitmap = logoBitmap,
+                            contentDescription = stringResource(R.string.plan_logo_label),
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(30.dp)
+                                .clip(RoundedCornerShape(6.dp)),
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        if (hasPlanName) {
+                            Text(
+                                text = record.name,
+                                style = MaterialTheme.typography.titleMediumEmphasized,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                        }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            val infoStyle = if (hasPlanName) {
+                                MaterialTheme.typography.bodySmall
+                            } else {
+                                MaterialTheme.typography.titleMediumEmphasized
+                            }
+                            val infoColor = if (hasPlanName) {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            }
+                            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                                Text(
+                                    text = capacityText,
+                                    style = infoStyle,
+                                    color = infoColor,
+                                    maxLines = 1,
+                                )
+                            }
+                            Text(
+                                text = "•",
+                                style = infoStyle,
+                                color = infoColor,
+                                maxLines = 1,
+                            )
+                            Text(
+                                text = durationText,
+                                style = infoStyle,
+                                color = infoColor,
+                                maxLines = 1,
+                            )
+                        }
+                    }
+                }
+
+                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                    Text(
+                        text = "$usedText / $capacityText",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                    )
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(progress)
+                        .height(6.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary),
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.DateRange,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Text(
+                        text = "${stringResource(R.string.history_plan_start_date)}: ${Format.shortDate(record.startMillis)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.CalendarMonth,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Text(
+                        text = "${stringResource(R.string.history_plan_end_date)}: ${Format.shortDate(record.endMillis)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class)
+@Composable
+private fun CompletedPlanAppsScreen(
+    detail: CompletedPlanDetailState,
+    hasUsageAccess: Boolean,
+    onBack: () -> Unit,
+    onOpenUsageAccess: () -> Unit,
+    onAppClick: (AppUsage) -> Unit,
+    onSearchActiveChange: (Boolean) -> Unit,
+    onSearchQueryChange: (String) -> Unit,
+    onReverseSortOrder: () -> Unit,
+    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(16.dp),
+    isActive: Boolean = true,
+) {
+    val record = detail.record
+    val searching = detail.searchActive && hasUsageAccess
+    val apps = detail.visibleApps
+    val listState = rememberLazyListState()
+    val searchListState = rememberLazyListState()
+    val logoBitmap = remember(record.logoPath) { loadPlanLogoBitmap(record.logoPath) }
+    val capacityText = Format.bytes(record.quotaBytes)
+    val durationText = "${record.durationValue} ${stringResource(record.durationUnit.labelResource())}"
+    val hasPlanName = record.name.isNotBlank()
+    val effectiveTotalBytes = maxOf(detail.totals.totalBytes, record.usedBytes)
+
+    BackHandler(enabled = isActive) {
+        if (searching) {
+            onSearchActiveChange(false)
+        } else {
+            onBack()
+        }
+    }
+
+    Box(modifier = modifier.fillMaxWidth().imePadding()) {
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth(),
+            state = if (searching) searchListState else listState,
+            contentPadding = contentPadding,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            if (!hasUsageAccess) {
+                item(key = "completed_plan_permission") {
+                    PermissionCard(
+                        icon = Icons.Rounded.Info,
+                        title = stringResource(R.string.permission_needed_title),
+                        message = stringResource(R.string.permission_needed_body),
+                        grantLabel = stringResource(R.string.action_open_usage_access),
+                        settingsLabel = stringResource(R.string.settings_usage_access),
+                        onGrant = onOpenUsageAccess,
+                        onOpenSettings = onOpenUsageAccess,
+                    )
+                }
+            } else {
+                if (!searching) {
+                    item(key = "completed_plan_summary") {
+                        ExpressiveCard {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                ) {
+                                    Row(
+                                        modifier = Modifier.weight(1f),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        IconButton(onClick = onBack) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.ArrowBack,
+                                                contentDescription = stringResource(R.string.cd_back),
+                                            )
+                                        }
+                                        if (logoBitmap != null) {
+                                            Image(
+                                                bitmap = logoBitmap,
+                                                contentDescription = stringResource(R.string.plan_logo_label),
+                                                contentScale = ContentScale.Crop,
+                                                modifier = Modifier
+                                                    .size(30.dp)
+                                                    .clip(RoundedCornerShape(6.dp)),
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                        }
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            if (hasPlanName) {
+                                                Text(
+                                                    text = record.name,
+                                                    style = MaterialTheme.typography.titleMediumEmphasized,
+                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                )
+                                                Spacer(modifier = Modifier.height(2.dp))
+                                            }
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            ) {
+                                                val infoStyle = if (hasPlanName) {
+                                                    MaterialTheme.typography.bodySmall
+                                                } else {
+                                                    MaterialTheme.typography.titleMediumEmphasized
+                                                }
+                                                val infoColor = if (hasPlanName) {
+                                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                                } else {
+                                                    MaterialTheme.colorScheme.onSurface
+                                                }
+                                                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                                                    Text(
+                                                        text = capacityText,
+                                                        style = infoStyle,
+                                                        color = infoColor,
+                                                        maxLines = 1,
+                                                    )
+                                                }
+                                                Text(
+                                                    text = "•",
+                                                    style = infoStyle,
+                                                    color = infoColor,
+                                                    maxLines = 1,
+                                                )
+                                                Text(
+                                                    text = durationText,
+                                                    style = infoStyle,
+                                                    color = infoColor,
+                                                    maxLines = 1,
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    Text(
+                                        text = stringResource(
+                                            if (detail.network == UsageNetwork.WIFI) R.string.apps_network_wifi
+                                            else R.string.apps_network_mobile,
+                                        ),
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        text = "${stringResource(R.string.history_plan_start_date)}: ${Format.shortDate(record.startMillis)}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    Text(
+                                        text = "${stringResource(R.string.history_plan_end_date)}: ${Format.shortDate(record.endMillis)}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                ) {
+                                    Column(
+                                        modifier = Modifier.weight(1f),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.ArrowDownward,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(16.dp),
+                                            )
+                                            Text(
+                                                text = stringResource(R.string.label_download),
+                                                style = MaterialTheme.typography.labelMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                        Text(
+                                            text = Format.bytes(detail.totals.rxBytes),
+                                            style = MaterialTheme.typography.bodyMediumEmphasized,
+                                            color = LocalDownloadColor.current,
+                                        )
+                                    }
+                                    Column(
+                                        modifier = Modifier.weight(1f),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.ArrowUpward,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(16.dp),
+                                            )
+                                            Text(
+                                                text = stringResource(R.string.label_upload),
+                                                style = MaterialTheme.typography.labelMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                        Text(
+                                            text = Format.bytes(detail.totals.txBytes),
+                                            style = MaterialTheme.typography.bodyMediumEmphasized,
+                                            color = LocalUploadColor.current,
+                                        )
+                                    }
+                                    Column(
+                                        modifier = Modifier.weight(1f),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.ShowChart,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(16.dp),
+                                            )
+                                            Text(
+                                                text = stringResource(R.string.label_total),
+                                                style = MaterialTheme.typography.labelMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                        Text(
+                                            text = Format.bytes(effectiveTotalBytes),
+                                            style = MaterialTheme.typography.bodyMediumEmphasized,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                item(key = "completed_plan_apps_title") {
+                    SectionHeader(
+                        title = stringResource(
+                            when {
+                                searching -> R.string.history_plan_apps_title
+                                detail.sortOrder == AppsSortOrder.LOWEST_USAGE -> R.string.history_least_apps
+                                else -> R.string.history_top_apps
+                            },
+                        ),
+                        supportingText = "${Format.shortDate(record.startMillis)} – ${Format.shortDate(record.endMillis)}",
+                    )
+                }
+
+                stickyHeader(key = "completed_plan_apps_search") {
+                    AppsSearchControls(
+                        isActive = isActive,
+                        expanded = searching,
+                        query = detail.searchQuery,
+                        sortOrder = detail.sortOrder,
+                        onExpandedChange = { active ->
+                            if (active) searchListState.requestScrollToItem(0)
+                            onSearchActiveChange(active)
+                        },
+                        onQueryChange = { query ->
+                            searchListState.requestScrollToItem(0)
+                            onSearchQueryChange(query)
+                        },
+                        onReverseSortOrder = {
+                            if (searching) searchListState.requestScrollToItem(0)
+                            onReverseSortOrder()
+                        },
+                    )
+                }
+
+                when {
+                    detail.isLoading -> item(key = "completed_plan_apps_loading") {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 32.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            LoadingIndicator(modifier = Modifier.size(48.dp))
+                        }
+                    }
+                    apps.isEmpty() -> item(key = "completed_plan_apps_empty") {
+                        EmptyState(
+                            icon = Icons.Rounded.Info,
+                            title = stringResource(
+                                if (searching && detail.searchQuery.isNotBlank()) R.string.apps_search_empty_title
+                                else R.string.apps_empty_title,
+                            ),
+                            message = stringResource(
+                                if (searching && detail.searchQuery.isNotBlank()) R.string.history_plan_apps_search_empty
+                                else R.string.history_plan_apps_empty,
+                            ),
+                        )
+                    }
+                    else -> itemsIndexed(items = apps, key = { _, app -> app.uid }) { index, app ->
+                        val denom = effectiveTotalBytes.coerceAtLeast(1L)
+                        AppUsageRow(
+                            app = app,
+                            share = app.totals.totalBytes.toFloat() / denom.toFloat(),
+                            rank = index + 1,
+                            onClick = { onAppClick(app) },
+                        )
+                    }
+                }
+            }
+        }
+        if (hasUsageAccess && !searching && !detail.isLoading && apps.isNotEmpty()) {
+            key(record.id, detail.network, detail.sortOrder, apps.map { it.uid }) {
+                AppsFastScroller(listState, apps.size, headerKey = "completed_plan_apps_search")
+            }
+        }
+    }
+}

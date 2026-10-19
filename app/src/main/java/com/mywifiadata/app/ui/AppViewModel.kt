@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.mywifiadata.app.core.AppsSortOrder
 import com.mywifiadata.app.core.AppsUsageScope
+import com.mywifiadata.app.core.HistoryPlanSortOrder
 import com.mywifiadata.app.core.HistorySection
 import com.mywifiadata.app.core.HistoryYearMonth
 import com.mywifiadata.app.core.UsageNetwork
@@ -35,6 +36,7 @@ import com.mywifiadata.app.data.model.AppLayoutDirection
 import com.mywifiadata.app.data.model.AppSettings
 import com.mywifiadata.app.data.model.AppUsage
 import com.mywifiadata.app.data.model.AppsFilter
+import com.mywifiadata.app.data.model.CompletedPlanRecord
 import com.mywifiadata.app.data.model.DayUsage
 import com.mywifiadata.app.data.model.DashboardLayout
 import com.mywifiadata.app.data.model.DataPlan
@@ -126,6 +128,9 @@ data class UiState(
     val historyPeriod: UsagePeriod = UsagePeriod.MONTH,
     val historySection: HistorySection = HistorySection.NETWORK,
     val historyNetwork: UsageNetwork = UsageNetwork.WIFI,
+    val historyPlanNetwork: UsageNetwork = UsageNetwork.WIFI,
+    val historyPlanSortOrder: HistoryPlanSortOrder = HistoryPlanSortOrder.NEWEST_FIRST,
+    val selectedCompletedPlan: CompletedPlanDetailState? = null,
     val historyYear: Int = TimeRanges.currentYearMonth(now).year,
     val historyMonth: Int = TimeRanges.currentYearMonth(now).month,
     val historyRecordedMonths: List<HistoryYearMonth> = emptyList(),
@@ -269,6 +274,32 @@ data class UiState(
 
     val availableHistoryMonths: List<Int>
         get() = availableHistoryMonths(historyRecordedMonths, historyYear)
+
+    val visibleCompletedPlans: List<CompletedPlanRecord>
+        get() {
+            val list = settings.completedPlansFor(historyPlanNetwork)
+            return when (historyPlanSortOrder) {
+                HistoryPlanSortOrder.NEWEST_FIRST -> list.sortedByDescending { it.endMillis }
+                HistoryPlanSortOrder.OLDEST_FIRST -> list.sortedBy { it.endMillis }
+            }
+        }
+}
+
+/**
+ * حالة صفحة إحصائيات استهلاك التطبيقات لباقة منتهية محددة.
+ */
+data class CompletedPlanDetailState(
+    val record: CompletedPlanRecord,
+    val network: UsageNetwork = UsageNetwork.WIFI,
+    val isLoading: Boolean = true,
+    val totals: TrafficTotals = TrafficTotals.Empty,
+    val apps: List<AppUsage> = emptyList(),
+    val searchActive: Boolean = false,
+    val searchQuery: String = "",
+    val sortOrder: AppsSortOrder = AppsSortOrder.HIGHEST_USAGE,
+) {
+    val visibleApps: List<AppUsage>
+        get() = historyApps(apps, searchActive, searchQuery, sortOrder)
 }
 
 /**
@@ -644,8 +675,105 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         _uiState.update {
             it.copy(
                 historySection = section,
+                selectedCompletedPlan = if (section == HistorySection.PLAN) it.selectedCompletedPlan else null,
                 historySearchActive = if (section == HistorySection.NETWORK) it.historySearchActive else false,
                 historySearchQuery = if (section == HistorySection.NETWORK) it.historySearchQuery else "",
+            )
+        }
+    }
+
+    fun setHistoryPlanNetwork(network: UsageNetwork) {
+        if (network == _uiState.value.historyPlanNetwork) return
+        _uiState.update {
+            it.copy(
+                historyPlanNetwork = network,
+                selectedCompletedPlan = null,
+            )
+        }
+    }
+
+    fun setHistoryPlanSortOrder(sortOrder: HistoryPlanSortOrder) {
+        if (sortOrder == _uiState.value.historyPlanSortOrder) return
+        _uiState.update {
+            it.copy(historyPlanSortOrder = sortOrder)
+        }
+    }
+
+    fun openCompletedPlanDetail(record: CompletedPlanRecord) {
+        val network = _uiState.value.historyPlanNetwork
+        _uiState.update {
+            it.copy(
+                selectedCompletedPlan = CompletedPlanDetailState(
+                    record = record,
+                    network = network,
+                    isLoading = true,
+                ),
+            )
+        }
+        viewModelScope.launch {
+            val range = TimeRange(
+                startMillis = record.startMillis,
+                endMillis = record.endMillis.coerceAtLeast(record.startMillis),
+            )
+            val totals = if (range.endMillis > range.startMillis) {
+                repository.deviceTotals(range, network)
+            } else {
+                TrafficTotals.Empty
+            }
+            val apps = if (range.endMillis > range.startMillis) {
+                repository.perAppUsage(range, network)
+            } else {
+                emptyList()
+            }
+            _uiState.update { state ->
+                val current = state.selectedCompletedPlan
+                if (current == null || current.record.id != record.id || current.network != network) {
+                    state
+                } else {
+                    state.copy(
+                        selectedCompletedPlan = current.copy(
+                            isLoading = false,
+                            totals = totals,
+                            apps = apps,
+                        ),
+                    )
+                }
+            }
+        }
+    }
+
+    fun closeCompletedPlanDetail() {
+        _uiState.update { it.copy(selectedCompletedPlan = null) }
+    }
+
+    fun setCompletedPlanSearchActive(active: Boolean) {
+        _uiState.update { state ->
+            val current = state.selectedCompletedPlan ?: return@update state
+            state.copy(
+                selectedCompletedPlan = current.copy(
+                    searchActive = active,
+                    searchQuery = if (active) current.searchQuery else "",
+                ),
+            )
+        }
+    }
+
+    fun setCompletedPlanSearchQuery(query: String) {
+        _uiState.update { state ->
+            val current = state.selectedCompletedPlan ?: return@update state
+            state.copy(
+                selectedCompletedPlan = current.copy(searchQuery = query),
+            )
+        }
+    }
+
+    fun reverseCompletedPlanAppsSortOrder() {
+        _uiState.update { state ->
+            val current = state.selectedCompletedPlan ?: return@update state
+            state.copy(
+                selectedCompletedPlan = current.copy(
+                    sortOrder = current.sortOrder.reversed(),
+                ),
             )
         }
     }
@@ -1044,6 +1172,12 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
     fun reorderAdditionalPlans(network: UsageNetwork, fromIndex: Int, toIndex: Int) {
         repository.settingsStore.update { settings ->
             settings.reorderAdditionalPlans(network, fromIndex, toIndex)
+        }
+    }
+
+    fun reorderSavedPlans(network: UsageNetwork, fromIndex: Int, toIndex: Int) {
+        repository.settingsStore.update { settings ->
+            settings.reorderSavedPlans(network, fromIndex, toIndex)
         }
     }
 

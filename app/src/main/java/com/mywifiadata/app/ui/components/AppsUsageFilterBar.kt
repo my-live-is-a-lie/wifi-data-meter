@@ -35,6 +35,7 @@ import com.mywifiadata.app.R
 import com.mywifiadata.app.core.AppsSortOrder
 import com.mywifiadata.app.core.AppsUsageScope
 import com.mywifiadata.app.core.Format
+import com.mywifiadata.app.core.HistoryPlanSortOrder
 import com.mywifiadata.app.core.UsageNetwork
 import com.mywifiadata.app.core.appsCountOptions
 
@@ -143,6 +144,51 @@ fun HistoryUsageFilterBar(
                     year to year.toString()
                 },
                 onSelect = onYearChange,
+            )
+        }
+    }
+}
+
+/** شريط فلاتر قسم «الباقة» في شاشة السجل: نوع الشبكة (واي فاي / بيانات الهاتف) والترتيب (الأحدث / الأقدم). */
+@Composable
+fun HistoryPlanFilterBar(
+    network: UsageNetwork,
+    sortOrder: HistoryPlanSortOrder,
+    onNetworkChange: (UsageNetwork) -> Unit,
+    onSortOrderChange: (HistoryPlanSortOrder) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(modifier = modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+        ) {
+            FilterMenu(
+                title = stringResource(R.string.apps_network_filter),
+                selected = network,
+                options = UsageNetwork.entries.map {
+                    it to stringResource(
+                        if (it == UsageNetwork.WIFI) R.string.apps_network_wifi else R.string.apps_network_mobile,
+                    )
+                },
+                onSelect = onNetworkChange,
+            )
+            FilterMenu(
+                title = stringResource(R.string.apps_sort_filter),
+                selected = sortOrder,
+                options = HistoryPlanSortOrder.entries.map {
+                    it to stringResource(
+                        if (it == HistoryPlanSortOrder.NEWEST_FIRST) {
+                            R.string.history_plan_sort_newest
+                        } else {
+                            R.string.history_plan_sort_oldest
+                        },
+                    )
+                },
+                onSelect = onSortOrderChange,
             )
         }
     }
