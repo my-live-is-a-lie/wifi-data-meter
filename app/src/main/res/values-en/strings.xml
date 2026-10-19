@@ -70,6 +70,14 @@
     <string name="speed_test_age_days">%1$s d</string>
     <string name="speed_test_age_months">%1$s mo</string>
     <string name="speed_test_age_years">%1$s y</string>
+    <string name="speed_test_mobile_warning_title">Mobile data warning</string>
+    <string name="speed_test_mobile_warning_message">You are on mobile data. A speed test downloads and uploads real data to measure speed, so it can use a large part of your data plan.</string>
+    <string name="speed_test_mobile_warning_estimate_label">Estimated data use for this test</string>
+    <string name="speed_test_mobile_warning_estimate_from_history">This estimate adapts automatically from your previous test results.</string>
+    <string name="speed_test_mobile_warning_estimate_default">A starting estimate that will adjust automatically after your first test.</string>
+    <string name="speed_test_mobile_warning_continue">Continue test</string>
+    <string name="speed_test_mobile_warning_cancel">Cancel</string>
+    <string name="speed_test_mobile_warning_ignore">Ignore for a day</string>
     <string name="label_period">Period</string>
     <string name="label_average">Daily average</string>
     <string name="label_peak">Busiest day</string>

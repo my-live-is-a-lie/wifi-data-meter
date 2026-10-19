@@ -36,6 +36,13 @@
 - **تُحفظ آخر عشر نتائج محليًا** (تنزيل/رفع/الوقت/المصدر) لتبقى متاحة بعد إغلاق
   التطبيق وإعادة تشغيله؛ تظهر الأحدث في الملخص والتسع الأسبق في السجل القابل للتوسيع.
 - أثناء القياس تظهر المرحلة الجارية والسرعة اللحظية، وزر التشغيل يتحول إلى إيقاف.
+- **تحذير بيانات الهاتف:** إن كانت الشبكة النشطة بيانات الهاتف يظهر قبل البدء تحذير
+  بكمية الاستهلاك التقديرية. يُحسب التقدير من الاستهلاك الفعلي لأحدث خمسة اختبارات
+  (مع وزن أعلى للأحدث)، ويُقدَّر استهلاك السجلات القديمة من سرعتيها. الخيارات:
+  «متابعة الاختبار»، «إلغاء»، و«تجاهل لمدة يوم» يخفي التحذير 24 ساعة كاملة ثم
+  يعود تلقائيًا في الاختبار التالي.
+- يُحفظ استهلاك كل اختبار فعليًا (معايرة + تنزيل + رفع) ضمن سجل النتائج، فالتقدير
+  يتغيّر مع كل اختبار جديد بدل أن يبقى رقمًا ثابتًا.
 
 **رسائل الانقطاع والمهلة وإغلاق التحميل:**
 
@@ -185,6 +192,7 @@ app/src/main/java/com/mywifiadata/app/
 ├── MainActivity.kt               # نقطة الدخول (Compose + edge-to-edge + RTL)
 ├── core/                         # Format (وحدات/تواريخ) و TimeRanges و SystemActions
 │                                 # و SpeedTest + SpeedTestWatchdog (قياس fast.com والمهلات)
+│                                 # و SpeedTestDataUsage (تقدير استهلاك البيانات والتحذير)
 ├── data/                         # SettingsStore، NetworkStatsReader، WifiNetworkReader، UsageRepository
 ├── data/model/                   # نماذج البيانات (TrafficTotals، WifiStatus، AppUsage …)
 ├── monitor/                      # MonitorService (خدمة أمامية) و Notifier
@@ -229,7 +237,9 @@ built with **Kotlin + Jetpack Compose + Material 3 Expressive**.
 - A reference-matching “Today” card (blue download / purple upload tiles, total row, fast.com speed-test panel) with
   a collapsible history of the nine preceding tests; the latest ten results are saved on-device. The speed test
   also aborts its transfer with a clear message when the connection drops or no data arrives for too long (12 s
-  stall window, 45 s overall cap).
+  stall window, 45 s overall cap). Before a test over mobile data, a warning shows an adaptive estimate of the
+  data it will use — computed from the last five tests’ measured consumption — with continue, cancel, and
+  “ignore for a day” options that suppress the warning for 24 hours before it returns.
 
 Build with `./gradlew assembleDebug` (AGP 9.3.1 · Kotlin 2.4.10 · Gradle 9.5.0 · Compose BOM 2026.09.00 ·
 Material 3 1.5.0‑alpha29 · compileSdk 37 · minSdk 26). Grant **Usage Access** on first run to enable per‑app stats.

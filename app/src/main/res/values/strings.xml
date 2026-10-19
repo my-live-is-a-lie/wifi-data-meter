@@ -82,6 +82,14 @@
     <string name="speed_test_age_days">%1$sي</string>
     <string name="speed_test_age_months">%1$sش</string>
     <string name="speed_test_age_years">%1$sسنة</string>
+    <string name="speed_test_mobile_warning_title">تحذير: استهلاك بيانات الهاتف</string>
+    <string name="speed_test_mobile_warning_message">أنت متصل ببيانات الهاتف. اختبار السرعة يحمّل ويرفع بيانات حقيقية لقياس السرعة، لذا قد يستهلك كمية كبيرة من رصيد باقتك.</string>
+    <string name="speed_test_mobile_warning_estimate_label">الاستهلاك التقديري لهذا الاختبار</string>
+    <string name="speed_test_mobile_warning_estimate_from_history">يتكيّف هذا التقدير تلقائيًا حسب نتائج اختباراتك السابقة.</string>
+    <string name="speed_test_mobile_warning_estimate_default">تقدير أولي سيُضبط تلقائيًا بعد إجرائك أول اختبار.</string>
+    <string name="speed_test_mobile_warning_continue">متابعة الاختبار</string>
+    <string name="speed_test_mobile_warning_cancel">إلغاء</string>
+    <string name="speed_test_mobile_warning_ignore">تجاهل لمدة يوم</string>
 
     <!-- البطاقة الرئيسية (الحلقة) -->
     <string name="quota_ring_title">استهلاك دورة الفاتورة</string>

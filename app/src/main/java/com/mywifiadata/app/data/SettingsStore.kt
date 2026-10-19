@@ -3,6 +3,7 @@ package com.mywifiadata.app.data
 import android.content.Context
 import com.mywifiadata.app.core.AppLanguage
 import com.mywifiadata.app.core.SamplingIntervals
+import com.mywifiadata.app.core.SpeedTestDataUsage
 import com.mywifiadata.app.data.model.AccentColor
 import com.mywifiadata.app.data.model.AppLayoutDirection
 import com.mywifiadata.app.data.model.AppSettings
@@ -63,6 +64,16 @@ class SettingsStore(context: Context) {
         settings.copy(
             lastSpeedTest = record,
             speedTestHistory = SpeedTestHistory.prepend(settings.speedTestHistory, record),
+        )
+    }
+
+    /**
+     * يتجاهل تحذير استهلاك بيانات الهاتف في اختبار السرعة ليوم كامل يبدأ من
+     * [nowMillis]؛ بعد انقضاء المدة يعود التحذير تلقائيًا.
+     */
+    fun snoozeSpeedTestWarning(nowMillis: Long = System.currentTimeMillis()) = update { settings ->
+        settings.copy(
+            speedTestWarningSnoozedUntilMillis = SpeedTestDataUsage.snoozeUntil(nowMillis),
         )
     }
 
@@ -161,6 +172,7 @@ class SettingsStore(context: Context) {
         alertLevelReached = prefs.getInt(KEY_ALERT_LEVEL, 0),
         speedTestHistory = readSpeedTestHistory(),
         lastSpeedTest = readSpeedTest(),
+        speedTestWarningSnoozedUntilMillis = prefs.getLong(KEY_SPEED_WARNING_SNOOZED_UNTIL, 0L),
     )
 
     /** قراءة آخر نتيجة اختبار سرعة محفوظة، أو null إن لم يُجرَ اختبار بعد. */
@@ -173,6 +185,7 @@ class SettingsStore(context: Context) {
             timestampMillis = timestamp,
             usedFastCom = prefs.getBoolean(KEY_SPEED_FAST, true),
             uploadMeasured = prefs.getBoolean(KEY_SPEED_UPLOAD_OK, true),
+            dataBytes = prefs.getLong(KEY_SPEED_DATA_BYTES, 0L).coerceAtLeast(0L),
         )
     }
 
@@ -271,6 +284,11 @@ class SettingsStore(context: Context) {
             .putLong(KEY_SPEED_TIME, settings.lastSpeedTest?.timestampMillis ?: 0L)
             .putBoolean(KEY_SPEED_FAST, settings.lastSpeedTest?.usedFastCom ?: true)
             .putBoolean(KEY_SPEED_UPLOAD_OK, settings.lastSpeedTest?.uploadMeasured ?: true)
+            .putLong(KEY_SPEED_DATA_BYTES, settings.lastSpeedTest?.dataBytes ?: 0L)
+            .putLong(
+                KEY_SPEED_WARNING_SNOOZED_UNTIL,
+                settings.speedTestWarningSnoozedUntilMillis,
+            )
             .putString(KEY_SPEED_HISTORY, SpeedTestHistory.encode(settings.speedTestHistory))
             .apply()
     }
@@ -336,6 +354,8 @@ class SettingsStore(context: Context) {
         private const val KEY_SPEED_TIME = "speed_test_time"
         private const val KEY_SPEED_FAST = "speed_test_source_fast"
         private const val KEY_SPEED_UPLOAD_OK = "speed_test_upload_ok"
+        private const val KEY_SPEED_DATA_BYTES = "speed_test_data_bytes"
+        private const val KEY_SPEED_WARNING_SNOOZED_UNTIL = "speed_test_warning_snoozed_until"
         private const val KEY_SPEED_HISTORY = "speed_test_history"
     }
 }

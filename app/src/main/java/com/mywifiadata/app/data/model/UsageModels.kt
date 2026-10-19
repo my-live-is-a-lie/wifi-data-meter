@@ -123,6 +123,13 @@ data class SpeedTestRecord(
     val usedFastCom: Boolean,
     /** false إن تعذّر قياس الرفع في ذلك الاختبار. */
     val uploadMeasured: Boolean = true,
+    /**
+     * كمية البيانات التي استهلكها الاختبار فعليًا (تنزيل + رفع + تجهيز).
+     *
+     * صفر يعني أن الاختبار سُجّل قبل إضافة هذا القياس؛ فيُقدَّر استهلاكه من
+     * سرعتيه عند حساب تقدير الاستهلاك للاختبار القادم.
+     */
+    val dataBytes: Long = 0L,
 )
 
 /**
@@ -358,6 +365,11 @@ data class AppSettings(
     val speedTestHistory: List<SpeedTestRecord> = emptyList(),
     /** آخر نتيجة اختبار سرعة محفوظة؛ تبقى منفصلة لتوافق التخزين القديم وملخص البطاقة. */
     val lastSpeedTest: SpeedTestRecord? = null,
+    /**
+     * نهاية فترة تجاهل تحذير استهلاك البيانات في اختبار السرعة على بيانات
+     * الهاتف. صفر أو قيمة ماضية تعني أن التحذير يظهر من جديد.
+     */
+    val speedTestWarningSnoozedUntilMillis: Long = 0L,
 ) {
     val planTotalDays: Int
         get() = (planDurationValue.coerceAtLeast(1) * planDurationUnit.daysPerUnit).coerceAtLeast(1)
