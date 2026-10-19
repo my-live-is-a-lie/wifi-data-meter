@@ -228,7 +228,7 @@ class ClockHandGeometryTest {
         val centerBlock = HandObstacle(left = -60f, top = -40f, right = 60f, bottom = 40f)
 
         val segment = ClockHandGeometry.visibleSegment(
-            angleDeg = 90f,
+            angleDeg = 180f,
             endRadius = 45f,
             obstacles = listOf(centerBlock),
             minLength = 1f,
@@ -247,7 +247,7 @@ class ClockHandGeometryTest {
         val centerBlock = HandObstacle(left = -60f, top = -40f, right = 60f, bottom = 40f)
 
         val segment = ClockHandGeometry.visibleSegment(
-            angleDeg = 90f,
+            angleDeg = 180f,
             endRadius = 45f,
             obstacles = listOf(centerBlock),
             minLength = 1f,
@@ -282,7 +282,7 @@ class ClockHandGeometryTest {
         val centerBlock = HandObstacle(left = -60f, top = -40f, right = 60f, bottom = 40f)
 
         val segment = ClockHandGeometry.visibleSegment(
-            angleDeg = 90f,
+            angleDeg = 180f,
             endRadius = 35f,
             obstacles = listOf(centerBlock),
             minLength = 1f,
