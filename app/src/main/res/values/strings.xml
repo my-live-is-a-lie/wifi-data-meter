@@ -121,6 +121,7 @@
     <string name="plan_unit_gb">جيجابايت</string>
     <string name="plan_unit_tb">تيرابايت</string>
     <string name="plan_duration_day">يوم</string>
+    <string name="clock_usage_days_unit">يوم</string>
     <string name="plan_duration_week">أسبوع</string>
     <string name="plan_duration_month">شهر</string>
     <string name="plan_duration_year">سنة</string>

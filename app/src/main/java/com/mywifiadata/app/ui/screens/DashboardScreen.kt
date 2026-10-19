@@ -137,6 +137,7 @@ import com.mywifiadata.app.ui.components.AppName
 import com.mywifiadata.app.ui.components.AppIcon
 import com.mywifiadata.app.ui.components.Dot
 import com.mywifiadata.app.ui.components.DottedUsageGauge
+import com.mywifiadata.app.ui.components.ClockUsageGauge
 import com.mywifiadata.app.ui.components.EmptyState
 import com.mywifiadata.app.ui.components.ExpressiveCard
 import com.mywifiadata.app.ui.components.InfoRow
@@ -1059,6 +1060,9 @@ private enum class UsageCardStyle {
     RING,
     DOTTED_RING,
     SPLIT,
+
+    /** ساعة حقيقية داخل ميناء منقّط، حولها قوس نسبة الاستهلاك. */
+    CLOCK,
 }
 
 @Composable
@@ -1242,6 +1246,19 @@ private fun FullUsageCard(
                             )
                         }
                     }
+                }
+
+                UsageCardStyle.CLOCK.ordinal -> {
+                    ClockUsageGauge(
+                        progress = progress,
+                        daysLeft = if (hasQuota) state.daysLeft else null,
+                        timeMillis = state.now,
+                        headline = usageValue,
+                        label = usageLabel,
+                        value = if (hasQuota) usedValue else "",
+                        exceeded = state.quotaExceeded,
+                        contentDescription = stringResource(R.string.quota_ring_title),
+                    )
                 }
 
                 else -> {
