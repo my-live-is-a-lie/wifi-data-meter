@@ -6,6 +6,7 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Matrix
@@ -27,6 +28,7 @@ import com.mywifiadata.app.core.ClockText
 import com.mywifiadata.app.core.Format
 import com.mywifiadata.app.core.HandObstacle
 import com.mywifiadata.app.core.UsageCardStyles
+import com.mywifiadata.app.core.WidgetFaceMetrics
 import java.util.Calendar
 import java.util.Locale
 import kotlin.math.abs
@@ -170,11 +172,27 @@ class UsageWidgetProvider : AppWidgetProvider() {
 
             appWidgetIds.forEach { widgetId ->
                 val options = appWidgetManager.getAppWidgetOptions(widgetId)
-                val widgetWidthDp = options
-                    .getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 220)
-                    .takeIf { it > 0 } ?: 220
+                // الأداة تُقاس في الوضع الحالي: العرض هو الحد الأدنى في الوضع
+                // الطولي والحد الأقصى في العرضي، والارتفاع بالعكس. الاعتماد على
+                // الحد الأدنى للارتفاع وحده يجعل الرسم صغيرًا في الوضع الطولي.
+                val portrait = context.resources.configuration.orientation !=
+                    Configuration.ORIENTATION_LANDSCAPE
+                val widgetWidthDp = (if (portrait) {
+                    options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 220)
+                } else {
+                    options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 220)
+                }).takeIf { it > 0 } ?: 220
+                val widgetHeightDp = (if (portrait) {
+                    options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 250)
+                } else {
+                    options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 250)
+                }).takeIf { it > 0 } ?: 250
                 // عرض الإطار الداخلي بعد حشوة 14dp على كل جهة.
-                val frameWidthDp = (widgetWidthDp - 28).coerceAtLeast(140)
+                val frameWidthDp = (widgetWidthDp - 2 * WidgetFaceMetrics.WIDGET_PADDING_DP)
+                    .coerceAtLeast(140)
+                // ارتفاع مساحة القرص من ارتفاع الأداة: التكبير يكبر القرص
+                // بدل أن يزيد الفراغ أسفل البطاقة.
+                val frameHeightDp = WidgetFaceMetrics.frameHeightDp(widgetHeightDp, frameWidthDp)
 
                 val views = RemoteViews(context.packageName, R.layout.widget_usage)
                 val drawsTextInside = styleIndex == STYLE_CLOCK
@@ -183,6 +201,7 @@ class UsageWidgetProvider : AppWidgetProvider() {
                     locale = locale,
                     styleIndex = styleIndex,
                     frameWidthDp = frameWidthDp,
+                    frameHeightDp = frameHeightDp,
                     progress = gaugeProgress,
                     exceeded = exceeded,
                     headline = headline,
@@ -226,15 +245,13 @@ class UsageWidgetProvider : AppWidgetProvider() {
     }
 }
 
-/** ارتفاع مساحة الرسم داخل الأداة بالـ dp (مطابق لـ widget_usage.xml). */
-private const val FRAME_HEIGHT_DP = 176
-
-/** يرسم وجه البطاقة داخل مساحة القياس (بعرض الأداة وارتفاع 176dp). */
+/** يرسم وجه البطاقة داخل مساحة القياس (بعرض الأداة وارتفاع مساحة القرص). */
 private fun createCardBitmap(
     context: Context,
     locale: Locale,
     styleIndex: Int,
     frameWidthDp: Int,
+    frameHeightDp: Int,
     progress: Float,
     exceeded: Boolean,
     headline: String,
@@ -243,8 +260,13 @@ private fun createCardBitmap(
     daysLeft: Int,
 ): Bitmap {
     val density = context.resources.displayMetrics.density
-    val bitmapWidth = (frameWidthDp * density).roundToInt().coerceAtLeast(1)
-    val bitmapHeight = (FRAME_HEIGHT_DP * density).roundToInt().coerceAtLeast(1)
+    // حد آمن للذاكرة مع الحفاظ على النسبة نفسها، فتظل الصورة مطابقة للمساحة.
+    val (safeWidthDp, safeHeightDp) = WidgetFaceMetrics.boundedBitmapSize(
+        widthDp = frameWidthDp,
+        heightDp = frameHeightDp,
+    )
+    val bitmapWidth = (safeWidthDp * density).roundToInt().coerceAtLeast(1)
+    val bitmapHeight = (safeHeightDp * density).roundToInt().coerceAtLeast(1)
     val bitmap = Bitmap.createBitmap(bitmapWidth, bitmapHeight, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
     val centerX = bitmapWidth / 2f
@@ -496,6 +518,50 @@ private fun drawClockFace(
     progressColor: Int,
 ) {
     val density = context.resources.displayMetrics.density
+    val designRadius = WidgetFaceMetrics.DESIGN_DIAL_RADIUS_DP * density
+    val scale = WidgetFaceMetrics.clockScale(dialRadius, density)
+    if (scale <= 0f) return
+    // نرسم الوجه كله في فضاء تصميم ثابت (قطر 252dp كما في بطاقة التطبيق) ثم
+    // نكبّر الرسم بنسبة واحدة. هكذا تكبر النقاط والنصوص والعقارب معًا وتبقى
+    // نِسبها صحيحة عند أي مقاس للأداة، بدل أن تكبر النقاط وحدها فتظهر ضخمة
+    // وتزدحم النصوص فوق الحلقة.
+    canvas.save()
+    canvas.scale(scale, scale, centerX, centerY)
+    drawClockFaceInDesignSpace(
+        context = context,
+        locale = locale,
+        canvas = canvas,
+        centerX = centerX,
+        centerY = centerY,
+        dialRadius = designRadius,
+        progress = progress,
+        exceeded = exceeded,
+        headline = headline,
+        label = label,
+        usedValue = usedValue,
+        daysLeft = daysLeft,
+        progressColor = progressColor,
+    )
+    canvas.restore()
+}
+
+/** يرسم وجه الساعة في فضاء التصميم المرجعي (نصف قطر 126dp) قبل التكبير. */
+private fun drawClockFaceInDesignSpace(
+    context: Context,
+    locale: Locale,
+    canvas: Canvas,
+    centerX: Float,
+    centerY: Float,
+    dialRadius: Float,
+    progress: Float,
+    exceeded: Boolean,
+    headline: String,
+    label: String,
+    usedValue: String,
+    daysLeft: Int,
+    progressColor: Int,
+) {
+    val density = context.resources.displayMetrics.density
     val onSurface = context.getColor(R.color.widget_on_surface)
     val muted = context.getColor(R.color.widget_on_surface_variant)
     val accent = if (exceeded) context.getColor(R.color.widget_error) else progressColor
@@ -525,7 +591,7 @@ private fun drawClockFace(
         val arcPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = arcColor
             style = Paint.Style.STROKE
-            strokeWidth = (7f / 126f) * dialRadius
+            strokeWidth = 7f * density
             strokeCap = Paint.Cap.ROUND
         }
         val arcBounds = RectF(
@@ -548,14 +614,13 @@ private fun drawClockFace(
         alpha = 110
         style = Paint.Style.FILL
     }
-    val dotScale = dialRadius / 126f
     for (index in 0 until 60) {
         val angle = Math.toRadians(index * 6.0 - 90.0)
         val isHourDot = index % 5 == 0
         canvas.drawCircle(
             centerX + cos(angle).toFloat() * dotRingRadius,
             centerY + sin(angle).toFloat() * dotRingRadius,
-            (if (isHourDot) 3f else 1.5f) * density * dotScale,
+            (if (isHourDot) 3f else 1.5f) * density,
             if (isHourDot) hourDotPaint else minuteDotPaint,
         )
     }
@@ -578,14 +643,15 @@ private fun drawClockFace(
     val headlinePaint = createTextPaint(
         context,
         locale,
-        if (headline.length > 6) 18f else 25f,
+        if (headline.length > 6) 21f else 30f,
         if (exceeded) accent else onSurface,
         bold = true,
     )
-    val labelPaint = createTextPaint(context, locale, 10f, muted, bold = false)
-    val usedPaint = createTextPaint(context, locale, 11.5f, accent, bold = false)
+    // نفس مقاسات نصوص بطاقة التطبيق (تُكبَّر وتُصغَّر مع الرسم كله).
+    val labelPaint = createTextPaint(context, locale, 11f, muted, bold = false)
+    val usedPaint = createTextPaint(context, locale, 12f, accent, bold = false)
     val daysPaint = createTextPaint(context, locale, 14f, onSurface, bold = true)
-    val unitPaint = createTextPaint(context, locale, 9f, muted, bold = false)
+    val unitPaint = createTextPaint(context, locale, 11f, muted, bold = false)
 
     fitTextSize(timePaint, timeText, contentWidth.toFloat(), minTextSizePx)
     fitTextSize(headlinePaint, headline, contentWidth.toFloat(), minTextSizePx)
