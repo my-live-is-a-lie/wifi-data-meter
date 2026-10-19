@@ -70,6 +70,8 @@ object SpeedTestEngine {
         val uploadMeasured: Boolean = true,
         /** معرّف المصدر الذي قِيس عليه التنزيل. */
         val sourceLabel: String? = null,
+        /** إجمالي البيانات التي استهلكها الاختبار (معايرة + تنزيل + رفع). */
+        val dataBytes: Long = 0L,
     )
 
     /** إعدادات الاختبار والمراصد الزمنية. */
@@ -245,6 +247,7 @@ object SpeedTestEngine {
                     durationMillis = (System.currentTimeMillis() - startedAt).coerceAtLeast(1L),
                     uploadMeasured = upload > 0.0,
                     sourceLabel = download.sourceId,
+                    dataBytes = tracker.totalByteCount,
                 )
             } finally {
                 watcher.cancel()
@@ -658,9 +661,13 @@ object SpeedTestEngine {
         private val phase = AtomicReference(Phase.PREPARING)
         private val phaseStartedAt = AtomicLong(startedAt)
         private val phaseBytes = AtomicLong(0L)
+        /** تراكمي عبر المراحل كلها، لحساب الاستهلاك الفعلي للاختبار. */
+        private val totalBytes = AtomicLong(0L)
         private val lastReportAt = AtomicLong(0L)
 
         val phaseByteCount: Long get() = phaseBytes.get()
+
+        val totalByteCount: Long get() = totalBytes.get()
 
         fun startPhase(next: Phase) {
             val now = System.currentTimeMillis()
@@ -676,6 +683,7 @@ object SpeedTestEngine {
             if (count <= 0L) return
             val now = System.currentTimeMillis()
             phaseBytes.addAndGet(count)
+            totalBytes.addAndGet(count)
             watchdog.onProgress(now)
             report(now, force = false)
         }

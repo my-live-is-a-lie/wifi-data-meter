@@ -24,6 +24,7 @@ import com.mywifiadata.app.core.historyApps
 import com.mywifiadata.app.core.Format
 import com.mywifiadata.app.core.LauncherIconVisibility
 import com.mywifiadata.app.core.SamplingIntervals
+import com.mywifiadata.app.core.SpeedTestDataUsage
 import com.mywifiadata.app.core.SpeedTestEngine
 import com.mywifiadata.app.core.TimeRange
 import com.mywifiadata.app.core.TimeRanges
@@ -111,6 +112,11 @@ data class UiState(
     val samples: List<SpeedSample> = emptyList(),
     val speedTest: SpeedTestState = SpeedTestState.Idle,
     val speedTestHistory: List<SpeedTestRecord> = emptyList(),
+    /**
+     * تحذير استهلاك بيانات الهاتف قبل بدء اختبار السرعة، أو null إن لم يكن
+     * هناك تحذير معروض. يستخدم [SpeedTestDataUsage.estimate] تقديرًا متكيّفًا.
+     */
+    val speedTestDataWarning: SpeedTestDataUsage.Estimate? = null,
     val daily: List<DayUsage> = emptyList(),
     /**
      * أعلى يوم استهلاكًا خلال آخر 30 يومًا — مرجع ثابت للمقارنة مهما كانت
@@ -1306,11 +1312,69 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
      * بدء اختبار السرعة عبر fast.com (مع رجوع تلقائي إلى Cloudflare إذا حُجب).
      *
      * - قبل البدء: إن لم يكن هناك اتصال تظهر رسالة فورية بلا أي تحميل.
+     * - على بيانات الهاتف: يظهر أولًا تحذير بكمية الاستهلاك التقديرية، ويبدأ
+     *   الاختبار بعد اختيار «متابعة» فقط، ما لم يكن المستخدم قد اختار تجاهل
+     *   التحذير خلال آخر يوم كامل.
      * - أثناء الاختبار: إن انقطع الاتصال أو مرّ وقت طويل دون نتيجة يوقف
      *   المحرّك التحميل ويصل السبب إلى الواجهة لتظهر رسالته.
      * - بعد النجاح: تُحفظ النتيجة محليًا فتبقى ظاهرة بعد إعادة التشغيل.
      */
     fun startSpeedTest() {
+        if (_uiState.value.speedTest is SpeedTestState.Running) return
+        if (_uiState.value.speedTestDataWarning != null) return
+
+        val wifi = repository.wifiStatus()
+        if (!wifi.isOnline) {
+            _uiState.update {
+                it.copy(speedTest = SpeedTestState.Failed(SpeedTestEngine.Failure.NO_CONNECTION))
+            }
+            return
+        }
+
+        val onMobileData = wifi.isMobileConnected && !wifi.isWifiConnected
+        val settings = repository.settingsStore.current
+        if (onMobileData && SpeedTestDataUsage.shouldWarn(settings.speedTestWarningSnoozedUntilMillis)) {
+            _uiState.update { state ->
+                state.copy(
+                    speedTestDataWarning = SpeedTestDataUsage.estimate(settings.speedTestHistory),
+                )
+            }
+            return
+        }
+
+        launchSpeedTest()
+    }
+
+    /** «متابعة الاختبار» من تحذير بيانات الهاتف: يغلق التحذير ويبدأ القياس. */
+    fun continueSpeedTestAfterWarning() {
+        if (_uiState.value.speedTestDataWarning == null) return
+        _uiState.update { it.copy(speedTestDataWarning = null) }
+        launchSpeedTest()
+    }
+
+    /** «إلغاء» من تحذير بيانات الهاتف: لا يبدأ أي تحميل ولا يُستهلك أي بيانات. */
+    fun cancelSpeedTestWarning() {
+        _uiState.update { it.copy(speedTestDataWarning = null) }
+    }
+
+    /**
+     * «تجاهل لمدة يوم»: يبدأ الاختبار الآن ويُخفى التحذير ليوم كامل، ثم يعود
+     * تلقائيًا في الاختبار التالي بعد انقضاء المدة.
+     */
+    fun ignoreSpeedTestWarningForDay() {
+        if (_uiState.value.speedTestDataWarning == null) return
+        repository.settingsStore.snoozeSpeedTestWarning()
+        _uiState.update { state ->
+            state.copy(
+                speedTestDataWarning = null,
+                settings = repository.settingsStore.current,
+            )
+        }
+        launchSpeedTest()
+    }
+
+    /** تشغيل الاختبار فعليًا بعد اجتياز فحوص الاتصال والتحذير. */
+    private fun launchSpeedTest() {
         if (_uiState.value.speedTest is SpeedTestState.Running) return
 
         if (!repository.wifiStatus().isOnline) {
@@ -1343,6 +1407,8 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
                     timestampMillis = System.currentTimeMillis(),
                     usedFastCom = result.usedFastCom,
                     uploadMeasured = result.uploadMeasured,
+                    // كمية الاستهلاك الفعلية تُغذّي تقدير الاختبار القادم على بيانات الهاتف.
+                    dataBytes = result.dataBytes,
                 )
                 repository.settingsStore.saveSpeedTest(record)
                 _uiState.update {

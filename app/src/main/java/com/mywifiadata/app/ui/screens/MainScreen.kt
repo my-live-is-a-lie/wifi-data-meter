@@ -108,6 +108,7 @@ import com.mywifiadata.app.ui.components.DragNavigationItem
 import com.mywifiadata.app.ui.components.AppsUsageFilterBar
 import com.mywifiadata.app.ui.components.HistoryPlanFilterBar
 import com.mywifiadata.app.ui.components.HistoryUsageFilterBar
+import com.mywifiadata.app.ui.components.SpeedTestDataWarningDialog
 import com.mywifiadata.app.ui.AppViewModel
 import com.mywifiadata.app.ui.theme.AppButtonShape
 import com.mywifiadata.app.widget.UsageWidgetProvider
@@ -376,6 +377,17 @@ fun MainScreen(
                     Text(text = stringResource(R.string.action_cancel))
                 }
             },
+        )
+    }
+
+    // تحذير استهلاك بيانات الهاتف قبل بدء اختبار السرعة، مع تقدير متكيّف
+    // وخيار تجاهله ليوم كامل.
+    state.speedTestDataWarning?.let { estimate ->
+        SpeedTestDataWarningDialog(
+            estimate = estimate,
+            onContinue = viewModel::continueSpeedTestAfterWarning,
+            onCancel = viewModel::cancelSpeedTestWarning,
+            onIgnoreForDay = viewModel::ignoreSpeedTestWarningForDay,
         )
     }
 
