@@ -443,17 +443,17 @@ data class AppSettings(
     }
 
     /**
-     * قائمة جميع الباقات المعروضة في نافذة «الباقات» بالترتيب الذي اختاره المستخدم،
-     * بما في ذلك الباقة المفعلة والباقات المحفوظة.
+     * قائمة جميع الباقات المعروضة في نافذة «الباقات»: الباقة المفعلة مثبتة دائمًا
+     * في أول القائمة، ثم تأتي الباقات المحفوظة بترتيب المستخدم.
      */
     fun allPlansFor(network: UsageNetwork): List<DataPlan> {
         val active = planFor(network)
         val saved = savedPlansFor(network)
         if (!active.hasQuota) return saved
-        val list = saved.toMutableList()
-        val insertIndex = activePlanIndexFor(network).coerceIn(0, list.size)
-        list.add(insertIndex, active)
-        return list
+        return buildList {
+            add(active)
+            addAll(saved)
+        }
     }
 
     fun completedPlansFor(network: UsageNetwork): List<CompletedPlanRecord> = when (network) {
@@ -603,10 +603,9 @@ data class AppSettings(
         )
         if (!currentActive.hasQuota) {
             val remainingSaved = savedList.filterNot { it.id == planId }
-            val targetIdx = savedList.indexOfFirst { it.id == planId }.coerceIn(0, remainingSaved.size)
             return withPlanFor(network, activatedTarget)
                 .withSavedPlansFor(network, remainingSaved)
-                .withActivePlanIndexFor(network, targetIdx)
+                .withActivePlanIndexFor(network, 0)
         }
         val resetPrevious = currentActive.copy(
             id = currentActive.id.ifBlank { java.util.UUID.randomUUID().toString() },
@@ -614,7 +613,6 @@ data class AppSettings(
             activatedAtMillis = 0L,
         )
         val combined = allPlansFor(network)
-        val newActiveIdx = combined.indexOfFirst { it.id == planId }.coerceAtLeast(0)
         val updatedSaved = combined.mapNotNull { item ->
             when (item.id) {
                 planId -> null
@@ -624,7 +622,7 @@ data class AppSettings(
         }
         return withPlanFor(network, activatedTarget)
             .withSavedPlansFor(network, updatedSaved)
-            .withActivePlanIndexFor(network, newActiveIdx)
+            .withActivePlanIndexFor(network, 0)
     }
 
     fun deletePlan(
@@ -767,18 +765,24 @@ data class AppSettings(
             list.add(toIndex, moved)
             return withSavedPlansFor(network, list)
         }
-        val activeIndex = activePlanIndexFor(network).coerceIn(0, saved.size)
+        // الباقة المفعلة مثبتة دائمًا في أول القائمة: لا تُحرَّك ولا يمكن وضع باقة أخرى فوقها.
+        if (fromIndex == 0) {
+            return this
+        }
         val tagged = saved.map { it to false }.toMutableList()
-        tagged.add(activeIndex, active to true)
+        tagged.add(0, active to true)
         if (fromIndex !in tagged.indices || toIndex !in tagged.indices || fromIndex == toIndex) {
             return this
         }
+        val safeToIndex = toIndex.coerceAtLeast(1)
+        if (safeToIndex == fromIndex) {
+            return this
+        }
         val moved = tagged.removeAt(fromIndex)
-        tagged.add(toIndex, moved)
-        val newActiveIndex = tagged.indexOfFirst { it.second }.coerceAtLeast(0)
+        tagged.add(safeToIndex, moved)
         val newSaved = tagged.filterNot { it.second }.map { it.first }
         return withSavedPlansFor(network, newSaved)
-            .withActivePlanIndexFor(network, newActiveIndex)
+            .withActivePlanIndexFor(network, 0)
     }
 
     /**
