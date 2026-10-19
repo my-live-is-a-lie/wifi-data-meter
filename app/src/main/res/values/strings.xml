@@ -266,7 +266,24 @@
     <string name="settings_interval_unit_hours">س</string>
     <string name="settings_dynamic_color">ألوان النظام (Material You)</string>
     <string name="settings_dynamic_color_desc">استخدام ألوان خلفية الشاشة على أندرويد 12 وما بعده.</string>
-    <string name="settings_section_data">الصلاحيات</string>
+    <string name="settings_section_data">التخزين والصلاحيات</string>
+    <string name="settings_history_retention">مدة الاحتفاظ بالسجل</string>
+    <string name="settings_history_retention_body">اختر كم يبقى استهلاك التطبيقات وبياناته المؤرشفة محفوظًا في السجل. تقليل المدة يحذف الأقدم فورًا.</string>
+    <plurals name="retention_months">
+        <item quantity="one">شهر واحد</item>
+        <item quantity="two">شهران</item>
+        <item quantity="few">%d أشهر</item>
+        <item quantity="many">%d شهرًا</item>
+        <item quantity="other">%d شهر</item>
+    </plurals>
+    <plurals name="retention_years">
+        <item quantity="one">سنة واحدة</item>
+        <item quantity="two">سنتان</item>
+        <item quantity="few">%d سنوات</item>
+        <item quantity="many">%d سنة</item>
+        <item quantity="other">%d سنة</item>
+    </plurals>
+    <string name="retention_unlimited">لا محدود</string>
     <string name="settings_section_appearance">المظهر</string>
     <string name="settings_accent_color">لون التمييز</string>
     <string name="settings_accent_color_system_active">ألوان النظام</string>

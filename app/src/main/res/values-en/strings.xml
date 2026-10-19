@@ -253,7 +253,18 @@
     <string name="settings_interval_unit_hours">h</string>
     <string name="settings_dynamic_color">System colors (Material You)</string>
     <string name="settings_dynamic_color_desc">Use wallpaper‑based colors on Android 12+.</string>
-    <string name="settings_section_data">Permissions</string>
+    <string name="settings_section_data">Storage &amp; permissions</string>
+    <string name="settings_history_retention">History retention</string>
+    <string name="settings_history_retention_body">Choose how long app usage and archived data stay saved. Lowering the retention deletes older data right away.</string>
+    <plurals name="retention_months">
+        <item quantity="one">%d month</item>
+        <item quantity="other">%d months</item>
+    </plurals>
+    <plurals name="retention_years">
+        <item quantity="one">%d year</item>
+        <item quantity="other">%d years</item>
+    </plurals>
+    <string name="retention_unlimited">Unlimited</string>
     <string name="settings_section_appearance">Appearance</string>
     <string name="settings_accent_color">Accent color</string>
     <string name="settings_accent_color_system_active">System colors</string>
