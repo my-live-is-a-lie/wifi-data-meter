@@ -3,6 +3,7 @@ package com.mywifiadata.app.core
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ClockHandGeometryTest {
@@ -114,5 +115,57 @@ class ClockHandGeometryTest {
         assertEquals(-46f, inflated.top, 0.01f)
         assertEquals(66f, inflated.right, 0.01f)
         assertEquals(46f, inflated.bottom, 0.01f)
+    }
+
+    @Test
+    fun `hand spring starts at the allowed length without animation`() {
+        val spring = HandSpring()
+
+        assertEquals(120f, spring.advance(120f, nowMillis = 0L), 0.01f)
+    }
+
+    @Test
+    fun `hand spring contracts gradually instead of jumping`() {
+        val spring = HandSpring()
+        spring.advance(120f, nowMillis = 0L)
+
+        val firstFrame = spring.advance(40f, nowMillis = 16L)
+
+        // أول إطار من التقلّص يقتطع جزءًا صغيرًا فقط من الطول.
+        assertTrue(firstFrame in 40f..120f)
+        assertTrue(firstFrame > 100f)
+    }
+
+    @Test
+    fun `hand spring never grows beyond the allowed length`() {
+        val spring = HandSpring()
+        spring.advance(20f, nowMillis = 0L)
+
+        var now = 0L
+        val lengths = buildList {
+            repeat(40) {
+                now += 16L
+                add(spring.advance(100f, now))
+            }
+        }
+
+        // يتمدد بسلاسة مع الوقت لكنه لا يتجاوز 100 في أي إطار.
+        assertTrue(lengths.first() < 100f)
+        assertTrue(lengths.all { it <= 100f })
+        assertEquals(100f, lengths.last(), 1f)
+    }
+
+    @Test
+    fun `hand spring settles back to the allowed length after contracting`() {
+        val spring = HandSpring()
+        spring.advance(120f, nowMillis = 0L)
+
+        var now = 0L
+        repeat(60) {
+            now += 16L
+            spring.advance(40f, now)
+        }
+
+        assertEquals(40f, spring.advance(40f, now + 16L), 1f)
     }
 }
