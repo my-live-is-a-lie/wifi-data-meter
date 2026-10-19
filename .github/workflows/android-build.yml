@@ -238,6 +238,12 @@ jobs:
           TAIL="$(tail -n 30 build.log | sed 's/%/%25/g; s/\r//g' | sed ':a;N;$!ba;s/\n/%0A/g')"
           echo "::error title=Tail::${TAIL}"
 
+      # اختبارات الوحدة الفاشلة تُنشر كتنبيهات باسم الصنف والدالة وسبب الفشل،
+      # فلا نحتاج إلى تنزيل تقرير HTML لمعرفة أي اختبار أسقط البناء.
+      - name: Show failing unit tests
+        if: failure()
+        run: python3 .github/scripts/report-test-failures.py
+
       - name: Upload build log (on failure)
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
