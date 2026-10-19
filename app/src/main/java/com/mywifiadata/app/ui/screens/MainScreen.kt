@@ -744,6 +744,15 @@ fun MainScreen(
                     onReorderSavedPlans = { network, fromIdx, toIdx ->
                         viewModel.reorderSavedPlans(network, fromIdx, toIdx)
                     },
+                    onResetActivePlan = { network ->
+                        viewModel.resetActivePlan(network)
+                    },
+                    onResetSavedPlan = { network, planId ->
+                        viewModel.resetSavedPlan(network, planId)
+                    },
+                    onResetAdditionalPlan = { network, additionalId ->
+                        viewModel.resetAdditionalPlan(network, additionalId)
+                    },
                 )
             }
         }

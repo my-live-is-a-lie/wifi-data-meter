@@ -236,6 +236,9 @@ fun SettingsScreen(
     onDeleteAdditionalPlan: (UsageNetwork, String) -> Unit = { _, _ -> },
     onReorderAdditionalPlans: (UsageNetwork, Int, Int) -> Unit = { _, _, _ -> },
     onReorderSavedPlans: (UsageNetwork, Int, Int) -> Unit = { _, _, _ -> },
+    onResetActivePlan: (UsageNetwork) -> Unit = {},
+    onResetSavedPlan: (UsageNetwork, String) -> Unit = { _, _ -> },
+    onResetAdditionalPlan: (UsageNetwork, String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(16.dp),
 ) {
@@ -766,6 +769,7 @@ fun SettingsScreen(
             settings = settings,
             initialNetwork = selectedPlanNetwork,
             onDismiss = { showQuotaDialog = false },
+            onResetPlan = { onResetActivePlan(selectedPlanNetwork) },
             onConfirm = { draft ->
                 onSavePlan(draft)
                 selectedPlanNetwork = when (draft.networkType) {
@@ -804,6 +808,7 @@ fun SettingsScreen(
             initialPlanOverride = editingSavedPlan,
             lockNetworkType = true,
             onDismiss = { editingSavedPlanId = null },
+            onResetPlan = { onResetSavedPlan(selectedPlanNetwork, editingSavedPlan.id) },
             onConfirm = { draft ->
                 onUpdateSavedPlan(selectedPlanNetwork, editingSavedPlan.id, draft)
                 editingSavedPlanId = null
@@ -867,6 +872,7 @@ fun SettingsScreen(
             network = selectedPlanNetwork,
             initialPlan = editingAdditionalPlan,
             onDismiss = { editingAdditionalPlanId = null },
+            onResetPlan = { onResetAdditionalPlan(selectedPlanNetwork, editingAdditionalPlan.id) },
             onConfirm = { draft ->
                 onUpdateAdditionalPlan(selectedPlanNetwork, editingAdditionalPlan.id, draft)
                 editingAdditionalPlanId = null
@@ -1139,18 +1145,6 @@ private fun HideAppIconGuideIllustration() {
         } ?: addedTilePoint ?: fallbackTargets.addedTile,
     )
     val pointerPosition = hideGuidePointerPosition(cycleProgress, pointerTargets)
-    val captionResource = when {
-        cycleProgress < 0.055f || cycleProgress >= 0.96f -> R.string.hide_app_icon_demo_icon_visible
-        cycleProgress < 0.09f -> R.string.hide_app_icon_demo_icon_hidden
-        cycleProgress < 0.23f -> R.string.hide_app_icon_demo_swipe
-        cycleProgress < 0.25f -> R.string.hide_app_icon_demo_panel_open
-        cycleProgress < 0.36f -> R.string.hide_app_icon_demo_tap_more
-        cycleProgress < 0.44f -> R.string.hide_app_icon_demo_choose_edit
-        cycleProgress < 0.66f -> R.string.hide_app_icon_demo_add
-        cycleProgress < 0.74f -> R.string.hide_app_icon_demo_finish_edit
-        cycleProgress < 0.82f -> R.string.hide_app_icon_demo_long_press
-        else -> R.string.hide_app_icon_demo_app_open
-    }
 
     Column(
         modifier = Modifier
@@ -1679,13 +1673,6 @@ private fun HideAppIconGuideIllustration() {
                 }
             }
         }
-
-        Text(
-            text = stringResource(captionResource),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            minLines = 1,
-        )
     }
 }
 
@@ -2830,6 +2817,7 @@ private fun QuotaDialog(
     isAddingNewPlan: Boolean = false,
     lockNetworkType: Boolean = false,
     onDismiss: () -> Unit,
+    onResetPlan: (() -> Unit)? = null,
     onConfirm: (PlanDraft) -> Unit,
 ) {
     val context = LocalContext.current
@@ -2848,8 +2836,11 @@ private fun QuotaDialog(
         else -> settings.planFor(activePlanNetwork)
     }
     val hasActiveQuota = !isAddingNewPlan && activePlan.hasQuota
-    val isEditLocked = hasActiveQuota && activePlan.preventEdit
     val stateKey = initialPlanOverride?.id ?: if (isAddingNewPlan) "new-${activePlanNetwork.name}" else activePlanNetwork.name
+    var wasResetInDialog by rememberSaveable(stateKey) { mutableStateOf(false) }
+    var showResetConfirmDialog by rememberSaveable(stateKey) { mutableStateOf(false) }
+    var showPreventEditWarningDialog by rememberSaveable(stateKey) { mutableStateOf(false) }
+    val isEditLocked = hasActiveQuota && activePlan.preventEdit && !wasResetInDialog
 
     val initialCapacityValue = remember(activePlan.quotaBytes, activePlan.capacityUnit) {
         if (activePlan.quotaBytes > 0L) {
@@ -3074,44 +3065,125 @@ private fun QuotaDialog(
                     )
                     Switch(
                         checked = preventEdit,
-                        onCheckedChange = { preventEdit = it },
+                        onCheckedChange = { checked ->
+                            if (checked) {
+                                showPreventEditWarningDialog = true
+                            } else {
+                                preventEdit = false
+                            }
+                        },
                         enabled = !isEditLocked,
                     )
                 }
             }
         },
         confirmButton = {
-            Button(
-                onClick = {
-                    onConfirm(
-                        PlanDraft(
-                            name = planName,
-                            logoPath = logoPath,
-                            capacityValue = parsedCapacity ?: 0.0,
-                            capacityUnit = capacityUnit,
-                            durationValue = (parsedDuration ?: 28).coerceAtLeast(1),
-                            durationUnit = durationUnit,
-                            networkType = networkType,
-                            preventEdit = preventEdit,
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (hasActiveQuota && onResetPlan != null) {
+                    TextButton(
+                        onClick = { showResetConfirmDialog = true },
+                        shape = AppButtonShape,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.plan_reset_action),
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.weight(1f))
+                TextButton(onClick = onDismiss, shape = AppButtonShape) {
+                    Text(text = stringResource(R.string.action_cancel))
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(
+                    onClick = {
+                        onConfirm(
+                            PlanDraft(
+                                name = planName,
+                                logoPath = logoPath,
+                                capacityValue = parsedCapacity ?: 0.0,
+                                capacityUnit = capacityUnit,
+                                durationValue = (parsedDuration ?: 28).coerceAtLeast(1),
+                                durationUnit = durationUnit,
+                                networkType = networkType,
+                                preventEdit = preventEdit,
+                            ),
+                        )
+                    },
+                    enabled = canSave,
+                    shape = AppButtonShape,
+                ) {
+                    Text(
+                        text = stringResource(
+                            if (hasActiveQuota) R.string.action_save else R.string.plans_action_add,
                         ),
                     )
-                },
-                enabled = canSave,
-                shape = AppButtonShape,
-            ) {
-                Text(
-                    text = stringResource(
-                        if (hasActiveQuota) R.string.action_save else R.string.plans_action_add,
-                    ),
-                )
+                }
             }
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss, shape = AppButtonShape) {
-                Text(text = stringResource(R.string.action_cancel))
-            }
-        },
+        dismissButton = null,
     )
+
+    if (showResetConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetConfirmDialog = false },
+            icon = { Icon(imageVector = Icons.Rounded.Refresh, contentDescription = null) },
+            title = { Text(text = stringResource(R.string.plan_reset_confirm_title)) },
+            text = { Text(text = stringResource(R.string.plan_reset_confirm_body)) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showResetConfirmDialog = false
+                        wasResetInDialog = true
+                        preventEdit = false
+                        onResetPlan?.invoke()
+                    },
+                    shape = AppButtonShape,
+                ) {
+                    Text(text = stringResource(R.string.action_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showResetConfirmDialog = false },
+                    shape = AppButtonShape,
+                ) {
+                    Text(text = stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
+
+    if (showPreventEditWarningDialog) {
+        AlertDialog(
+            onDismissRequest = { showPreventEditWarningDialog = false },
+            icon = { Icon(imageVector = Icons.Rounded.Info, contentDescription = null) },
+            title = { Text(text = stringResource(R.string.plan_prevent_edit_warning_title)) },
+            text = { Text(text = stringResource(R.string.plan_prevent_edit_warning_body)) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showPreventEditWarningDialog = false
+                        preventEdit = true
+                    },
+                    shape = AppButtonShape,
+                ) {
+                    Text(text = stringResource(R.string.action_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showPreventEditWarningDialog = false },
+                    shape = AppButtonShape,
+                ) {
+                    Text(text = stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -3628,12 +3700,16 @@ private fun AdditionalPlanDialog(
     network: UsageNetwork,
     initialPlan: AdditionalPlan? = null,
     onDismiss: () -> Unit,
+    onResetPlan: (() -> Unit)? = null,
     onConfirm: (AdditionalPlanDraft) -> Unit,
 ) {
     val context = LocalContext.current
     val isEditing = initialPlan != null
-    val isEditLocked = initialPlan?.preventEdit == true
     val stateKey = initialPlan?.id ?: "new-additional-${network.name}"
+    var wasResetInDialog by rememberSaveable(stateKey) { mutableStateOf(false) }
+    var showResetConfirmDialog by rememberSaveable(stateKey) { mutableStateOf(false) }
+    var showPreventEditWarningDialog by rememberSaveable(stateKey) { mutableStateOf(false) }
+    val isEditLocked = initialPlan?.preventEdit == true && !wasResetInDialog
 
     val initialCapacityText = remember(initialPlan?.quotaBytes, initialPlan?.capacityUnit) {
         if (initialPlan != null && initialPlan.quotaBytes > 0L) {
@@ -3862,48 +3938,129 @@ private fun AdditionalPlanDialog(
                     Spacer(modifier = Modifier.width(8.dp))
                     Switch(
                         checked = preventEdit,
-                        onCheckedChange = { preventEdit = it },
+                        onCheckedChange = { checked ->
+                            if (checked) {
+                                showPreventEditWarningDialog = true
+                            } else {
+                                preventEdit = false
+                            }
+                        },
                         enabled = !isEditLocked,
                     )
                 }
             }
         },
         confirmButton = {
-            Button(
-                onClick = {
-                    val safeCapacity = if (isEditLocked && initialPlan != null) {
-                        initialPlan.quotaBytes.toDouble() / initialPlan.capacityUnit.bytesFactor.toDouble()
-                    } else {
-                        parsedCapacity ?: 0.0
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (isEditing && onResetPlan != null) {
+                    TextButton(
+                        onClick = { showResetConfirmDialog = true },
+                        shape = AppButtonShape,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.plan_reset_action),
+                            color = MaterialTheme.colorScheme.error,
+                        )
                     }
-                    onConfirm(
-                        AdditionalPlanDraft(
-                            name = planName,
-                            logoPath = logoPath,
-                            capacityValue = safeCapacity,
-                            capacityUnit = capacityUnit,
-                            durationValue = (parsedDuration ?: 7).coerceAtLeast(1),
-                            durationUnit = durationUnit,
-                            preventEdit = preventEdit,
+                }
+                Spacer(modifier = Modifier.weight(1f))
+                TextButton(onClick = onDismiss, shape = AppButtonShape) {
+                    Text(text = stringResource(R.string.action_cancel))
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(
+                    onClick = {
+                        val safeCapacity = if (isEditLocked && initialPlan != null) {
+                            initialPlan.quotaBytes.toDouble() / initialPlan.capacityUnit.bytesFactor.toDouble()
+                        } else {
+                            parsedCapacity ?: 0.0
+                        }
+                        onConfirm(
+                            AdditionalPlanDraft(
+                                name = planName,
+                                logoPath = logoPath,
+                                capacityValue = safeCapacity,
+                                capacityUnit = capacityUnit,
+                                durationValue = (parsedDuration ?: 7).coerceAtLeast(1),
+                                durationUnit = durationUnit,
+                                preventEdit = preventEdit,
+                            ),
+                        )
+                    },
+                    enabled = canSave,
+                    shape = AppButtonShape,
+                ) {
+                    Text(
+                        text = stringResource(
+                            if (isEditing) R.string.action_save else R.string.plans_action_add,
                         ),
                     )
-                },
-                enabled = canSave,
-                shape = AppButtonShape,
-            ) {
-                Text(
-                    text = stringResource(
-                        if (isEditing) R.string.action_save else R.string.plans_action_add,
-                    ),
-                )
+                }
             }
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss, shape = AppButtonShape) {
-                Text(text = stringResource(R.string.action_cancel))
-            }
-        },
+        dismissButton = null,
     )
+
+    if (showResetConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetConfirmDialog = false },
+            icon = { Icon(imageVector = Icons.Rounded.Refresh, contentDescription = null) },
+            title = { Text(text = stringResource(R.string.plan_reset_confirm_title)) },
+            text = { Text(text = stringResource(R.string.plan_reset_confirm_body)) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showResetConfirmDialog = false
+                        wasResetInDialog = true
+                        preventEdit = false
+                        onResetPlan?.invoke()
+                    },
+                    shape = AppButtonShape,
+                ) {
+                    Text(text = stringResource(R.string.action_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showResetConfirmDialog = false },
+                    shape = AppButtonShape,
+                ) {
+                    Text(text = stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
+
+    if (showPreventEditWarningDialog) {
+        AlertDialog(
+            onDismissRequest = { showPreventEditWarningDialog = false },
+            icon = { Icon(imageVector = Icons.Rounded.Info, contentDescription = null) },
+            title = { Text(text = stringResource(R.string.plan_prevent_edit_warning_title)) },
+            text = { Text(text = stringResource(R.string.plan_prevent_edit_warning_body)) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showPreventEditWarningDialog = false
+                        preventEdit = true
+                    },
+                    shape = AppButtonShape,
+                ) {
+                    Text(text = stringResource(R.string.action_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showPreventEditWarningDialog = false },
+                    shape = AppButtonShape,
+                ) {
+                    Text(text = stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
 }
 
 private data class PlanListEntry(

@@ -1181,6 +1181,27 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         }
     }
 
+    fun resetActivePlan(network: UsageNetwork) {
+        repository.settingsStore.update { settings ->
+            settings.resetActivePlan(network)
+        }
+        refreshNow()
+    }
+
+    fun resetSavedPlan(network: UsageNetwork, planId: String) {
+        repository.settingsStore.update { settings ->
+            settings.resetSavedPlan(network, planId)
+        }
+        refreshNow()
+    }
+
+    fun resetAdditionalPlan(network: UsageNetwork, additionalPlanId: String) {
+        repository.settingsStore.update { settings ->
+            settings.resetAdditionalPlan(network, additionalPlanId)
+        }
+        refreshNow()
+    }
+
     fun setUsageCardStyle(styleIndex: Int) {
         repository.settingsStore.update {
             it.copy(
