@@ -1,6 +1,7 @@
 package com.mywifiadata.app.data.model
 
 import com.mywifiadata.app.core.AppLanguage
+import com.mywifiadata.app.core.HistoryRetention
 import com.mywifiadata.app.core.SamplingIntervals
 import com.mywifiadata.app.core.UsageNetwork
 
@@ -348,6 +349,8 @@ data class AppSettings(
     val hideStatusBarIcon: Boolean = false,
     /** فهرس تصميم بطاقة استهلاك الباقة المختار على لوحة المعلومات. */
     val usageCardStyleIndex: Int = 0,
+    /** مدة الاحتفاظ باستهلاك التطبيقات المؤرشف بالأشهر؛ صفر يعني بلا حد. */
+    val historyRetentionMonths: Int = HistoryRetention.DEFAULT_MONTHS,
     /** ترتيب العناصر المخفية وترتيبها في الصفحة الرئيسية. */
     val dashboardLayout: DashboardLayout = DashboardLayout.Default,
     /** نمط مخطط السجل محفوظ بشكل مستقل عن نمط مخططات التطبيقات. */

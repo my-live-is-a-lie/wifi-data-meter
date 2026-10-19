@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.mywifiadata.app.core.AppsSortOrder
 import com.mywifiadata.app.core.AppsUsageScope
 import com.mywifiadata.app.core.HistoryPlanSortOrder
+import com.mywifiadata.app.core.HistoryRetention
 import com.mywifiadata.app.core.HistorySection
 import com.mywifiadata.app.core.HistoryYearMonth
 import com.mywifiadata.app.core.UsageNetwork
@@ -1254,6 +1255,16 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
     fun setSampleInterval(index: Int) {
         repository.settingsStore.update {
             it.copy(sampleIntervalIndex = SamplingIntervals.coerceIndex(index))
+        }
+    }
+
+    fun setHistoryRetention(months: Int) {
+        val safeMonths = HistoryRetention.normalize(months)
+        repository.settingsStore.update { it.copy(historyRetentionMonths = safeMonths) }
+        // تقليل المدة يحذف ما تجاوزها فورًا؛ الزيادة لا تعيد ما حُذف.
+        viewModelScope.launch {
+            repository.pruneUsageArchive()
+            if (repository.hasUsageAccess()) loadHistory(adjustSelectionToRecorded = true)
         }
     }
 

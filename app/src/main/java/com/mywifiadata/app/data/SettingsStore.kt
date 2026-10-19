@@ -2,6 +2,7 @@ package com.mywifiadata.app.data
 
 import android.content.Context
 import com.mywifiadata.app.core.AppLanguage
+import com.mywifiadata.app.core.HistoryRetention
 import com.mywifiadata.app.core.SamplingIntervals
 import com.mywifiadata.app.core.SpeedTestDataUsage
 import com.mywifiadata.app.core.UsageCardStyles
@@ -171,6 +172,9 @@ class SettingsStore(context: Context) {
         trackingEnabled = prefs.getBoolean(KEY_TRACKING, false),
         hideStatusBarIcon = prefs.getBoolean(KEY_HIDE_STATUS_BAR_ICON, false),
         usageCardStyleIndex = readUsageCardStyle(),
+        historyRetentionMonths = HistoryRetention.normalize(
+            prefs.getInt(KEY_HISTORY_RETENTION, HistoryRetention.DEFAULT_MONTHS),
+        ),
         dashboardLayout = DashboardLayout.decode(prefs.getString(KEY_DASHBOARD_LAYOUT, null)),
         historyLineChartEnabled = prefs.getBoolean(KEY_HISTORY_LINE_CHART, false),
         appsLineChartEnabled = prefs.getBoolean(KEY_APPS_LINE_CHART, false),
@@ -286,6 +290,10 @@ class SettingsStore(context: Context) {
             .putBoolean(KEY_TRACKING, settings.trackingEnabled)
             .putBoolean(KEY_HIDE_STATUS_BAR_ICON, settings.hideStatusBarIcon)
             .putInt(KEY_USAGE_CARD_STYLE, settings.usageCardStyleIndex)
+            .putInt(
+                KEY_HISTORY_RETENTION,
+                HistoryRetention.normalize(settings.historyRetentionMonths),
+            )
             .putInt(KEY_USAGE_CARD_STYLE_VERSION, UsageCardStyles.LATEST_VERSION)
             .putString(KEY_DASHBOARD_LAYOUT, settings.dashboardLayout.encode())
             .putBoolean(KEY_HISTORY_LINE_CHART, settings.historyLineChartEnabled)
@@ -357,6 +365,7 @@ class SettingsStore(context: Context) {
         private const val KEY_TRACKING = "tracking_enabled"
         private const val KEY_HIDE_STATUS_BAR_ICON = "hide_status_bar_icon"
         private const val KEY_USAGE_CARD_STYLE = "usage_card_style"
+        private const val KEY_HISTORY_RETENTION = "history_retention_months"
         private const val KEY_USAGE_CARD_STYLE_VERSION = "usage_card_style_version"
         private const val KEY_DASHBOARD_LAYOUT = "dashboard_layout"
         private const val KEY_HISTORY_LINE_CHART = "history_line_chart_enabled"

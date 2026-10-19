@@ -1,6 +1,7 @@
 package com.mywifiadata.app.data
 
 import android.content.Context
+import com.mywifiadata.app.core.HistoryRetention
 import com.mywifiadata.app.core.HistoryYearMonth
 import com.mywifiadata.app.core.UsageNetwork
 import com.mywifiadata.app.core.TimeRange
@@ -30,12 +31,23 @@ class UsageRepository(
     private val statsReader = NetworkStatsReader(context)
     private val wifiReader = WifiNetworkReader(context)
     val appIdentities = AppIdentityCache(context.applicationContext)
-    private val usageArchive = AppUsageArchive(File(context.noBackupFilesDir, "app-usage-archive"))
+    // الأرشيف يحتفظ بالبيانات للمدة التي يختارها المستخدم في الإعدادات.
+    private val usageArchive = AppUsageArchive(
+        directory = File(context.noBackupFilesDir, "app-usage-archive"),
+        retentionMillis = {
+            HistoryRetention.retentionMillis(settingsStore.current.historyRetentionMonths)
+        },
+    )
     private val archiveRefreshMutex = Mutex()
     private val recordedMonthsMutex = Mutex()
     private val completedMonthsUsageCache = mutableMapOf<Pair<UsageNetwork, HistoryYearMonth>, Boolean>()
     private var archivedDayStart = -1L
     private var lastArchiveRefresh = 0L
+
+    /** يطبّق مدة الاحتفاظ الجديدة على الأرشيف فورًا بعد تغييرها. */
+    suspend fun pruneUsageArchive() = withContext(Dispatchers.IO) {
+        usageArchive.pruneNow()
+    }
 
     suspend fun clearAppIdentityCache() = withContext(Dispatchers.IO) {
         archiveRefreshMutex.withLock {
@@ -247,7 +259,11 @@ class UsageRepository(
                 }
             }
         }
-        result
+        // «السجل» لا يعرض أشهرًا أقدم من مدة الاحتفاظ المختارة، و«لا محدود» يبقي المسح أربع سنوات.
+        val retention = HistoryRetention.retentionMillis(settingsStore.current.historyRetentionMonths)
+        if (retention <= 0L) return@withContext result
+        val oldestAllowed = TimeRanges.currentYearMonth(now - retention)
+        result.filter { it >= oldestAllowed }
     }
 
     private fun resolveApp(uid: Int, totals: TrafficTotals): AppUsage =

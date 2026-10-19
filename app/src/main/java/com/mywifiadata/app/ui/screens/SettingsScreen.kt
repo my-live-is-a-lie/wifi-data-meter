@@ -58,6 +58,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -95,6 +96,7 @@ import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.TouchApp
@@ -115,6 +117,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -162,6 +165,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
@@ -173,6 +177,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mywifiadata.app.R
 import com.mywifiadata.app.core.Format
+import com.mywifiadata.app.core.HistoryRetention
 import com.mywifiadata.app.core.SamplingIntervalUnit
 import com.mywifiadata.app.core.SamplingIntervals
 import com.mywifiadata.app.core.UsageNetwork
@@ -243,6 +248,7 @@ fun SettingsScreen(
     onOpenWifiSettings: () -> Unit,
     onClearData: () -> Unit,
     onLayoutDirectionChange: (AppLayoutDirection) -> Unit = {},
+    onHistoryRetentionChange: (Int) -> Unit = {},
     onSavePlan: (PlanDraft) -> Unit = { draft -> onQuotaChange(draft.quotaBytes) },
     onActivatePlan: (UsageNetwork) -> Unit = {},
     onAddPlanToSavedList: (PlanDraft) -> Unit = {},
@@ -274,6 +280,7 @@ fun SettingsScreen(
         selectedPlanNetwork = state.activePlanNetwork
     }
     var showClearDialog by rememberSaveable { mutableStateOf(false) }
+    var showHistoryRetentionDialog by rememberSaveable { mutableStateOf(false) }
     var showHideAppIconDialog by rememberSaveable { mutableStateOf(false) }
     var hideAppIconFailed by rememberSaveable { mutableStateOf(false) }
     var moreExpanded by rememberSaveable { mutableStateOf(false) }
@@ -711,6 +718,11 @@ fun SettingsScreen(
                         }
                     }
 
+                    HistoryRetentionRow(
+                        months = state.settings.historyRetentionMonths,
+                        onClick = { showHistoryRetentionDialog = true },
+                    )
+
                     Spacer(modifier = Modifier.height(8.dp))
                     TextButton(
                         onClick = { showClearDialog = true },
@@ -939,6 +951,63 @@ fun SettingsScreen(
             dismissButton = {
                 TextButton(
                     onClick = { pendingDeleteAdditionalPlanId = null },
+                    shape = AppButtonShape,
+                ) {
+                    Text(text = stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
+
+    if (showHistoryRetentionDialog) {
+        val selectedMonths = HistoryRetention.normalize(state.settings.historyRetentionMonths)
+        AlertDialog(
+            onDismissRequest = { showHistoryRetentionDialog = false },
+            icon = { Icon(imageVector = Icons.Rounded.Storage, contentDescription = null) },
+            title = { Text(text = stringResource(R.string.settings_history_retention)) },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 420.dp)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    Text(
+                        text = stringResource(R.string.settings_history_retention_body),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                    HistoryRetention.options.forEach { months ->
+                        val selected = months == selectedMonths
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(MaterialTheme.shapes.medium)
+                                .selectable(
+                                    selected = selected,
+                                    role = Role.RadioButton,
+                                    onClick = {
+                                        showHistoryRetentionDialog = false
+                                        if (!selected) onHistoryRetentionChange(months)
+                                    },
+                                )
+                                .padding(vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(selected = selected, onClick = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = retentionLabel(months),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { showHistoryRetentionDialog = false },
                     shape = AppButtonShape,
                 ) {
                     Text(text = stringResource(R.string.action_cancel))
@@ -2276,6 +2345,63 @@ private fun hideGuideTapRipple(value: Float): Float {
         progressFrom(0.41f),
         progressFrom(0.71f),
     )
+}
+
+/**
+ * سطر «مدة الاحتفاظ بالسجل»: يعرض المدة الحالية ويفتح قائمة الاختيار.
+ * يقع أسفل صلاحية الوصول مباشرة في قسم التخزين والصلاحيات.
+ */
+@Composable
+private fun HistoryRetentionRow(months: Int, onClick: () -> Unit) {
+    val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.medium)
+            .clickable(onClick = onClick)
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.Storage,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(22.dp),
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = stringResource(R.string.settings_history_retention),
+                style = MaterialTheme.typography.bodyLargeEmphasized,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = retentionLabel(months),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Icon(
+            imageVector = if (isRtl) Icons.Rounded.ChevronLeft else Icons.Rounded.ChevronRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** نص خيار مدة الاحتفاظ: أشهر حتى 11، ثم سنوات، ثم بلا حد. */
+@Composable
+private fun retentionLabel(months: Int): String {
+    val safeMonths = HistoryRetention.normalize(months)
+    return when (safeMonths) {
+        HistoryRetention.UNLIMITED -> stringResource(R.string.retention_unlimited)
+        12, 24, 36 -> {
+            val years = safeMonths / 12
+            pluralStringResource(R.plurals.retention_years, years, years)
+        }
+        else -> pluralStringResource(R.plurals.retention_months, safeMonths, safeMonths)
+    }
 }
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3ExpressiveApi::class)
