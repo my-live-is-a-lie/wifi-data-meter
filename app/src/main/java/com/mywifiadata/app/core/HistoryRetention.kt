@@ -15,7 +15,7 @@ object HistoryRetention {
     private const val MONTH_DAYS = 30L
     private const val DAY_MILLIS = 24L * 60L * 60L * 1_000L
 
-    /** خيارات القائمة بالترتيب: شهر حتى 11 شهرًا، ثم سنوات، ثم بلا حد. */
+    /** خيارات القائمة بالترتيب: شهر حتى 11 شهرًا، ثم سنوات، ثم «لا محدود». */
     val options: List<Int> = listOf(
         1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
         12, 24, 36,
@@ -25,7 +25,7 @@ object HistoryRetention {
     /** يعيد قيمة صالحة من القائمة، وأول خيار عند أي قيمة غير معروفة. */
     fun normalize(months: Int): Int = if (months in options) months else DEFAULT_MONTHS
 
-    /** مدة الاحتفاظ بالمللي ثانية، وصفر يعني بلا حد. */
+    /** مدة الاحتفاظ بالمللي ثانية، وصفر يعني «لا محدود». */
     fun retentionMillis(months: Int): Long {
         val safeMonths = normalize(months)
         if (safeMonths == UNLIMITED) return 0L

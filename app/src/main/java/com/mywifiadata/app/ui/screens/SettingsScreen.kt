@@ -2390,7 +2390,7 @@ private fun HistoryRetentionRow(months: Int, onClick: () -> Unit) {
     }
 }
 
-/** نص خيار مدة الاحتفاظ: أشهر حتى 11، ثم سنوات، ثم بلا حد. */
+/** نص خيار مدة الاحتفاظ: أشهر حتى 11، ثم سنوات، ثم «لا محدود». */
 @Composable
 private fun retentionLabel(months: Int): String {
     val safeMonths = HistoryRetention.normalize(months)
