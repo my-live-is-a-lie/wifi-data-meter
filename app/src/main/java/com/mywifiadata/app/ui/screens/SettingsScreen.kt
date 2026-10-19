@@ -204,6 +204,22 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
 /**
+ * حشوة بطاقات أقسام الإعدادات: الحافة العلوية أصغر من بقية الحواف ليقترب
+ * عنوان القسم من أعلى البطاقة ويقلّ الفراغ فوقه، مع إبقاء الحافة السفلية
+ * كما هي حتى لا يلتصق آخر عنصر في البطاقة بحافتها.
+ */
+private val SettingsSectionCardPadding =
+    PaddingValues(start = 20.dp, top = 10.dp, end = 20.dp, bottom = 20.dp)
+
+/** بطاقة المظهر أضيق أصلًا، فيُقلَّل أعلاها بالنسبة نفسها. */
+private val SettingsAppearanceCardPadding =
+    PaddingValues(start = 12.dp, top = 8.dp, end = 12.dp, bottom = 12.dp)
+
+/** حشوة عنوان القسم داخل بطاقات الإعدادات: بلا فراغ إضافي في الأعلى. */
+private val SettingsSectionHeaderPadding =
+    PaddingValues(start = 4.dp, top = 0.dp, end = 4.dp, bottom = 4.dp)
+
+/**
  * شاشة الإعدادات: الباقة، التنبيهات، المراقبة، البيانات، والمزيد.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -270,6 +286,7 @@ fun SettingsScreen(
     ) {
         item {
             ExpressiveCard(
+                contentPadding = SettingsSectionCardPadding,
                 modifier = Modifier.pointerInput(selectedPlanNetwork) {
                     var accumulatedDrag = 0f
                     detectHorizontalDragGestures(
@@ -550,9 +567,12 @@ fun SettingsScreen(
         }
 
         item {
-            ExpressiveCard {
+            ExpressiveCard(contentPadding = SettingsSectionCardPadding) {
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    SectionHeader(title = stringResource(R.string.settings_section_alerts))
+                    SectionHeader(
+                        title = stringResource(R.string.settings_section_alerts),
+                        contentPadding = SettingsSectionHeaderPadding,
+                    )
                     SettingSwitchRow(
                         icon = Icons.Rounded.Notifications,
                         title = stringResource(R.string.settings_notifications),
@@ -577,9 +597,12 @@ fun SettingsScreen(
         }
 
         item {
-            ExpressiveCard {
+            ExpressiveCard(contentPadding = SettingsSectionCardPadding) {
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    SectionHeader(title = stringResource(R.string.settings_section_monitor))
+                    SectionHeader(
+                        title = stringResource(R.string.settings_section_monitor),
+                        contentPadding = SettingsSectionHeaderPadding,
+                    )
                     IntervalSelector(
                         intervalIndex = settings.sampleIntervalIndex,
                         onIntervalChange = onIntervalChange,
@@ -601,10 +624,13 @@ fun SettingsScreen(
 
         item {
             ExpressiveCard(
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
+                contentPadding = SettingsAppearanceCardPadding,
             ) {
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    SectionHeader(title = stringResource(R.string.settings_section_appearance))
+                    SectionHeader(
+                        title = stringResource(R.string.settings_section_appearance),
+                        contentPadding = SettingsSectionHeaderPadding,
+                    )
                     ThemeModeSelector(
                         themeMode = settings.themeMode,
                         onThemeModeChange = onThemeModeChange,
@@ -630,9 +656,12 @@ fun SettingsScreen(
         }
 
         item {
-            ExpressiveCard {
+            ExpressiveCard(contentPadding = SettingsSectionCardPadding) {
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    SectionHeader(title = stringResource(R.string.settings_section_data))
+                    SectionHeader(
+                        title = stringResource(R.string.settings_section_data),
+                        contentPadding = SettingsSectionHeaderPadding,
+                    )
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -706,12 +735,13 @@ fun SettingsScreen(
                 targetValue = if (moreExpanded) 180f else 0f,
                 label = "moreChevron",
             )
-            ExpressiveCard {
+            ExpressiveCard(contentPadding = SettingsSectionCardPadding) {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     // رأس القسم نفسه هو زر التوسيع/الطيّ.
                     SectionHeader(
                         title = stringResource(R.string.settings_section_more),
                         modifier = Modifier.clickable { moreExpanded = !moreExpanded },
+                        contentPadding = SettingsSectionHeaderPadding,
                         trailing = {
                             Icon(
                                 imageVector = Icons.Rounded.ExpandMore,
