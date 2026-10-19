@@ -1,11 +1,14 @@
 package com.mywifiadata.app.data
 
 import android.content.Context
+import com.mywifiadata.app.core.HistoryYearMonth
 import com.mywifiadata.app.core.UsageNetwork
 import com.mywifiadata.app.core.TimeRange
 import com.mywifiadata.app.core.TimeRanges
+import com.mywifiadata.app.data.model.AppSettings
 import com.mywifiadata.app.data.model.AppUsage
 import com.mywifiadata.app.data.model.DayUsage
+import com.mywifiadata.app.data.model.PlanNetworkType
 import com.mywifiadata.app.data.model.TrafficTotals
 import com.mywifiadata.app.data.model.WifiStatus
 import kotlinx.coroutines.currentCoroutineContext
@@ -29,6 +32,8 @@ class UsageRepository(
     val appIdentities = AppIdentityCache(context.applicationContext)
     private val usageArchive = AppUsageArchive(File(context.noBackupFilesDir, "app-usage-archive"))
     private val archiveRefreshMutex = Mutex()
+    private val recordedMonthsMutex = Mutex()
+    private val completedMonthsUsageCache = mutableMapOf<Pair<UsageNetwork, HistoryYearMonth>, Boolean>()
     private var archivedDayStart = -1L
     private var lastArchiveRefresh = 0L
 
@@ -38,6 +43,9 @@ class UsageRepository(
             appIdentities.clear()
             archivedDayStart = -1L
             lastArchiveRefresh = 0L
+        }
+        recordedMonthsMutex.withLock {
+            completedMonthsUsageCache.clear()
         }
     }
 
@@ -59,6 +67,45 @@ class UsageRepository(
         cycleStartDay: Int,
         now: Long = System.currentTimeMillis(),
     ): TrafficTotals = deviceTotals(TimeRanges.cycleRange(cycleStartDay, now))
+
+    suspend fun planTotals(
+        settings: AppSettings,
+        now: Long = System.currentTimeMillis(),
+    ): TrafficTotals {
+        if (settings.planPendingActivation) return TrafficTotals.Empty
+        val range = if (settings.planActivatedAtMillis > 0L) {
+            val endMillis = settings.planActivatedAtMillis + settings.planTotalDays.toLong() * 86_400_000L
+            TimeRange(
+                startMillis = settings.planActivatedAtMillis,
+                endMillis = maxOf(settings.planActivatedAtMillis, minOf(now, endMillis)),
+            )
+        } else {
+            TimeRanges.cycleRange(settings.cycleStartDay, now)
+        }
+        return when (settings.planNetworkType) {
+            PlanNetworkType.WIFI -> deviceTotals(range, UsageNetwork.WIFI)
+            PlanNetworkType.MOBILE -> deviceTotals(range, UsageNetwork.MOBILE)
+            PlanNetworkType.BOTH -> deviceTotals(range, UsageNetwork.WIFI) + deviceTotals(range, UsageNetwork.MOBILE)
+        }
+    }
+
+    suspend fun mobilePlanTotals(
+        settings: AppSettings,
+        now: Long = System.currentTimeMillis(),
+    ): TrafficTotals {
+        val plan = settings.mobilePlan
+        if (!plan.hasQuota || plan.pendingActivation) return TrafficTotals.Empty
+        val range = if (plan.activatedAtMillis > 0L) {
+            val endMillis = plan.activatedAtMillis + plan.totalDays.toLong() * 86_400_000L
+            TimeRange(
+                startMillis = plan.activatedAtMillis,
+                endMillis = maxOf(plan.activatedAtMillis, minOf(now, endMillis)),
+            )
+        } else {
+            TimeRanges.cycleRange(settings.cycleStartDay, now)
+        }
+        return deviceTotals(range, UsageNetwork.MOBILE)
+    }
 
     /** استهلاك التطبيقات مرتّبًا من الأكثر استهلاكًا. */
     suspend fun perAppUsage(
@@ -131,6 +178,82 @@ class UsageRepository(
         }
     }
 
+    /** استهلاك أيام الشهر الميلادي المحدد للشبكة المختارة (الأقدم أولاً). */
+    suspend fun dailyUsageForMonth(
+        year: Int,
+        month: Int,
+        network: UsageNetwork = UsageNetwork.WIFI,
+        now: Long = System.currentTimeMillis(),
+    ): List<DayUsage> = withContext(Dispatchers.IO) {
+        TimeRanges.daysOfMonth(year, month, now).map { day ->
+            DayUsage(
+                startMillis = day.startMillis,
+                endMillis = day.endMillis,
+                totals = statsReader.deviceTotals(day.startMillis, day.endMillis, network),
+            )
+        }
+    }
+
+    /**
+     * الأشهر والسنوات التي سُجّل فيها استهلاك بيانات فعلي (> 0 بايت) للشبكة المحددة.
+     */
+    suspend fun recordedHistoryMonths(
+        network: UsageNetwork = UsageNetwork.WIFI,
+        now: Long = System.currentTimeMillis(),
+    ): List<HistoryYearMonth> = withContext(Dispatchers.IO) {
+        if (!statsReader.hasUsageAccess()) return@withContext emptyList()
+        val currentYm = TimeRanges.currentYearMonth(now)
+        val oldestYear = currentYm.year - HISTORY_SCAN_YEARS_BACK
+        val result = mutableListOf<HistoryYearMonth>()
+
+        recordedMonthsMutex.withLock {
+            for (year in oldestYear..currentYm.year) {
+                currentCoroutineContext().ensureActive()
+                val yearRange = TimeRanges.yearRange(year, now)
+                if (yearRange.endMillis <= yearRange.startMillis) continue
+                val maxMonth = if (year == currentYm.year) currentYm.month else 12
+                val allCached = year < currentYm.year && (1..maxMonth).all { month ->
+                    completedMonthsUsageCache.containsKey(network to HistoryYearMonth(year, month))
+                }
+                if (!allCached) {
+                    val yearTotals = statsReader.deviceTotals(yearRange.startMillis, yearRange.endMillis, network)
+                    if (yearTotals.totalBytes <= 0L) {
+                        if (year < currentYm.year) {
+                            for (month in 1..maxMonth) {
+                                completedMonthsUsageCache[network to HistoryYearMonth(year, month)] = false
+                            }
+                        }
+                        continue
+                    }
+                }
+                for (month in 1..maxMonth) {
+                    currentCoroutineContext().ensureActive()
+                    val ym = HistoryYearMonth(year, month)
+                    val isCompletedMonth = ym < currentYm
+                    val hasUsage = if (isCompletedMonth) {
+                        completedMonthsUsageCache.getOrPut(network to ym) {
+                            val range = TimeRanges.monthRange(year, month, now)
+                            range.endMillis > range.startMillis &&
+                                statsReader.deviceTotals(range.startMillis, range.endMillis, network).totalBytes > 0L
+                        }
+                    } else {
+                        val range = TimeRanges.monthRange(year, month, now)
+                        range.endMillis > range.startMillis &&
+                            statsReader.deviceTotals(range.startMillis, range.endMillis, network).totalBytes > 0L
+                    }
+                    if (hasUsage) {
+                        result += ym
+                    }
+                }
+            }
+        }
+        result
+    }
+
     private fun resolveApp(uid: Int, totals: TrafficTotals): AppUsage =
         appIdentities.resolve(uid, totals)
+
+    companion object {
+        private const val HISTORY_SCAN_YEARS_BACK = 4
+    }
 }

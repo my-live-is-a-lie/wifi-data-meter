@@ -19,6 +19,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mywifiadata.app.core.AppLanguage
 import com.mywifiadata.app.core.LauncherIconVisibility
+import com.mywifiadata.app.data.model.AppLayoutDirection
 import com.mywifiadata.app.data.model.ThemeMode
 import com.mywifiadata.app.ui.AppViewModel
 import com.mywifiadata.app.ui.screens.MainScreen
@@ -61,11 +62,14 @@ class MainActivity : ComponentActivity() {
             val configuration = LocalConfiguration.current
             val language = configuration.locales[0].language
 
-            // النصوص الافتراضية عربية، لذا نفرض اتجاهًا من اليمين لليسار
-            // في كل اللغات عدا الإنجليزية.
-            val layoutDirection = when (language) {
-                "en" -> LayoutDirection.Ltr
-                else -> LayoutDirection.Rtl
+            // اتجاه العرض: يتبع الاختيار الصريح إن وُجد، وإلا فحسب لغة التطبيق الحالية.
+            val layoutDirection = when (settings.layoutDirection) {
+                AppLayoutDirection.RTL -> LayoutDirection.Rtl
+                AppLayoutDirection.LTR -> LayoutDirection.Ltr
+                AppLayoutDirection.AUTO -> when (language) {
+                    "en" -> LayoutDirection.Ltr
+                    else -> LayoutDirection.Rtl
+                }
             }
 
             // سمة التطبيق: النظام / فاتح / داكن / مظلم (أسود AMOLED).

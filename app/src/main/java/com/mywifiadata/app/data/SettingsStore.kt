@@ -4,8 +4,13 @@ import android.content.Context
 import com.mywifiadata.app.core.AppLanguage
 import com.mywifiadata.app.core.SamplingIntervals
 import com.mywifiadata.app.data.model.AccentColor
+import com.mywifiadata.app.data.model.AppLayoutDirection
 import com.mywifiadata.app.data.model.AppSettings
 import com.mywifiadata.app.data.model.DashboardLayout
+import com.mywifiadata.app.data.model.DataPlan
+import com.mywifiadata.app.data.model.PlanCapacityUnit
+import com.mywifiadata.app.data.model.PlanDurationUnit
+import com.mywifiadata.app.data.model.PlanNetworkType
 import com.mywifiadata.app.data.model.SpeedTestRecord
 import com.mywifiadata.app.data.model.ThemeMode
 import com.mywifiadata.app.data.model.TrafficTotals
@@ -64,6 +69,58 @@ class SettingsStore(context: Context) {
     private fun read(): AppSettings = AppSettings(
         quotaBytes = prefs.getLong(KEY_QUOTA_BYTES, 0L),
         cycleStartDay = prefs.getInt(KEY_CYCLE_DAY, 1),
+        planId = prefs.getString(KEY_PLAN_ID, "wifi-active")?.ifBlank { "wifi-active" } ?: "wifi-active",
+        planName = prefs.getString(KEY_PLAN_NAME, "") ?: "",
+        planLogoPath = prefs.getString(KEY_PLAN_LOGO_PATH, "") ?: "",
+        planCapacityUnit = prefs.getString(KEY_PLAN_CAPACITY_UNIT, null)
+            ?.let { stored -> PlanCapacityUnit.entries.firstOrNull { it.name == stored } }
+            ?: PlanCapacityUnit.GB,
+        planDurationValue = prefs.getInt(KEY_PLAN_DURATION_VALUE, 28).coerceAtLeast(1),
+        planDurationUnit = prefs.getString(KEY_PLAN_DURATION_UNIT, null)
+            ?.let { stored -> PlanDurationUnit.entries.firstOrNull { it.name == stored } }
+            ?: PlanDurationUnit.DAY,
+        planNetworkType = prefs.getString(KEY_PLAN_NETWORK_TYPE, null)
+            ?.let { stored -> PlanNetworkType.entries.firstOrNull { it.name == stored } }
+            ?: PlanNetworkType.WIFI,
+        planPreventEdit = prefs.getBoolean(KEY_PLAN_PREVENT_EDIT, false),
+        planPendingActivation = prefs.getBoolean(KEY_PLAN_PENDING_ACTIVATION, false),
+        planActivatedAtMillis = prefs.getLong(KEY_PLAN_ACTIVATED_AT, 0L),
+        planAdditionalPlans = PlanStorageCodec.decodeAdditionalPlans(
+            prefs.getString(KEY_PLAN_ADDITIONAL_PLANS, null),
+        ),
+        mobilePlan = DataPlan(
+            id = prefs.getString(KEY_MOBILE_PLAN_ID, "mobile-active")?.ifBlank { "mobile-active" } ?: "mobile-active",
+            name = prefs.getString(KEY_MOBILE_PLAN_NAME, "") ?: "",
+            logoPath = prefs.getString(KEY_MOBILE_PLAN_LOGO_PATH, "") ?: "",
+            quotaBytes = prefs.getLong(KEY_MOBILE_QUOTA_BYTES, 0L),
+            capacityUnit = prefs.getString(KEY_MOBILE_PLAN_CAPACITY_UNIT, null)
+                ?.let { stored -> PlanCapacityUnit.entries.firstOrNull { it.name == stored } }
+                ?: PlanCapacityUnit.GB,
+            durationValue = prefs.getInt(KEY_MOBILE_PLAN_DURATION_VALUE, 28).coerceAtLeast(1),
+            durationUnit = prefs.getString(KEY_MOBILE_PLAN_DURATION_UNIT, null)
+                ?.let { stored -> PlanDurationUnit.entries.firstOrNull { it.name == stored } }
+                ?: PlanDurationUnit.DAY,
+            preventEdit = prefs.getBoolean(KEY_MOBILE_PLAN_PREVENT_EDIT, false),
+            pendingActivation = prefs.getBoolean(KEY_MOBILE_PLAN_PENDING_ACTIVATION, false),
+            activatedAtMillis = prefs.getLong(KEY_MOBILE_PLAN_ACTIVATED_AT, 0L),
+            additionalPlans = PlanStorageCodec.decodeAdditionalPlans(
+                prefs.getString(KEY_MOBILE_PLAN_ADDITIONAL_PLANS, null),
+            ),
+        ),
+        savedWifiPlans = PlanStorageCodec.decodeSavedPlans(
+            prefs.getString(KEY_SAVED_WIFI_PLANS, null),
+        ),
+        savedMobilePlans = PlanStorageCodec.decodeSavedPlans(
+            prefs.getString(KEY_SAVED_MOBILE_PLANS, null),
+        ),
+        wifiActivePlanIndex = prefs.getInt(KEY_WIFI_ACTIVE_PLAN_INDEX, 0).coerceAtLeast(0),
+        mobileActivePlanIndex = prefs.getInt(KEY_MOBILE_ACTIVE_PLAN_INDEX, 0).coerceAtLeast(0),
+        completedWifiPlans = PlanStorageCodec.decodeCompletedPlans(
+            prefs.getString(KEY_COMPLETED_WIFI_PLANS, null),
+        ),
+        completedMobilePlans = PlanStorageCodec.decodeCompletedPlans(
+            prefs.getString(KEY_COMPLETED_MOBILE_PLANS, null),
+        ),
         notificationsEnabled = prefs.getBoolean(KEY_NOTIFICATIONS, true),
         alertThresholdPercent = prefs.getInt(KEY_THRESHOLD, 80),
         sampleIntervalIndex = if (prefs.contains(KEY_INTERVAL_INDEX)) {
@@ -92,6 +149,9 @@ class SettingsStore(context: Context) {
         themeMode = prefs.getString(KEY_THEME_MODE, null)
             ?.let { stored -> ThemeMode.entries.firstOrNull { it.name == stored } }
             ?: ThemeMode.SYSTEM,
+        layoutDirection = prefs.getString(KEY_LAYOUT_DIRECTION, null)
+            ?.let { stored -> AppLayoutDirection.entries.firstOrNull { it.name == stored } }
+            ?: AppLayoutDirection.AUTO,
         sessionStartMillis = prefs.getLong(KEY_SESSION_START, System.currentTimeMillis()),
         sessionBaseline = TrafficTotals(
             rxBytes = prefs.getLong(KEY_SESSION_RX, 0L),
@@ -142,6 +202,46 @@ class SettingsStore(context: Context) {
         prefs.edit()
             .putLong(KEY_QUOTA_BYTES, settings.quotaBytes)
             .putInt(KEY_CYCLE_DAY, settings.cycleStartDay)
+            .putString(KEY_PLAN_ID, settings.planId)
+            .putString(KEY_PLAN_NAME, settings.planName)
+            .putString(KEY_PLAN_LOGO_PATH, settings.planLogoPath)
+            .putString(KEY_PLAN_CAPACITY_UNIT, settings.planCapacityUnit.name)
+            .putInt(KEY_PLAN_DURATION_VALUE, settings.planDurationValue.coerceAtLeast(1))
+            .putString(KEY_PLAN_DURATION_UNIT, settings.planDurationUnit.name)
+            .putString(KEY_PLAN_NETWORK_TYPE, settings.planNetworkType.name)
+            .putBoolean(KEY_PLAN_PREVENT_EDIT, settings.planPreventEdit)
+            .putBoolean(KEY_PLAN_PENDING_ACTIVATION, settings.planPendingActivation)
+            .putLong(KEY_PLAN_ACTIVATED_AT, settings.planActivatedAtMillis)
+            .putString(
+                KEY_PLAN_ADDITIONAL_PLANS,
+                PlanStorageCodec.encodeAdditionalPlans(settings.planAdditionalPlans),
+            )
+            .putString(KEY_MOBILE_PLAN_ID, settings.mobilePlan.id)
+            .putString(KEY_MOBILE_PLAN_NAME, settings.mobilePlan.name)
+            .putString(KEY_MOBILE_PLAN_LOGO_PATH, settings.mobilePlan.logoPath)
+            .putLong(KEY_MOBILE_QUOTA_BYTES, settings.mobilePlan.quotaBytes)
+            .putString(KEY_MOBILE_PLAN_CAPACITY_UNIT, settings.mobilePlan.capacityUnit.name)
+            .putInt(KEY_MOBILE_PLAN_DURATION_VALUE, settings.mobilePlan.durationValue.coerceAtLeast(1))
+            .putString(KEY_MOBILE_PLAN_DURATION_UNIT, settings.mobilePlan.durationUnit.name)
+            .putBoolean(KEY_MOBILE_PLAN_PREVENT_EDIT, settings.mobilePlan.preventEdit)
+            .putBoolean(KEY_MOBILE_PLAN_PENDING_ACTIVATION, settings.mobilePlan.pendingActivation)
+            .putLong(KEY_MOBILE_PLAN_ACTIVATED_AT, settings.mobilePlan.activatedAtMillis)
+            .putString(
+                KEY_MOBILE_PLAN_ADDITIONAL_PLANS,
+                PlanStorageCodec.encodeAdditionalPlans(settings.mobilePlan.additionalPlans),
+            )
+            .putString(KEY_SAVED_WIFI_PLANS, PlanStorageCodec.encodeSavedPlans(settings.savedWifiPlans))
+            .putString(KEY_SAVED_MOBILE_PLANS, PlanStorageCodec.encodeSavedPlans(settings.savedMobilePlans))
+            .putInt(KEY_WIFI_ACTIVE_PLAN_INDEX, settings.wifiActivePlanIndex.coerceAtLeast(0))
+            .putInt(KEY_MOBILE_ACTIVE_PLAN_INDEX, settings.mobileActivePlanIndex.coerceAtLeast(0))
+            .putString(
+                KEY_COMPLETED_WIFI_PLANS,
+                PlanStorageCodec.encodeCompletedPlans(settings.completedWifiPlans),
+            )
+            .putString(
+                KEY_COMPLETED_MOBILE_PLANS,
+                PlanStorageCodec.encodeCompletedPlans(settings.completedMobilePlans),
+            )
             .putBoolean(KEY_NOTIFICATIONS, settings.notificationsEnabled)
             .putInt(KEY_THRESHOLD, settings.alertThresholdPercent)
             .putInt(KEY_INTERVAL_INDEX, intervalIndex)
@@ -160,6 +260,7 @@ class SettingsStore(context: Context) {
             .putBoolean(KEY_APPS_LINE_CHART, settings.appsLineChartEnabled)
             .putString(KEY_APP_SEARCH_HISTORY, AppSearchHistory.encode(settings.appSearchHistory))
             .putString(KEY_THEME_MODE, settings.themeMode.name)
+            .putString(KEY_LAYOUT_DIRECTION, settings.layoutDirection.name)
             .putLong(KEY_SESSION_START, settings.sessionStartMillis)
             .putLong(KEY_SESSION_RX, settings.sessionBaseline.rxBytes)
             .putLong(KEY_SESSION_TX, settings.sessionBaseline.txBytes)
@@ -179,6 +280,34 @@ class SettingsStore(context: Context) {
 
         private const val KEY_QUOTA_BYTES = "quota_bytes"
         private const val KEY_CYCLE_DAY = "cycle_day"
+        private const val KEY_PLAN_ID = "plan_id"
+        private const val KEY_PLAN_NAME = "plan_name"
+        private const val KEY_PLAN_LOGO_PATH = "plan_logo_path"
+        private const val KEY_PLAN_CAPACITY_UNIT = "plan_capacity_unit"
+        private const val KEY_PLAN_DURATION_VALUE = "plan_duration_value"
+        private const val KEY_PLAN_DURATION_UNIT = "plan_duration_unit"
+        private const val KEY_PLAN_NETWORK_TYPE = "plan_network_type"
+        private const val KEY_PLAN_PREVENT_EDIT = "plan_prevent_edit"
+        private const val KEY_PLAN_PENDING_ACTIVATION = "plan_pending_activation"
+        private const val KEY_PLAN_ACTIVATED_AT = "plan_activated_at"
+        private const val KEY_PLAN_ADDITIONAL_PLANS = "plan_additional_plans"
+        private const val KEY_MOBILE_PLAN_ID = "mobile_plan_id"
+        private const val KEY_MOBILE_PLAN_NAME = "mobile_plan_name"
+        private const val KEY_MOBILE_PLAN_LOGO_PATH = "mobile_plan_logo_path"
+        private const val KEY_MOBILE_QUOTA_BYTES = "mobile_quota_bytes"
+        private const val KEY_MOBILE_PLAN_CAPACITY_UNIT = "mobile_plan_capacity_unit"
+        private const val KEY_MOBILE_PLAN_DURATION_VALUE = "mobile_plan_duration_value"
+        private const val KEY_MOBILE_PLAN_DURATION_UNIT = "mobile_plan_duration_unit"
+        private const val KEY_MOBILE_PLAN_PREVENT_EDIT = "mobile_plan_prevent_edit"
+        private const val KEY_MOBILE_PLAN_PENDING_ACTIVATION = "mobile_plan_pending_activation"
+        private const val KEY_MOBILE_PLAN_ACTIVATED_AT = "mobile_plan_activated_at"
+        private const val KEY_MOBILE_PLAN_ADDITIONAL_PLANS = "mobile_plan_additional_plans"
+        private const val KEY_SAVED_WIFI_PLANS = "saved_wifi_plans"
+        private const val KEY_SAVED_MOBILE_PLANS = "saved_mobile_plans"
+        private const val KEY_WIFI_ACTIVE_PLAN_INDEX = "wifi_active_plan_index"
+        private const val KEY_MOBILE_ACTIVE_PLAN_INDEX = "mobile_active_plan_index"
+        private const val KEY_COMPLETED_WIFI_PLANS = "completed_wifi_plans"
+        private const val KEY_COMPLETED_MOBILE_PLANS = "completed_mobile_plans"
         private const val KEY_NOTIFICATIONS = "notifications"
         private const val KEY_THRESHOLD = "alert_threshold"
         private const val KEY_INTERVAL_INDEX = "sample_interval_index"
@@ -201,6 +330,7 @@ class SettingsStore(context: Context) {
         private const val KEY_ALERT_CYCLE = "alert_cycle"
         private const val KEY_ALERT_LEVEL = "alert_level"
         private const val KEY_THEME_MODE = "theme_mode"
+        private const val KEY_LAYOUT_DIRECTION = "layout_direction"
         private const val KEY_SPEED_DOWNLOAD = "speed_test_download"
         private const val KEY_SPEED_UPLOAD = "speed_test_upload"
         private const val KEY_SPEED_TIME = "speed_test_time"

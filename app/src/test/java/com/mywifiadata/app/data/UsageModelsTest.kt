@@ -1,7 +1,17 @@
 package com.mywifiadata.app.data
 
+import com.mywifiadata.app.core.HistoryPlanSortOrder
+import com.mywifiadata.app.core.UsageNetwork
+import com.mywifiadata.app.data.model.AdditionalPlanDraft
 import com.mywifiadata.app.data.model.AppSettings
+import com.mywifiadata.app.data.model.CompletedPlanRecord
+import com.mywifiadata.app.data.model.DataPlan
+import com.mywifiadata.app.data.model.PlanCapacityUnit
+import com.mywifiadata.app.data.model.PlanDraft
+import com.mywifiadata.app.data.model.PlanDurationUnit
+import com.mywifiadata.app.data.model.PlanNetworkType
 import com.mywifiadata.app.data.model.TrafficTotals
+import com.mywifiadata.app.data.model.WifiStatus
 import com.mywifiadata.app.ui.UiState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -69,5 +79,304 @@ class UsageModelsTest {
         assertEquals(state.cycle.totalBytes / state.elapsedDays, state.averagePerDay)
         assertTrue(state.projectedBytes >= state.cycle.totalBytes)
         assertTrue(state.daysLeft in 0..31)
+    }
+
+    @Test
+    fun `plan draft converts capacity units and pending or active plan days`() {
+        val gbDraft = PlanDraft(capacityValue = 80.0, capacityUnit = PlanCapacityUnit.GB)
+        val mbDraft = PlanDraft(capacityValue = 500.0, capacityUnit = PlanCapacityUnit.MB)
+        val tbDraft = PlanDraft(capacityValue = 1.5, capacityUnit = PlanCapacityUnit.TB)
+
+        assertEquals(80_000_000_000L, gbDraft.quotaBytes)
+        assertEquals(500_000_000L, mbDraft.quotaBytes)
+        assertEquals(1_500_000_000_000L, tbDraft.quotaBytes)
+
+        val now = 1_700_000_000_000L
+        val pendingState = UiState(
+            now = now,
+            settings = AppSettings(
+                quotaBytes = 80_000_000_000L,
+                planDurationValue = 28,
+                planDurationUnit = PlanDurationUnit.DAY,
+                planPendingActivation = true,
+            ),
+        )
+        assertEquals(28, pendingState.cycleDays)
+        assertEquals(28, pendingState.daysLeft)
+
+        val activatedTwelveDaysAgo = now - 12L * 86_400_000L
+        val activeState = UiState(
+            now = now,
+            settings = AppSettings(
+                quotaBytes = 80_000_000_000L,
+                planDurationValue = 28,
+                planDurationUnit = PlanDurationUnit.DAY,
+                planPendingActivation = false,
+                planActivatedAtMillis = activatedTwelveDaysAgo,
+            ),
+        )
+        assertEquals(28, activeState.cycleDays)
+        assertEquals(16, activeState.daysLeft)
+    }
+
+    @Test
+    fun `wifi and mobile plans track remaining bytes and days independently`() {
+        val now = 1_700_000_000_000L
+        val state = UiState(
+            now = now,
+            settings = AppSettings(
+                planName = "فودافون كاش",
+                quotaBytes = 80_000_000_000L,
+                planDurationValue = 28,
+                planDurationUnit = PlanDurationUnit.DAY,
+                planPendingActivation = false,
+                planActivatedAtMillis = now,
+                mobilePlan = DataPlan(
+                    name = "باقة الموبايل",
+                    quotaBytes = 20_000_000_000L,
+                    durationValue = 14,
+                    durationUnit = PlanDurationUnit.DAY,
+                    pendingActivation = false,
+                    activatedAtMillis = now - 4L * 86_400_000L,
+                ),
+            ),
+            cycle = TrafficTotals(rxBytes = 250_000_000L, txBytes = 0L),
+            mobileCycle = TrafficTotals(rxBytes = 5_000_000_000L, txBytes = 0L),
+        )
+
+        assertEquals(79_750_000_000L, state.planRemainingBytes(UsageNetwork.WIFI))
+        assertEquals(28, state.planDaysLeft(UsageNetwork.WIFI))
+        assertEquals(28, state.planTotalDays(UsageNetwork.WIFI))
+
+        assertEquals(15_000_000_000L, state.planRemainingBytes(UsageNetwork.MOBILE))
+        assertEquals(10, state.planDaysLeft(UsageNetwork.MOBILE))
+        assertEquals(14, state.planTotalDays(UsageNetwork.MOBILE))
+
+        val wifiActiveState = state.copy(wifi = WifiStatus(isWifiConnected = true, isMobileConnected = false))
+        assertEquals(UsageNetwork.WIFI, wifiActiveState.activePlanNetwork)
+        assertEquals(80_000_000_000L, wifiActiveState.quotaBytes)
+        assertEquals(79_750_000_000L, wifiActiveState.remainingBytes)
+        assertEquals(28, wifiActiveState.daysLeft)
+
+        val mobileActiveState = state.copy(wifi = WifiStatus(isWifiConnected = false, isMobileConnected = true))
+        assertEquals(UsageNetwork.MOBILE, mobileActiveState.activePlanNetwork)
+        assertEquals(20_000_000_000L, mobileActiveState.quotaBytes)
+        assertEquals(15_000_000_000L, mobileActiveState.remainingBytes)
+        assertEquals(10, mobileActiveState.daysLeft)
+
+        val pendingWifiPlanState = state.copy(
+            settings = state.settings.copy(planPendingActivation = true),
+            cycle = TrafficTotals(rxBytes = 40_000_000_000L, txBytes = 0L),
+            wifiPlanUsage = TrafficTotals.Empty,
+        )
+        assertEquals(80_000_000_000L, pendingWifiPlanState.remainingBytes)
+        assertEquals(
+            pendingWifiPlanState.cycle.totalBytes / pendingWifiPlanState.elapsedDays,
+            pendingWifiPlanState.averagePerDay,
+        )
+    }
+
+    @Test
+    fun `additional plans support max 2 items reorder update delete and handover`() {
+        val now = 1_700_000_000_000L
+        var settings = AppSettings(
+            planId = "main-wifi",
+            planName = "فودافون كاش",
+            quotaBytes = 80_000_000_000L,
+            planCapacityUnit = PlanCapacityUnit.GB,
+            planDurationValue = 28,
+            planDurationUnit = PlanDurationUnit.DAY,
+            planPendingActivation = false,
+            planActivatedAtMillis = now - 5L * 86_400_000L,
+        )
+
+        settings = settings.addAdditionalPlan(
+            network = UsageNetwork.WIFI,
+            draft = AdditionalPlanDraft(
+                name = "إضافية 1",
+                capacityValue = 500.0,
+                capacityUnit = PlanCapacityUnit.MB,
+                durationValue = 7,
+                durationUnit = PlanDurationUnit.DAY,
+            ),
+        )
+        settings = settings.addAdditionalPlan(
+            network = UsageNetwork.WIFI,
+            draft = AdditionalPlanDraft(
+                name = "إضافية 2",
+                capacityValue = 1.0,
+                capacityUnit = PlanCapacityUnit.GB,
+                durationValue = 14,
+                durationUnit = PlanDurationUnit.DAY,
+                preventEdit = true,
+            ),
+        )
+        // محاولة إضافة باقة ثالثة يجب تجاهلها (الحد الأقصى 2)
+        settings = settings.addAdditionalPlan(
+            network = UsageNetwork.WIFI,
+            draft = AdditionalPlanDraft(
+                name = "إضافية 3",
+                capacityValue = 2.0,
+                capacityUnit = PlanCapacityUnit.GB,
+            ),
+        )
+        assertEquals(2, settings.planFor(UsageNetwork.WIFI).additionalPlans.size)
+        assertEquals("إضافية 1", settings.planFor(UsageNetwork.WIFI).additionalPlans[0].name)
+        assertEquals("إضافية 2", settings.planFor(UsageNetwork.WIFI).additionalPlans[1].name)
+
+        // إعادة الترتيب بين الباقتين الإضافيتين
+        settings = settings.reorderAdditionalPlans(UsageNetwork.WIFI, 0, 1)
+        assertEquals("إضافية 2", settings.planFor(UsageNetwork.WIFI).additionalPlans[0].name)
+        assertEquals("إضافية 1", settings.planFor(UsageNetwork.WIFI).additionalPlans[1].name)
+
+        // عند تفعيل منع التعديل على الباقة الإضافية، يُسمح بتعديل الاسم فقط دون السعة أو المدة
+        val lockedId = settings.planFor(UsageNetwork.WIFI).additionalPlans[0].id
+        settings = settings.updateAdditionalPlan(
+            network = UsageNetwork.WIFI,
+            additionalPlanId = lockedId,
+            draft = AdditionalPlanDraft(
+                name = "إضافية 2 محدثة",
+                capacityValue = 99.0,
+                capacityUnit = PlanCapacityUnit.GB,
+                durationValue = 30,
+                durationUnit = PlanDurationUnit.DAY,
+            ),
+        )
+        val updatedFirst = settings.planFor(UsageNetwork.WIFI).additionalPlans[0]
+        assertEquals("إضافية 2 محدثة", updatedFirst.name)
+        assertEquals(1_000_000_000L, updatedFirst.quotaBytes)
+        assertEquals(14, updatedFirst.durationValue)
+
+        // عند نفاد سعة الباقة الرئيسية تحل الباقة الإضافية الأولى مكانها بانتظار التفعيل
+        // وتُحفظ الباقة السابقة في قائمة الباقات المحفوظة
+        val promoted = settings.promoteExpiredPlansIfNeeded(
+            wifiUsedBytes = 80_000_000_000L,
+            mobileUsedBytes = 0L,
+            now = now,
+        )
+        val newActive = promoted.planFor(UsageNetwork.WIFI)
+        assertEquals("إضافية 2 محدثة", newActive.name)
+        assertEquals(1_000_000_000L, newActive.quotaBytes)
+        assertTrue(newActive.pendingActivation)
+        assertEquals(1, newActive.additionalPlans.size)
+        assertEquals("إضافية 1", newActive.additionalPlans[0].name)
+        assertEquals(1, promoted.savedPlansFor(UsageNetwork.WIFI).size)
+        assertEquals("فودافون كاش", promoted.savedPlansFor(UsageNetwork.WIFI)[0].name)
+    }
+
+    @Test
+    fun `saved plans list supports switching with reset and storage codec roundtrip`() {
+        val now = 1_700_000_000_000L
+        var settings = AppSettings(
+            planId = "wifi-1",
+            planName = "باقة أساسية",
+            quotaBytes = 100_000_000_000L,
+            planPendingActivation = false,
+            planActivatedAtMillis = now - 10L * 86_400_000L,
+        )
+
+        settings = settings.addOrSavePlanFromList(
+            PlanDraft(
+                name = "باقة احتياطية",
+                capacityValue = 50.0,
+                capacityUnit = PlanCapacityUnit.GB,
+                durationValue = 30,
+                durationUnit = PlanDurationUnit.DAY,
+                networkType = PlanNetworkType.WIFI,
+            ),
+        )
+        assertEquals(1, settings.savedPlansFor(UsageNetwork.WIFI).size)
+        val savedPlanId = settings.savedPlansFor(UsageNetwork.WIFI)[0].id
+
+        // التبديل إلى الباقة المحفوظة يفعّلها ويُعيد تعيين عداد الباقة السابقة ويحفظها في القائمة
+        val switched = settings.switchToSavedPlan(UsageNetwork.WIFI, savedPlanId, now)
+        assertEquals("باقة احتياطية", switched.planFor(UsageNetwork.WIFI).name)
+        assertFalse(switched.planFor(UsageNetwork.WIFI).pendingActivation)
+        assertEquals(now, switched.planFor(UsageNetwork.WIFI).activatedAtMillis)
+
+        val previousInSaved = switched.savedPlansFor(UsageNetwork.WIFI).single()
+        assertEquals("باقة أساسية", previousInSaved.name)
+        assertTrue(previousInSaved.pendingActivation)
+        assertEquals(0L, previousInSaved.activatedAtMillis)
+
+        // اختبار ترميز وفك ترميز الباقات المحفوظة والباقات الإضافية
+        val encodedSaved = PlanStorageCodec.encodeSavedPlans(switched.savedPlansFor(UsageNetwork.WIFI))
+        val decodedSaved = PlanStorageCodec.decodeSavedPlans(encodedSaved)
+        assertEquals(switched.savedPlansFor(UsageNetwork.WIFI), decodedSaved)
+
+        // إعادة ترتيب الباقات في القائمة الموحدة (الباقة المفعلة والباقات المحفوظة)
+        val reordered = switched.reorderSavedPlans(
+            network = UsageNetwork.WIFI,
+            fromIndex = 1,
+            toIndex = 0,
+        )
+        assertEquals(
+            listOf("باقة احتياطية", "باقة أساسية"),
+            reordered.allPlansFor(UsageNetwork.WIFI).map { it.name },
+        )
+
+        // عند انتهاء الباقة بدون باقات إضافية تُسجّل في سجل الباقات المنتهية مع تاريخ البدء والانتهاء
+        val completedSettings = reordered.promoteExpiredPlansIfNeeded(
+            wifiUsedBytes = 50_000_000_000L,
+            mobileUsedBytes = 0L,
+            now = now + 5L * 86_400_000L,
+        )
+        val completedRecord = completedSettings.completedPlansFor(UsageNetwork.WIFI).single()
+        assertEquals("باقة احتياطية", completedRecord.name)
+        assertEquals(now, completedRecord.startMillis)
+        assertEquals(now + 5L * 86_400_000L, completedRecord.endMillis)
+
+        val olderRecord = CompletedPlanRecord(
+            id = "older-1",
+            planId = "old",
+            name = "باقة قديمة",
+            quotaBytes = 20_000_000_000L,
+            startMillis = now - 40L * 86_400_000L,
+            endMillis = now - 10L * 86_400_000L,
+            usedBytes = 20_000_000_000L,
+        )
+        val withTwoCompleted = completedSettings.withCompletedPlansFor(
+            UsageNetwork.WIFI,
+            listOf(olderRecord, completedRecord),
+        )
+        val encodedCompleted = PlanStorageCodec.encodeCompletedPlans(
+            withTwoCompleted.completedPlansFor(UsageNetwork.WIFI),
+        )
+        assertEquals(
+            withTwoCompleted.completedPlansFor(UsageNetwork.WIFI),
+            PlanStorageCodec.decodeCompletedPlans(encodedCompleted),
+        )
+
+        val newestFirstState = UiState(
+            settings = withTwoCompleted,
+            historyPlanNetwork = UsageNetwork.WIFI,
+            historyPlanSortOrder = HistoryPlanSortOrder.NEWEST_FIRST,
+        )
+        assertEquals(
+            listOf("باقة احتياطية", "باقة قديمة"),
+            newestFirstState.visibleCompletedPlans.map { it.name },
+        )
+
+        val oldestFirstState = newestFirstState.copy(
+            historyPlanSortOrder = HistoryPlanSortOrder.OLDEST_FIRST,
+        )
+        assertEquals(
+            listOf("باقة قديمة", "باقة احتياطية"),
+            oldestFirstState.visibleCompletedPlans.map { it.name },
+        )
+
+        // اختبار إعادة تعيين الباقة: يصفر التفعيل ويعطل خيار «امنع التعديل»
+        val lockedActive = AppSettings(
+            planId = "wifi-locked",
+            planName = "باقة مقفلة",
+            quotaBytes = 50_000_000_000L,
+            planPreventEdit = true,
+            planPendingActivation = false,
+            planActivatedAtMillis = now,
+        )
+        val afterReset = lockedActive.resetActivePlan(UsageNetwork.WIFI)
+        assertFalse(afterReset.planFor(UsageNetwork.WIFI).preventEdit)
+        assertTrue(afterReset.planFor(UsageNetwork.WIFI).pendingActivation)
+        assertEquals(0L, afterReset.planFor(UsageNetwork.WIFI).activatedAtMillis)
     }
 }
