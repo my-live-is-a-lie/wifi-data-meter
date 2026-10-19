@@ -365,7 +365,7 @@ fun SettingsScreen(
                                             contentDescription = stringResource(R.string.plan_logo_label),
                                             contentScale = ContentScale.Crop,
                                             modifier = Modifier
-                                                .size(44.dp)
+                                                .size(35.dp)
                                                 .clip(RoundedCornerShape(6.dp)),
                                         )
                                     }
@@ -811,6 +811,7 @@ fun SettingsScreen(
             network = selectedPlanNetwork,
             activePlan = state.planFor(selectedPlanNetwork),
             savedPlans = settings.savedPlansFor(selectedPlanNetwork),
+            onSelectNetwork = { selectedPlanNetwork = it },
             onDismiss = { showPlansListDialog = false },
             onActivateCurrentPlan = { onActivatePlan(selectedPlanNetwork) },
             onEditActivePlan = {
@@ -3030,7 +3031,7 @@ private fun QuotaDialog(
                     )
                 }
 
-                if (!lockNetworkType) {
+                if (!lockNetworkType && !hasActiveQuota) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -3089,7 +3090,11 @@ private fun QuotaDialog(
                 enabled = canSave,
                 shape = AppButtonShape,
             ) {
-                Text(text = stringResource(R.string.action_save))
+                Text(
+                    text = stringResource(
+                        if (hasActiveQuota) R.string.action_save else R.string.plans_action_add,
+                    ),
+                )
             }
         },
         dismissButton = {
@@ -3362,7 +3367,8 @@ private fun AdditionalPlanRow(
     // ويكون السحب لليمين دائمًا لتوسيع الشريط الأحمر وحذف الباقة الإضافية.
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
         val currentOffsetDp = with(density) { offsetX.value.coerceAtLeast(0f).toDp() }
-        val redBarWidthDp = 10.dp + currentOffsetDp
+        val redBarRestingWidthDp = 5.dp
+        val redBarWidthDp = redBarRestingWidthDp + currentOffsetDp
 
         Box(
             modifier = Modifier
@@ -3417,16 +3423,15 @@ private fun AdditionalPlanRow(
                         shape = RoundedCornerShape(16.dp)
                         clip = true
                     }
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                    .background(deleteRed),
             ) {
-                // الشريط الأحمر في أقصى اليسار: رفيع في الحالة العادية، ويتوسع لليمين عند السحب،
+                // منطقة الشريط الأحمر في أقصى اليسار: هلال رفيع منحني في الحالة العادية، ويتوسع لليمين عند السحب،
                 // وعند الضغط عليه مرة واحدة يتحرك قليلًا لليمين ليظهر جزء من سلة المهملات ثم يعود بتأثير مطاطي.
                 Box(
                     modifier = Modifier
                         .align(Alignment.CenterStart)
-                        .width(redBarWidthDp)
+                        .width(redBarWidthDp.coerceAtLeast(14.dp))
                         .fillMaxHeight()
-                        .background(deleteRed)
                         .clickable(role = Role.Button) {
                             if (offsetX.value >= deleteThresholdPx * 0.7f) {
                                 scope.launch {
@@ -3457,7 +3462,7 @@ private fun AdditionalPlanRow(
                         },
                     contentAlignment = Alignment.Center,
                 ) {
-                    if (redBarWidthDp > 18.dp) {
+                    if (redBarWidthDp > 16.dp) {
                         val revealAlpha = ((offsetX.value / peekRevealPx).coerceIn(0f, 1f))
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
@@ -3470,7 +3475,7 @@ private fun AdditionalPlanRow(
                                 tint = Color.White,
                                 modifier = Modifier.size(20.dp),
                             )
-                            if (redBarWidthDp > 48.dp) {
+                            if (redBarWidthDp > 46.dp) {
                                 Text(
                                     text = stringResource(R.string.plans_action_delete),
                                     style = MaterialTheme.typography.labelSmall,
@@ -3482,11 +3487,14 @@ private fun AdditionalPlanRow(
                     }
                 }
 
-                // محتوى صف الباقة الإضافية يتحرك لليمين مع توسع الشريط الأحمر
+                // سطح البطاقة الداكن ذو الحواف الدائرية ينزلق فوق الخلفية الحمراء ليترك شريطًا هلاليًا رفيعًا في اليسار
                 Row(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(start = redBarWidthDp + 6.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
+                        .padding(start = redBarWidthDp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        .padding(start = 8.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(
@@ -3529,7 +3537,7 @@ private fun AdditionalPlanRow(
                                     contentDescription = stringResource(R.string.plan_logo_label),
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier
-                                        .size(38.dp)
+                                        .size(30.dp)
                                         .clip(RoundedCornerShape(6.dp)),
                                 )
                             }
@@ -3578,7 +3586,7 @@ private fun AdditionalPlanRow(
                 Box(
                     modifier = Modifier
                         .align(Alignment.CenterStart)
-                        .padding(start = redBarWidthDp + 40.dp)
+                        .padding(start = redBarWidthDp + 42.dp)
                         .size(36.dp)
                         .clip(CircleShape)
                         .clickable(role = Role.Button, onClick = onTapSwapOrder)
@@ -3867,7 +3875,11 @@ private fun AdditionalPlanDialog(
                 enabled = canSave,
                 shape = AppButtonShape,
             ) {
-                Text(text = stringResource(R.string.quota_update_action))
+                Text(
+                    text = stringResource(
+                        if (isEditing) R.string.action_save else R.string.plans_action_add,
+                    ),
+                )
             }
         },
         dismissButton = {
@@ -3884,6 +3896,7 @@ private fun PlansListDialog(
     network: UsageNetwork,
     activePlan: DataPlan,
     savedPlans: List<DataPlan>,
+    onSelectNetwork: (UsageNetwork) -> Unit,
     onDismiss: () -> Unit,
     onActivateCurrentPlan: () -> Unit,
     onEditActivePlan: () -> Unit,
@@ -3908,17 +3921,44 @@ private fun PlansListDialog(
                     text = stringResource(R.string.plans_dialog_title),
                     style = MaterialTheme.typography.headlineSmall,
                 )
-                Text(
-                    text = stringResource(
-                        if (network == UsageNetwork.WIFI) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    listOf(UsageNetwork.WIFI, UsageNetwork.MOBILE).forEach { targetNetwork ->
+                        val selected = network == targetNetwork
+                        val labelRes = if (targetNetwork == UsageNetwork.WIFI) {
                             R.string.plan_card_network_wifi
                         } else {
                             R.string.plan_card_network_mobile
-                        },
-                    ),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(
+                                    if (selected) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.surfaceContainerLow
+                                    },
+                                )
+                                .clickable(role = Role.Button) { onSelectNetwork(targetNetwork) }
+                                .padding(horizontal = 14.dp, vertical = 7.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = stringResource(labelRes),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = if (selected) {
+                                    MaterialTheme.colorScheme.onPrimary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                maxLines = 1,
+                            )
+                        }
+                    }
+                }
             }
         },
         text = {
@@ -3942,7 +3982,7 @@ private fun PlansListDialog(
                         plan = activePlan,
                         isActivePlan = true,
                         onPrimaryAction = if (activePlan.pendingActivation) onActivateCurrentPlan else null,
-                        primaryActionLabel = stringResource(R.string.quota_activate_action),
+                        primaryActionLabel = stringResource(R.string.plans_action_switch),
                         onAddAdditionalClick = if (activePlan.additionalPlans.size < MAX_ADDITIONAL_PLANS) {
                             onAddAdditionalPlanToActive
                         } else {
@@ -4075,200 +4115,317 @@ private fun PlanListItemCard(
     onEditClick: () -> Unit,
     onDeleteClick: () -> Unit,
 ) {
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    val maxRevealPx = with(density) { 96.dp.toPx() }
+    val activateThresholdPx = with(density) { 64.dp.toPx() }
+    val peekRevealPx = with(density) { 44.dp.toPx() }
+    val offsetX = remember { Animatable(0f) }
+    val canSwipeToActivate = onPrimaryAction != null
     val logoBitmap = remember(plan.logoPath) { loadPlanLogoBitmap(plan.logoPath) }
     val durationText = "${plan.durationValue} ${stringResource(plan.durationUnit.labelResource())}"
     val capacityText = Format.bytes(plan.quotaBytes)
     val hasPlanName = plan.name.isNotBlank()
+    val activateBarColor = MaterialTheme.colorScheme.primary
+    val activateBarContentColor = MaterialTheme.colorScheme.onPrimary
+    val cardBackgroundColor = if (isActivePlan) {
+        MaterialTheme.colorScheme.surfaceContainerHigh
+    } else {
+        MaterialTheme.colorScheme.surfaceContainerLow
+    }
+    val cardBorderColor = if (isActivePlan) {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
+    } else {
+        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+    }
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(
-                if (isActivePlan) {
-                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
-                } else {
-                    MaterialTheme.colorScheme.surfaceContainerLow
-                },
-            )
-            .border(
-                width = 1.dp,
-                color = if (isActivePlan) {
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
-                } else {
-                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                },
-                shape = RoundedCornerShape(16.dp),
-            )
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
+    // نستخدم تخطيط LTR فيزيائي للبطاقة الخارجية حتى يكون شريط التفعيل في أقصى اليسار
+    // ويكون السحب لليمين دائمًا لتفعيل الباقة، تمامًا مثل شريط الحذف في الباقات الإضافية.
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+        val currentOffsetDp = with(density) { offsetX.value.coerceAtLeast(0f).toDp() }
+        val restingStripWidthDp = if (canSwipeToActivate) 5.dp else 0.dp
+        val activateBarWidthDp = restingStripWidthDp + currentOffsetDp
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(if (canSwipeToActivate) activateBarColor else cardBackgroundColor)
+                .then(
+                    if (canSwipeToActivate) {
+                        Modifier.pointerInput(plan.id) {
+                            detectHorizontalDragGestures(
+                                onHorizontalDrag = { change, dragAmount ->
+                                    change.consume()
+                                    val next = (offsetX.value + dragAmount).coerceIn(0f, maxRevealPx * 1.15f)
+                                    scope.launch { offsetX.snapTo(next) }
+                                },
+                                onDragEnd = {
+                                    val triggered = offsetX.value >= activateThresholdPx
+                                    scope.launch {
+                                        offsetX.animateTo(
+                                            targetValue = 0f,
+                                            animationSpec = spring(
+                                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                                stiffness = Spring.StiffnessMediumLow,
+                                            ),
+                                        )
+                                    }
+                                    if (triggered) {
+                                        onPrimaryAction?.invoke()
+                                    }
+                                },
+                                onDragCancel = {
+                                    scope.launch {
+                                        offsetX.animateTo(
+                                            targetValue = 0f,
+                                            animationSpec = spring(
+                                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                                stiffness = Spring.StiffnessMediumLow,
+                                            ),
+                                        )
+                                    }
+                                },
+                            )
+                        }
+                    } else {
+                        Modifier
+                    },
+                ),
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.weight(1f),
-            ) {
-                if (logoBitmap != null) {
-                    Image(
-                        bitmap = logoBitmap,
-                        contentDescription = stringResource(R.string.plan_logo_label),
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .size(38.dp)
-                            .clip(RoundedCornerShape(6.dp)),
-                    )
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    if (hasPlanName) {
-                        Text(
-                            text = plan.name,
-                            style = MaterialTheme.typography.titleMediumEmphasized,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
+            if (canSwipeToActivate) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .width(activateBarWidthDp.coerceAtLeast(14.dp))
+                        .matchParentSize()
+                        .clickable(role = Role.Button) {
+                            if (offsetX.value >= activateThresholdPx * 0.7f) {
+                                scope.launch {
+                                    offsetX.animateTo(
+                                        targetValue = 0f,
+                                        animationSpec = spring(
+                                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                                            stiffness = Spring.StiffnessLow,
+                                        ),
+                                    )
+                                }
+                                onPrimaryAction?.invoke()
+                            } else {
+                                scope.launch {
+                                    offsetX.animateTo(
+                                        targetValue = peekRevealPx,
+                                        animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing),
+                                    )
+                                    offsetX.animateTo(
+                                        targetValue = 0f,
+                                        animationSpec = spring(
+                                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                                            stiffness = Spring.StiffnessLow,
+                                        ),
+                                    )
+                                }
+                            }
+                        },
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    if (activateBarWidthDp > 16.dp) {
+                        val revealAlpha = ((offsetX.value / peekRevealPx).coerceIn(0f, 1f))
+                        Column(
+                            modifier = Modifier
+                                .width(activateBarWidthDp)
+                                .graphicsLayer { alpha = revealAlpha },
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Check,
+                                contentDescription = primaryActionLabel,
+                                tint = activateBarContentColor,
+                                modifier = Modifier.size(20.dp),
+                            )
+                            if (activateBarWidthDp > 46.dp) {
+                                Text(
+                                    text = primaryActionLabel,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = activateBarContentColor,
+                                    maxLines = 1,
+                                )
+                            }
+                        }
                     }
+                }
+            }
+
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(end = activateBarWidthDp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(cardBackgroundColor)
+                        .border(
+                            width = 1.dp,
+                            color = cardBorderColor,
+                            shape = RoundedCornerShape(16.dp),
+                        )
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
                     Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            if (logoBitmap != null) {
+                                Image(
+                                    bitmap = logoBitmap,
+                                    contentDescription = stringResource(R.string.plan_logo_label),
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .size(30.dp)
+                                        .clip(RoundedCornerShape(6.dp)),
+                                )
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                if (hasPlanName) {
+                                    Text(
+                                        text = plan.name,
+                                        style = MaterialTheme.typography.titleMediumEmphasized,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                }
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                ) {
+                                    val infoStyle = if (hasPlanName) {
+                                        MaterialTheme.typography.bodySmall
+                                    } else {
+                                        MaterialTheme.typography.titleSmall
+                                    }
+                                    val infoColor = if (hasPlanName) {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface
+                                    }
+                                    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                                        Text(
+                                            text = capacityText,
+                                            style = infoStyle,
+                                            color = infoColor,
+                                            maxLines = 1,
+                                        )
+                                    }
+                                    Text(
+                                        text = "•",
+                                        style = infoStyle,
+                                        color = infoColor,
+                                        maxLines = 1,
+                                    )
+                                    Text(
+                                        text = durationText,
+                                        style = infoStyle,
+                                        color = infoColor,
+                                        maxLines = 1,
+                                    )
+                                }
+                            }
+                        }
+
+                        if (isActivePlan) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(50))
+                                    .background(
+                                        if (plan.pendingActivation) {
+                                            MaterialTheme.colorScheme.secondaryContainer
+                                        } else {
+                                            MaterialTheme.colorScheme.primaryContainer
+                                        },
+                                    )
+                                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                            ) {
+                                Text(
+                                    text = stringResource(
+                                        if (plan.pendingActivation) {
+                                            R.string.plans_status_pending
+                                        } else {
+                                            R.string.plans_status_active
+                                        },
+                                    ),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (plan.pendingActivation) {
+                                        MaterialTheme.colorScheme.onSecondaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.onPrimaryContainer
+                                    },
+                                )
+                            }
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        val infoStyle = if (hasPlanName) {
-                            MaterialTheme.typography.bodySmall
-                        } else {
-                            MaterialTheme.typography.titleSmall
+                        if (onAddAdditionalClick != null) {
+                            FilledTonalButton(
+                                onClick = onAddAdditionalClick,
+                                shape = AppButtonShape,
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                modifier = Modifier.height(34.dp),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Add,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = stringResource(R.string.plans_action_add_additional),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    maxLines = 1,
+                                )
+                            }
                         }
-                        val infoColor = if (hasPlanName) {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        }
-                        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-                            Text(
-                                text = capacityText,
-                                style = infoStyle,
-                                color = infoColor,
-                                maxLines = 1,
+
+                        Spacer(modifier = Modifier.weight(1f))
+
+                        IconButton(
+                            onClick = onEditClick,
+                            modifier = Modifier.size(34.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Edit,
+                                contentDescription = stringResource(R.string.plans_action_edit),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp),
                             )
                         }
-                        Text(
-                            text = "•",
-                            style = infoStyle,
-                            color = infoColor,
-                            maxLines = 1,
-                        )
-                        Text(
-                            text = durationText,
-                            style = infoStyle,
-                            color = infoColor,
-                            maxLines = 1,
-                        )
+
+                        IconButton(
+                            onClick = onDeleteClick,
+                            modifier = Modifier.size(34.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Delete,
+                                contentDescription = stringResource(R.string.plans_action_delete),
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
                     }
                 }
-            }
-
-            if (isActivePlan) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(50))
-                        .background(
-                            if (plan.pendingActivation) {
-                                MaterialTheme.colorScheme.secondaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.primaryContainer
-                            },
-                        )
-                        .padding(horizontal = 10.dp, vertical = 4.dp),
-                ) {
-                    Text(
-                        text = stringResource(
-                            if (plan.pendingActivation) {
-                                R.string.plans_status_pending
-                            } else {
-                                R.string.plans_status_active
-                            },
-                        ),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (plan.pendingActivation) {
-                            MaterialTheme.colorScheme.onSecondaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.onPrimaryContainer
-                        },
-                    )
-                }
-            }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            if (onPrimaryAction != null) {
-                Button(
-                    onClick = onPrimaryAction,
-                    shape = AppButtonShape,
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                    modifier = Modifier.height(34.dp),
-                ) {
-                    Text(
-                        text = primaryActionLabel,
-                        style = MaterialTheme.typography.labelMedium,
-                        maxLines = 1,
-                    )
-                }
-            }
-
-            if (onAddAdditionalClick != null) {
-                FilledTonalButton(
-                    onClick = onAddAdditionalClick,
-                    shape = AppButtonShape,
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                    modifier = Modifier.height(34.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Add,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = stringResource(R.string.plans_action_add_additional),
-                        style = MaterialTheme.typography.labelMedium,
-                        maxLines = 1,
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            IconButton(
-                onClick = onEditClick,
-                modifier = Modifier.size(34.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Edit,
-                    contentDescription = stringResource(R.string.plans_action_edit),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp),
-                )
-            }
-
-            IconButton(
-                onClick = onDeleteClick,
-                modifier = Modifier.size(34.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Delete,
-                    contentDescription = stringResource(R.string.plans_action_delete),
-                    tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(18.dp),
-                )
             }
         }
     }
