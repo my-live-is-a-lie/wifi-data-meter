@@ -638,7 +638,9 @@ private fun OverlayTheme(settings: AppSettings, content: @Composable () -> Unit)
         ThemeMode.LIGHT -> false
         ThemeMode.DARK, ThemeMode.BLACK -> true
     }
-    val language = LocalConfiguration.current.locales.firstOrNull()?.language ?: "ar"
+    val locales = LocalConfiguration.current.locales
+    // LocaleList ليس Iterable؛ get(0) آمنة ما دامت هناك لغة واحدة على الأقل.
+    val language = runCatching { locales.get(0).language }.getOrDefault("ar")
     val layoutDirection = when (settings.layoutDirection) {
         AppLayoutDirection.RTL -> LayoutDirection.Rtl
         AppLayoutDirection.LTR -> LayoutDirection.Ltr

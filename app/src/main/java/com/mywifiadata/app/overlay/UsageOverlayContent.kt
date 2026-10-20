@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.AbsoluteRoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -132,9 +133,9 @@ private fun OverlayPill(state: OverlayUiState, actions: OverlayActions) {
 private fun OverlayEdgeTab(state: OverlayUiState, actions: OverlayActions) {
     // زوايا مطلقة (لا Start/End) كي يبقى الاستدارة في الجهة الداخلية مهما كان اتجاه الواجهة.
     val shape = if (state.edge == OverlayEdge.LEFT) {
-        RoundedCornerShape(topLeft = 0.dp, topRight = 18.dp, bottomRight = 18.dp, bottomLeft = 0.dp)
+        AbsoluteRoundedCornerShape(topLeft = 0.dp, topRight = 18.dp, bottomRight = 18.dp, bottomLeft = 0.dp)
     } else {
-        RoundedCornerShape(topLeft = 18.dp, topRight = 0.dp, bottomRight = 0.dp, bottomLeft = 18.dp)
+        AbsoluteRoundedCornerShape(topLeft = 18.dp, topRight = 0.dp, bottomRight = 0.dp, bottomLeft = 18.dp)
     }
     val (amount, unit) = Format.bytesParts(state.totals.totalBytes)
     Surface(
