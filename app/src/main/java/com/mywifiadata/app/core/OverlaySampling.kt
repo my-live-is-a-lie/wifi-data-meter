@@ -24,6 +24,12 @@ object OverlaySampling {
      */
     const val RATE_WINDOW_MILLIS = 16_000L
 
+    /**
+     * نافذة المعدّل اللحظي عند القراءة المباشرة من `TrafficStats` (كل ثانية):
+     * متوسط آخر 3 ثوانٍ، فيتحرك الرقم كل ثانية دون أن يقفز بعنف.
+     */
+    const val LIVE_RATE_WINDOW_MILLIS = 3_000L
+
     /** أقل مدة تُقبل لحساب معدّل معقول (بايت/ثانية). */
     private const val MIN_RATE_MILLIS = 1_000L
 
@@ -38,6 +44,34 @@ object OverlaySampling {
             rxBytes = (currentTotals.rxBytes - startTotals.rxBytes).coerceAtLeast(0L),
             txBytes = (currentTotals.txBytes - startTotals.txBytes).coerceAtLeast(0L),
         )
+
+    /**
+     * الفرق بين قراءتين تراكميتين من العدّاد نفسه.
+     * التراجع (إعادة تشغيل الجهاز أو تصفير العدّاد) يُعامل كصفر لا كرقم سالب.
+     */
+    fun delta(previous: TrafficTotals, current: TrafficTotals): TrafficTotals =
+        TrafficTotals(
+            rxBytes = (current.rxBytes - previous.rxBytes).coerceAtLeast(0L),
+            txBytes = (current.txBytes - previous.txBytes).coerceAtLeast(0L),
+        )
+
+    /**
+     * فرق استهلاك الواي فاي فقط = فرق إجمالي الجهاز − فرق بيانات الجوال.
+     * نطرح **الفروق** لا القراءتين المطلقتين كي لا تنتج أرقام سالبة من اختلاف لحظة القراءة.
+     */
+    fun wifiDelta(
+        previousTotal: TrafficTotals,
+        currentTotal: TrafficTotals,
+        previousMobile: TrafficTotals,
+        currentMobile: TrafficTotals,
+    ): TrafficTotals {
+        val total = delta(previousTotal, currentTotal)
+        val mobile = delta(previousMobile, currentMobile)
+        return TrafficTotals(
+            rxBytes = (total.rxBytes - mobile.rxBytes).coerceAtLeast(0L),
+            txBytes = (total.txBytes - mobile.txBytes).coerceAtLeast(0L),
+        )
+    }
 
     /** بايت/ثانية بين قراءتين فعليتين؛ صفر إذا لم يمرّ وقت كافٍ أو تراجعت القراءة. */
     fun rate(first: UsageSample, last: UsageSample): TrafficTotalsRate {
@@ -56,9 +90,13 @@ object OverlaySampling {
      *
      * [samples] مرتّبة من الأقدم إلى الأحدث.
      */
-    fun rateWindowStart(samples: List<UsageSample>, nowMillis: Long): UsageSample? {
+    fun rateWindowStart(
+        samples: List<UsageSample>,
+        nowMillis: Long,
+        windowMillis: Long = RATE_WINDOW_MILLIS,
+    ): UsageSample? {
         if (samples.isEmpty()) return null
-        val cutoff = nowMillis - RATE_WINDOW_MILLIS
+        val cutoff = nowMillis - windowMillis
         val index = samples.indexOfLast { it.millis <= cutoff }
         return when {
             index < 0 -> samples.first()

@@ -90,4 +90,44 @@ class OverlaySamplingTest {
         // أندرويد لا يسمح بتحديث الإحصاءات أكثر من مرة كل 15 ثانية للمستخدم العادي.
         assertEquals(16_000L, OverlaySampling.RATE_WINDOW_MILLIS)
     }
+
+    @Test
+    fun `delta never goes negative after a counter reset`() {
+        val before = TrafficTotals(rxBytes = 9_000L, txBytes = 3_000L)
+        val afterReboot = TrafficTotals(rxBytes = 100L, txBytes = 50L)
+
+        assertEquals(TrafficTotals.Empty, OverlaySampling.delta(before, afterReboot))
+    }
+
+    @Test
+    fun `wifi delta is total delta minus mobile delta`() {
+        val wifi = OverlaySampling.wifiDelta(
+            previousTotal = TrafficTotals(1_000L, 500L),
+            currentTotal = TrafficTotals(4_000L, 900L),
+            previousMobile = TrafficTotals(200L, 100L),
+            currentMobile = TrafficTotals(700L, 150L),
+        )
+
+        assertEquals(TrafficTotals(rxBytes = 2_500L, txBytes = 350L), wifi)
+    }
+
+    @Test
+    fun `live window is three seconds and picks a sample outside it`() {
+        assertEquals(3_000L, OverlaySampling.LIVE_RATE_WINDOW_MILLIS)
+        val samples = listOf(
+            UsageSample(1_000L, TrafficTotals(0L, 0L)),
+            UsageSample(2_000L, TrafficTotals(10L, 0L)),
+            UsageSample(3_000L, TrafficTotals(20L, 0L)),
+            UsageSample(4_000L, TrafficTotals(30L, 0L)),
+            UsageSample(5_000L, TrafficTotals(40L, 0L)),
+        )
+
+        val start = OverlaySampling.rateWindowStart(
+            samples,
+            5_000L,
+            OverlaySampling.LIVE_RATE_WINDOW_MILLIS,
+        )
+
+        assertEquals(samples[1], start)
+    }
 }
