@@ -540,7 +540,8 @@ fun DashboardScreen(
                             isEditing = isEditing,
                             onOpenPicker = onOpenMonitorPicker,
                             onStart = onStartOverlay,
-                            usageAccessGranted = state.hasUsageAccess,
+                            // لا تُظهر التحذير أثناء التحميل الأول قبل معرفة الحالة.
+                            usageAccessGranted = state.hasUsageAccess || state.isLoading,
                         )
 
                         DashboardLayoutIds.WIFI_CARD -> {

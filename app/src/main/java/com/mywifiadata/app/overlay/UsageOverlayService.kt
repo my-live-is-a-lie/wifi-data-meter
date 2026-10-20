@@ -624,7 +624,8 @@ class UsageOverlayService :
             )
             return
         }
-        ui.value = ui.value.copy(wifiConnected = wifiConnected)
+        // مُنحت الصلاحية (أو كانت ممنوحة): أزل اللافتة حتى لو تعذّرت قراءة هذه الدورة.
+        ui.value = ui.value.copy(usageAccessMissing = false, wifiConnected = wifiConnected)
 
         val target = ui.value.target
         // قراءة فاشلة ليست صفرًا: نتجاهل هذه الدورة ونبقي خط الأساس كما هو.
