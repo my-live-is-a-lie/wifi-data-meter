@@ -88,6 +88,15 @@ class FormatTest {
     }
 
     @Test
+    fun `session elapsed time shows minutes and seconds`() {
+        assertEquals("00:00", Format.elapsed(0L))
+        assertEquals("00:00", Format.elapsed(-5_000L))
+        assertEquals("00:09", Format.elapsed(9_400L))
+        assertEquals("05:09", Format.elapsed(309_000L))
+        assertEquals("1:02:33", Format.elapsed(3_753_000L))
+    }
+
+    @Test
     fun `short byte format is compact`() {
         assertEquals("1.5G", Format.bytesShort(1_500_000_000))
         assertEquals("500M", Format.bytesShort(500_000_000))

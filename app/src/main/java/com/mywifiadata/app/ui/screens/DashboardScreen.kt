@@ -129,6 +129,7 @@ import com.mywifiadata.app.R
 import com.mywifiadata.app.core.Format
 import com.mywifiadata.app.data.model.AppUsage
 import com.mywifiadata.app.data.model.DashboardLayout
+import com.mywifiadata.app.data.model.MonitorTarget
 import com.mywifiadata.app.data.model.DashboardLayoutIds
 import com.mywifiadata.app.data.model.WifiBand
 import com.mywifiadata.app.data.model.WifiStatus
@@ -141,6 +142,8 @@ import com.mywifiadata.app.ui.components.ClockUsageGauge
 import com.mywifiadata.app.ui.components.EmptyState
 import com.mywifiadata.app.ui.components.ExpressiveCard
 import com.mywifiadata.app.ui.components.InfoRow
+import com.mywifiadata.app.ui.components.MonitorCard
+import com.mywifiadata.app.ui.components.MonitorTargetPickerDialog
 import com.mywifiadata.app.ui.components.PermissionCard
 import com.mywifiadata.app.ui.components.QuotaBar
 import com.mywifiadata.app.ui.components.SectionHeader
@@ -301,6 +304,11 @@ fun DashboardScreen(
     contentPadding: PaddingValues = PaddingValues(16.dp),
     onLoadTodayApps: () -> Unit = {},
     dashboardListState: LazyListState = rememberLazyListState(),
+    onOpenMonitorPicker: () -> Unit = {},
+    onSelectMonitorTarget: (MonitorTarget) -> Unit = {},
+    onDismissMonitorPicker: () -> Unit = {},
+    onStartOverlay: () -> Unit = {},
+    overlayRunning: Boolean = false,
 ) {
     var isHeroCompact by rememberSaveable { mutableStateOf(false) }
     var selectedCardStyle by rememberSaveable {
@@ -380,6 +388,17 @@ fun DashboardScreen(
 
             else -> true
         }
+    }
+
+    if (state.monitorPickerVisible) {
+        MonitorTargetPickerDialog(
+            apps = state.monitorApps,
+            isLoading = state.isMonitorAppsLoading,
+            selected = state.settings.monitorTarget,
+            history = state.settings.monitorTargetHistory,
+            onSelect = onSelectMonitorTarget,
+            onDismiss = onDismissMonitorPicker,
+        )
     }
 
     Column(modifier = modifier.fillMaxSize()) {
@@ -474,6 +493,7 @@ fun DashboardScreen(
                     },
                     showVisibilityButton = cardId !in DashboardLayoutIds.COMPOSITE_CARD_IDS,
                     dragShield = cardId == DashboardLayoutIds.USAGE_CARD ||
+                        cardId == DashboardLayoutIds.MONITOR_CARD ||
                         cardId == DashboardLayoutIds.WIFI_CARD ||
                         cardId == DashboardLayoutIds.SPEED_TEST_CARD ||
                         cardId == DashboardLayoutIds.SESSION_CARD,
@@ -512,6 +532,14 @@ fun DashboardScreen(
                             itemBounds = quickActionBounds,
                             onLayoutChange = onDashboardLayoutChange,
                             dragState = dragState,
+                        )
+
+                        DashboardLayoutIds.MONITOR_CARD -> MonitorCard(
+                            target = state.settings.monitorTarget,
+                            isRunning = overlayRunning,
+                            isEditing = isEditing,
+                            onOpenPicker = onOpenMonitorPicker,
+                            onStart = onStartOverlay,
                         )
 
                         DashboardLayoutIds.WIFI_CARD -> {

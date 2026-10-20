@@ -358,6 +358,15 @@ data class AppSettings(
     /** نمط مخططات التطبيقات محفوظ ليستمر بعد إعادة تشغيل التطبيق. */
     val appsLineChartEnabled: Boolean = false,
     val appSearchHistory: List<AppSearchSelection> = emptyList(),
+    /** هدف النافذة العائمة للاستهلاك المباشر؛ الافتراضي «جميع التطبيقات». */
+    val monitorTarget: MonitorTarget = MonitorTarget.AllApps,
+    /** ترتيب التطبيقات بحسب تكرار اختيارها في نافذة المراقبة (منفصل عن بحث التطبيقات). */
+    val monitorTargetHistory: List<AppSearchSelection> = emptyList(),
+    /** مركز النافذة العائمة كنسبة من عرض/ارتفاع الشاشة. */
+    val overlayAnchorX: Float = 0.5f,
+    val overlayAnchorY: Float = 0.24f,
+    /** الحافة التي يلتصق بها اللسان الجانبي. */
+    val overlayEdge: OverlayEdge = OverlayEdge.LEFT,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val layoutDirection: AppLayoutDirection = AppLayoutDirection.AUTO,
     val sessionStartMillis: Long = System.currentTimeMillis(),

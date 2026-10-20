@@ -403,4 +403,28 @@
     <string name="plan_prevent_edit_warning_title">Enable prevent editing</string>
     <string name="plan_prevent_edit_warning_body">When “Prevent editing” is enabled and saved, you will not be able to modify the plan’s capacity or duration later (only name and logo can be changed).\n\nYou can disable this option later by tapping “Reset” to reset the plan’s usage.</string>
     <string name="apps_fast_scroll">App list position and fast scrolling</string>
+    <!-- Floating live usage window -->
+    <string name="monitor_card_title">Floating live usage window</string>
+    <string name="monitor_all_apps">All apps</string>
+    <string name="monitor_start">Show floating window</string>
+    <string name="monitor_pick_target">Choose monitored app</string>
+    <string name="monitor_picker_title">Choose apps</string>
+    <string name="monitor_picker_body">Pick the apps whose usage you want to monitor</string>
+    <string name="monitor_picker_search">Search for an app</string>
+    <string name="monitor_picker_empty">No matching app.</string>
+    <string name="monitor_picker_close">Close app picker</string>
+    <string name="monitor_picker_selected">Selected</string>
+    <string name="monitor_picker_unselected">Not selected</string>
+    <string name="overlay_time">Time</string>
+    <string name="overlay_pause">Pause</string>
+    <string name="overlay_resume">Resume</string>
+    <string name="overlay_minimize">Minimize window</string>
+    <string name="overlay_close">Close window</string>
+    <string name="overlay_change_target">Change monitored app</string>
+    <string name="overlay_permission_title">Display over other apps</string>
+    <string name="overlay_permission_body">To show the floating window while you use other apps, allow Wi‑Fi Data to display over other apps.</string>
+    <string name="overlay_permission_open">Open settings</string>
+    <string name="channel_overlay_name">Floating window</string>
+    <string name="channel_overlay_desc">Persistent notification that keeps the floating usage window visible.</string>
+    <string name="overlay_notification_title">Floating usage window</string>
 </resources>

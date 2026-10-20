@@ -42,6 +42,7 @@ import com.mywifiadata.app.data.model.CompletedPlanRecord
 import com.mywifiadata.app.data.model.DayUsage
 import com.mywifiadata.app.data.model.DashboardLayout
 import com.mywifiadata.app.data.model.DataPlan
+import com.mywifiadata.app.data.model.MonitorTarget
 import com.mywifiadata.app.data.model.PlanDraft
 import com.mywifiadata.app.data.model.PlanNetworkType
 import com.mywifiadata.app.data.model.SpeedSample
@@ -154,6 +155,10 @@ data class UiState(
     val appsSortOrder: AppsSortOrder = AppsSortOrder.HIGHEST_USAGE,
     val appsSearchActive: Boolean = false,
     val appsSearchQuery: String = "",
+    /** حوار اختيار هدف النافذة العائمة وقائمة تطبيقاته. */
+    val monitorPickerVisible: Boolean = false,
+    val monitorApps: List<AppUsage> = emptyList(),
+    val isMonitorAppsLoading: Boolean = false,
     // تفصيل قسم التطبيقات: أسابيع/أيام/ساعات مع الشريحة المختارة حاليًا.
     val appsWeeks: List<UsageSlice> = emptyList(),
     val appsDays: List<UsageSlice> = emptyList(),
@@ -650,6 +655,41 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
             _uiState.update { it.copy(settings = repository.settingsStore.current) }
         }
         openAppDetail(app, state.appsNetwork)
+    }
+
+    /** يفتح قائمة اختيار هدف النافذة العائمة ويحمّل التطبيقات المثبّتة. */
+    fun openMonitorPicker() {
+        if (_uiState.value.monitorPickerVisible) return
+        _uiState.update { it.copy(monitorPickerVisible = true, isMonitorAppsLoading = true) }
+        viewModelScope.launch {
+            val apps = runCatching { repository.installedApps() }.getOrDefault(emptyList())
+            _uiState.update { it.copy(monitorApps = apps, isMonitorAppsLoading = false) }
+        }
+    }
+
+    fun closeMonitorPicker() {
+        _uiState.update { it.copy(monitorPickerVisible = false) }
+    }
+
+    /**
+     * يثبّت هدف النافذة العائمة ويسجّل الاختيار ليرتفع التطبيق في القائمة لاحقًا.
+     * تغيير الهدف يُصفّر عدّادات النافذة ووقتها (تتولاه الخدمة عند رؤية الهدف الجديد).
+     */
+    fun selectMonitorTarget(target: MonitorTarget) {
+        val now = System.currentTimeMillis()
+        repository.settingsStore.update { settings ->
+            settings.copy(
+                monitorTarget = target,
+                monitorTargetHistory = if (target.isAllApps) {
+                    settings.monitorTargetHistory
+                } else {
+                    AppSearchHistory.record(settings.monitorTargetHistory, target.asUsage(), now)
+                },
+            )
+        }
+        _uiState.update {
+            it.copy(settings = repository.settingsStore.current, monitorPickerVisible = false)
+        }
     }
 
     fun setAppsSortOrder(sortOrder: AppsSortOrder) {

@@ -13,6 +13,7 @@ class DashboardLayoutTest {
                 DashboardLayoutIds.SPEED_TEST_CARD,
                 DashboardLayoutIds.USAGE_CARD,
                 DashboardLayoutIds.QUICK_ACTIONS_CARD,
+                DashboardLayoutIds.MONITOR_CARD,
                 DashboardLayoutIds.WIFI_CARD,
                 DashboardLayoutIds.SESSION_CARD,
             ),
@@ -59,6 +60,7 @@ class DashboardLayoutTest {
                 DashboardLayoutIds.WIFI_CARD,
                 DashboardLayoutIds.USAGE_CARD,
                 DashboardLayoutIds.QUICK_ACTIONS_CARD,
+                DashboardLayoutIds.MONITOR_CARD,
                 DashboardLayoutIds.TODAY_CARD,
                 DashboardLayoutIds.SPEED_TEST_CARD,
                 DashboardLayoutIds.SESSION_CARD,
@@ -80,6 +82,7 @@ class DashboardLayoutTest {
             listOf(
                 DashboardLayoutIds.USAGE_CARD,
                 DashboardLayoutIds.QUICK_ACTIONS_CARD,
+                DashboardLayoutIds.MONITOR_CARD,
                 DashboardLayoutIds.WIFI_CARD,
                 DashboardLayoutIds.TODAY_CARD,
                 DashboardLayoutIds.SPEED_TEST_CARD,

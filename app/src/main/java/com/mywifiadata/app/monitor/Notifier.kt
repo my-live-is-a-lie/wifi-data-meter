@@ -13,6 +13,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.graphics.drawable.IconCompat
 import com.mywifiadata.app.MainActivity
 import com.mywifiadata.app.R
+import com.mywifiadata.app.overlay.UsageOverlayService
 
 /**
  * إنشاء قنوات الإشعارات وبنائها (إشعار المراقبة الدائم + تنبيهات الباقة).
@@ -44,7 +45,17 @@ class Notifier(private val context: Context) {
         ).apply {
             description = context.getString(R.string.channel_alerts_desc)
         }
-        notificationManager.createNotificationChannels(listOf(monitorChannel, alertsChannel))
+        val overlayChannel = NotificationChannel(
+            CHANNEL_OVERLAY,
+            context.getString(R.string.channel_overlay_name),
+            NotificationManager.IMPORTANCE_LOW,
+        ).apply {
+            description = context.getString(R.string.channel_overlay_desc)
+            setShowBadge(false)
+        }
+        notificationManager.createNotificationChannels(
+            listOf(monitorChannel, alertsChannel, overlayChannel),
+        )
     }
 
     /** يبقي إشعار الخدمة ظاهرًا، مع إمكانية إخفاء أيقونته من شريط الحالة. */
@@ -101,6 +112,41 @@ class Notifier(private val context: Context) {
             .build()
     }
 
+    /** إشعار دائم يبقي خدمة النافذة العائمة حيّة ويمكن إغلاقها منه. */
+    fun buildOverlayNotification(targetLabel: String): Notification {
+        val contentIntent = PendingIntent.getActivity(
+            context,
+            3,
+            Intent(context, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val closeIntent = PendingIntent.getService(
+            context,
+            4,
+            Intent(context, UsageOverlayService::class.java)
+                .setAction(UsageOverlayService.ACTION_CLOSE),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        return NotificationCompat.Builder(context, CHANNEL_OVERLAY)
+            .setSmallIcon(R.drawable.ic_stat_usage)
+            .setContentTitle(context.getString(R.string.overlay_notification_title))
+            .setContentText(targetLabel)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(targetLabel))
+            .setContentIntent(contentIntent)
+            .addAction(0, context.getString(R.string.action_close), closeIntent)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setShowWhen(false)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build()
+    }
+
+    fun updateOverlay(notification: Notification) {
+        runCatching { manager?.notify(OVERLAY_ID, notification) }
+    }
+
     fun updateOngoing(notification: Notification) {
         runCatching {
             manager?.notify(ONGOING_ID, notification)
@@ -138,7 +184,9 @@ class Notifier(private val context: Context) {
     companion object {
         const val CHANNEL_MONITOR = "monitor"
         const val CHANNEL_ALERTS = "alerts"
+        const val CHANNEL_OVERLAY = "overlay"
         const val ONGOING_ID = 1001
+        const val OVERLAY_ID = 1005
         const val ALERT_THRESHOLD_ID = 1002
         const val ALERT_EXCEEDED_ID = 1003
         const val ALERT_TIMEOUT_ID = 1004
