@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mywifiadata.app.R
+import com.mywifiadata.app.core.ClockArc
 import com.mywifiadata.app.core.ClockHandGeometry
 import com.mywifiadata.app.core.ClockText
 import com.mywifiadata.app.core.HandObstacle
@@ -56,8 +57,8 @@ import kotlin.math.sin
 
 /**
  * بطاقة «ساعة الاستهلاك»: ميناء ساعة منقّط تحيط به حلقة، ويحيط بالحلقة قوس
- * يعرض نسبة الاستهلاك من الباقة (يبدأ من أعلى الدائرة ويدور عكس عقارب الساعة
- * كما في التصميم المطلوب). داخل الميناء نص الساعة الحالية، ونسبة الاستهلاك،
+ * يعرض نسبة الاستهلاك من الباقة (يبدأ من منتصف أعلى الدائرة وينزل مع عقارب
+ * الساعة حتى منتصف أسفلها عند اكتمال النسبة). داخل الميناء نص الساعة الحالية، ونسبة الاستهلاك،
  * وتسمية «المستهلك» مع قيمته، وعدد الأيام المتبقية أعلى الدائرة.
  *
  * عقارب الساعة (الثواني، الساعات، الدقائق) تتحرك مع وقت الجهاز الحقيقي،
@@ -158,13 +159,13 @@ fun ClockUsageGauge(
                     style = Stroke(width = 1.5.dp.toPx()),
                 )
 
-                // قوس الاستهلاك خارج الحلقة: يبدأ من أسفل الدائرة ويتقدم باتجاه
-                // عقارب الساعة (نحو اليسار ثم الأعلى) كما في تصميم الصورة.
+                // قوس الاستهلاك خارج الحلقة: يبدأ من منتصف أعلى الدائرة وينزل مع
+                // عقارب الساعة حتى منتصف أسفلها عند اكتمال النسبة.
                 if (animatedProgress > 0.0005f) {
                     drawArc(
                         color = arcColor,
-                        startAngle = 90f,
-                        sweepAngle = 360f * animatedProgress,
+                        startAngle = ClockArc.START_ANGLE_DEG,
+                        sweepAngle = ClockArc.sweepAngleDeg(animatedProgress),
                         useCenter = false,
                         topLeft = Offset(center.x - arcRadius, center.y - arcRadius),
                         size = Size(arcRadius * 2f, arcRadius * 2f),

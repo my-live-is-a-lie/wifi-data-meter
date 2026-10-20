@@ -23,6 +23,7 @@ import android.widget.RemoteViews
 import com.mywifiadata.app.MainActivity
 import com.mywifiadata.app.R
 import com.mywifiadata.app.core.AppLanguage
+import com.mywifiadata.app.core.ClockArc
 import com.mywifiadata.app.core.ClockHandGeometry
 import com.mywifiadata.app.core.ClockText
 import com.mywifiadata.app.core.Format
@@ -586,7 +587,8 @@ private fun drawClockFaceInDesignSpace(
         },
     )
 
-    // قوس الاستهلاك: يبدأ من أسفل الدائرة ويدور باتجاه عقارب الساعة.
+    // قوس الاستهلاك: يبدأ من منتصف أعلى الدائرة وينزل مع عقارب الساعة حتى
+    // منتصف أسفلها عند اكتمال النسبة، مثل بطاقة التطبيق.
     if (progress > 0.001f) {
         val arcPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = arcColor
@@ -600,7 +602,13 @@ private fun drawClockFaceInDesignSpace(
             centerX + arcRadius,
             centerY + arcRadius,
         )
-        canvas.drawArc(arcBounds, 90f, 360f * progress, false, arcPaint)
+        canvas.drawArc(
+            arcBounds,
+            ClockArc.START_ANGLE_DEG,
+            ClockArc.sweepAngleDeg(progress),
+            false,
+            arcPaint,
+        )
     }
 
     // نقاط الساعة: نقطة كبيرة لكل ساعة ونقاط دقيقة بينها.
