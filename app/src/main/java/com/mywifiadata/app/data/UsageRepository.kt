@@ -1,6 +1,7 @@
 package com.mywifiadata.app.data
 
 import android.content.Context
+import com.mywifiadata.app.core.HistoryRetention
 import com.mywifiadata.app.core.HistoryYearMonth
 import com.mywifiadata.app.core.UsageNetwork
 import com.mywifiadata.app.core.TimeRange
@@ -30,12 +31,23 @@ class UsageRepository(
     private val statsReader = NetworkStatsReader(context)
     private val wifiReader = WifiNetworkReader(context)
     val appIdentities = AppIdentityCache(context.applicationContext)
-    private val usageArchive = AppUsageArchive(File(context.noBackupFilesDir, "app-usage-archive"))
+    // الأرشيف يحتفظ بالبيانات للمدة التي يختارها المستخدم في الإعدادات.
+    private val usageArchive = AppUsageArchive(
+        directory = File(context.noBackupFilesDir, "app-usage-archive"),
+        retentionMillis = {
+            HistoryRetention.retentionMillis(settingsStore.current.historyRetentionMonths)
+        },
+    )
     private val archiveRefreshMutex = Mutex()
     private val recordedMonthsMutex = Mutex()
     private val completedMonthsUsageCache = mutableMapOf<Pair<UsageNetwork, HistoryYearMonth>, Boolean>()
     private var archivedDayStart = -1L
     private var lastArchiveRefresh = 0L
+
+    /** يطبّق مدة الاحتفاظ الجديدة على الأرشيف فورًا بعد تغييرها. */
+    suspend fun pruneUsageArchive() = withContext(Dispatchers.IO) {
+        usageArchive.pruneNow()
+    }
 
     suspend fun clearAppIdentityCache() = withContext(Dispatchers.IO) {
         archiveRefreshMutex.withLock {
@@ -52,6 +64,9 @@ class UsageRepository(
     fun hasUsageAccess(): Boolean = statsReader.hasUsageAccess()
 
     fun wifiStatus(): WifiStatus = wifiReader.read()
+
+    /** هل الجهاز متصل حاليًا بشبكة واي فاي؟ (للنافذة العائمة التي تقيس الواي فاي فقط) */
+    fun isWifiConnected(): Boolean = wifiReader.isWifiConnected()
 
     suspend fun deviceTotals(
         range: TimeRange,
@@ -123,6 +138,37 @@ class UsageRepository(
         usageArchive.record(bounded, network, live, now)
         val removed = usageArchive.restoreMissing(perUid.keys, bounded, network, ::resolveApp)
         (live + removed).sortedByDescending { it.totals.totalBytes }
+    }
+
+    /**
+     * استهلاك كل تطبيق على الشبكة المختارة خلال نطاق زمني — للنافذة العائمة.
+     * لا يكتب الأرشيف ولا يحلّ هوية التطبيق، ويعيد `null` إذا تعذّرت القراءة
+     * (لا إذا كان الاستهلاك صفرًا) كي لا يُتخذ صفر خط أساس.
+     */
+    suspend fun perUidTotalsOrNull(
+        range: TimeRange,
+        network: UsageNetwork = UsageNetwork.WIFI,
+    ): Map<Int, TrafficTotals>? = withContext(Dispatchers.IO) {
+        if (!statsReader.hasUsageAccess()) return@withContext null
+        val end = minOf(range.endMillis, System.currentTimeMillis())
+        if (end <= range.startMillis) return@withContext null
+        statsReader.perUidTotalsOrNull(range.startMillis, end, network)
+    }
+
+    /**
+     * التطبيقات المثبّتة لاختيار هدف النافذة العائمة.
+     * لا تُقرأ إحصاءات الشبكة هنا كي تفتح القائمة فورًا بلا صلاحية استخدام،
+     * ويتولّى سجل الاختيار ترتيب الأكثر اختيارًا في الواجهة.
+     */
+    suspend fun installedApps(): List<AppUsage> = withContext(Dispatchers.IO) {
+        val cached = appIdentities.installed()
+        // أول فتح بعد التثبيت قد يسبق مسح الهويات في الخلفية؛ نمسح هنا مرة واحدة.
+        if (cached.isNotEmpty()) {
+            cached
+        } else {
+            runCatching { appIdentities.captureInstalledApps() }
+            appIdentities.installed()
+        }
     }
 
     /** Details use the same live/archive merge as the list, not an unrelated reused UID. */
@@ -203,7 +249,13 @@ class UsageRepository(
     ): List<HistoryYearMonth> = withContext(Dispatchers.IO) {
         if (!statsReader.hasUsageAccess()) return@withContext emptyList()
         val currentYm = TimeRanges.currentYearMonth(now)
-        val oldestYear = currentYm.year - HISTORY_SCAN_YEARS_BACK
+        // نحسب بداية النافذة أولًا كي لا نمسح أشهرًا ستُستبعد أصلًا من السجل.
+        val retention = HistoryRetention.retentionMillis(settingsStore.current.historyRetentionMonths)
+        val oldestAllowed = if (retention > 0L) TimeRanges.currentYearMonth(now - retention) else null
+        val oldestYear = maxOf(
+            currentYm.year - HISTORY_SCAN_YEARS_BACK,
+            oldestAllowed?.year ?: (currentYm.year - HISTORY_SCAN_YEARS_BACK),
+        )
         val result = mutableListOf<HistoryYearMonth>()
 
         recordedMonthsMutex.withLock {
@@ -212,7 +264,8 @@ class UsageRepository(
                 val yearRange = TimeRanges.yearRange(year, now)
                 if (yearRange.endMillis <= yearRange.startMillis) continue
                 val maxMonth = if (year == currentYm.year) currentYm.month else 12
-                val allCached = year < currentYm.year && (1..maxMonth).all { month ->
+                val firstMonth = if (oldestAllowed != null && year == oldestAllowed.year) oldestAllowed.month else 1
+                val allCached = year < currentYm.year && (firstMonth..maxMonth).all { month ->
                     completedMonthsUsageCache.containsKey(network to HistoryYearMonth(year, month))
                 }
                 if (!allCached) {
@@ -226,7 +279,7 @@ class UsageRepository(
                         continue
                     }
                 }
-                for (month in 1..maxMonth) {
+                for (month in firstMonth..maxMonth) {
                     currentCoroutineContext().ensureActive()
                     val ym = HistoryYearMonth(year, month)
                     val isCompletedMonth = ym < currentYm
@@ -247,7 +300,9 @@ class UsageRepository(
                 }
             }
         }
-        result
+        // «السجل» لا يعرض أشهرًا أقدم من مدة الاحتفاظ المختارة، و«لا محدود» يبقي المسح أربع سنوات.
+        if (oldestAllowed == null) return@withContext result
+        result.filter { it >= oldestAllowed }
     }
 
     private fun resolveApp(uid: Int, totals: TrafficTotals): AppUsage =

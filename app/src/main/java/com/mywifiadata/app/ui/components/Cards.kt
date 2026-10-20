@@ -42,12 +42,14 @@ fun SectionHeader(
     title: String,
     modifier: Modifier = Modifier,
     supportingText: String? = null,
+    /** حشوة داخلية قابلة للتقليص عند الحاجة (مثل عناوين أقسام الإعدادات). */
+    contentPadding: PaddingValues = PaddingValues(horizontal = 4.dp, vertical = 4.dp),
     trailing: (@Composable () -> Unit)? = null,
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 4.dp, vertical = 4.dp),
+            .padding(contentPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(

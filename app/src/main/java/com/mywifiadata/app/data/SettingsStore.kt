@@ -2,11 +2,16 @@ package com.mywifiadata.app.data
 
 import android.content.Context
 import com.mywifiadata.app.core.AppLanguage
+import com.mywifiadata.app.core.HistoryRetention
 import com.mywifiadata.app.core.SamplingIntervals
+import com.mywifiadata.app.core.SpeedTestDataUsage
+import com.mywifiadata.app.core.UsageCardStyles
 import com.mywifiadata.app.data.model.AccentColor
 import com.mywifiadata.app.data.model.AppLayoutDirection
 import com.mywifiadata.app.data.model.AppSettings
 import com.mywifiadata.app.data.model.DashboardLayout
+import com.mywifiadata.app.data.model.MonitorTarget
+import com.mywifiadata.app.data.model.OverlayEdge
 import com.mywifiadata.app.data.model.DataPlan
 import com.mywifiadata.app.data.model.PlanCapacityUnit
 import com.mywifiadata.app.data.model.PlanDurationUnit
@@ -39,6 +44,23 @@ class SettingsStore(context: Context) {
         _settings.value = updated
     }
 
+    /**
+     * يقرأ فهرس شكل البطاقة ويرحّل القيم المحفوظة قبل إزالة النمط الجانبي،
+     * ثم يكتب الفهرس المرحّل والنسخة الجديدة مرة واحدة.
+     */
+    private fun readUsageCardStyle(): Int {
+        val storedVersion = prefs.getInt(KEY_USAGE_CARD_STYLE_VERSION, 0)
+        val storedStyle = prefs.getInt(KEY_USAGE_CARD_STYLE, UsageCardStyles.RING)
+        val migrated = UsageCardStyles.migrate(storedStyle, storedVersion)
+        if (storedVersion < UsageCardStyles.LATEST_VERSION || storedStyle != migrated) {
+            prefs.edit()
+                .putInt(KEY_USAGE_CARD_STYLE, migrated)
+                .putInt(KEY_USAGE_CARD_STYLE_VERSION, UsageCardStyles.LATEST_VERSION)
+                .apply()
+        }
+        return migrated
+    }
+
     fun clearAll() {
         // يحتفظ بحالة البلاطة المثبتة ولغة الواجهة؛ فهما لا تمثلان بيانات القياس المحلية.
         val current = _settings.value
@@ -63,6 +85,16 @@ class SettingsStore(context: Context) {
         settings.copy(
             lastSpeedTest = record,
             speedTestHistory = SpeedTestHistory.prepend(settings.speedTestHistory, record),
+        )
+    }
+
+    /**
+     * يتجاهل تحذير استهلاك بيانات الهاتف في اختبار السرعة ليوم كامل يبدأ من
+     * [nowMillis]؛ بعد انقضاء المدة يعود التحذير تلقائيًا.
+     */
+    fun snoozeSpeedTestWarning(nowMillis: Long = System.currentTimeMillis()) = update { settings ->
+        settings.copy(
+            speedTestWarningSnoozedUntilMillis = SpeedTestDataUsage.snoozeUntil(nowMillis),
         )
     }
 
@@ -141,11 +173,26 @@ class SettingsStore(context: Context) {
         ),
         trackingEnabled = prefs.getBoolean(KEY_TRACKING, false),
         hideStatusBarIcon = prefs.getBoolean(KEY_HIDE_STATUS_BAR_ICON, false),
-        usageCardStyleIndex = prefs.getInt(KEY_USAGE_CARD_STYLE, 0).coerceAtLeast(0),
+        usageCardStyleIndex = readUsageCardStyle(),
+        historyRetentionMonths = HistoryRetention.normalize(
+            prefs.getInt(KEY_HISTORY_RETENTION, HistoryRetention.DEFAULT_MONTHS),
+        ),
         dashboardLayout = DashboardLayout.decode(prefs.getString(KEY_DASHBOARD_LAYOUT, null)),
         historyLineChartEnabled = prefs.getBoolean(KEY_HISTORY_LINE_CHART, false),
         appsLineChartEnabled = prefs.getBoolean(KEY_APPS_LINE_CHART, false),
         appSearchHistory = AppSearchHistory.decode(prefs.getString(KEY_APP_SEARCH_HISTORY, null)),
+        monitorTarget = MonitorTarget(
+            uid = prefs.getInt(KEY_MONITOR_TARGET_UID, MonitorTarget.NO_APP),
+            packageName = prefs.getString(KEY_MONITOR_TARGET_PACKAGE, null).orEmpty(),
+            label = prefs.getString(KEY_MONITOR_TARGET_LABEL, null).orEmpty(),
+            iconPath = prefs.getString(KEY_MONITOR_TARGET_ICON, null).orEmpty(),
+        ).let { target -> if (target.uid < 0) MonitorTarget.AllApps else target },
+        monitorTargetHistory = AppSearchHistory.decode(prefs.getString(KEY_MONITOR_TARGET_HISTORY, null)),
+        overlayAnchorX = prefs.getFloat(KEY_OVERLAY_ANCHOR_X, 0.5f),
+        overlayAnchorY = prefs.getFloat(KEY_OVERLAY_ANCHOR_Y, 0.24f),
+        overlayEdge = prefs.getString(KEY_OVERLAY_EDGE, null)
+            ?.let { stored -> OverlayEdge.entries.firstOrNull { it.name == stored } }
+            ?: OverlayEdge.LEFT,
         themeMode = prefs.getString(KEY_THEME_MODE, null)
             ?.let { stored -> ThemeMode.entries.firstOrNull { it.name == stored } }
             ?: ThemeMode.SYSTEM,
@@ -161,6 +208,7 @@ class SettingsStore(context: Context) {
         alertLevelReached = prefs.getInt(KEY_ALERT_LEVEL, 0),
         speedTestHistory = readSpeedTestHistory(),
         lastSpeedTest = readSpeedTest(),
+        speedTestWarningSnoozedUntilMillis = prefs.getLong(KEY_SPEED_WARNING_SNOOZED_UNTIL, 0L),
     )
 
     /** قراءة آخر نتيجة اختبار سرعة محفوظة، أو null إن لم يُجرَ اختبار بعد. */
@@ -173,6 +221,7 @@ class SettingsStore(context: Context) {
             timestampMillis = timestamp,
             usedFastCom = prefs.getBoolean(KEY_SPEED_FAST, true),
             uploadMeasured = prefs.getBoolean(KEY_SPEED_UPLOAD_OK, true),
+            dataBytes = prefs.getLong(KEY_SPEED_DATA_BYTES, 0L).coerceAtLeast(0L),
         )
     }
 
@@ -255,10 +304,26 @@ class SettingsStore(context: Context) {
             .putBoolean(KEY_TRACKING, settings.trackingEnabled)
             .putBoolean(KEY_HIDE_STATUS_BAR_ICON, settings.hideStatusBarIcon)
             .putInt(KEY_USAGE_CARD_STYLE, settings.usageCardStyleIndex)
+            .putInt(
+                KEY_HISTORY_RETENTION,
+                HistoryRetention.normalize(settings.historyRetentionMonths),
+            )
+            .putInt(KEY_USAGE_CARD_STYLE_VERSION, UsageCardStyles.LATEST_VERSION)
             .putString(KEY_DASHBOARD_LAYOUT, settings.dashboardLayout.encode())
             .putBoolean(KEY_HISTORY_LINE_CHART, settings.historyLineChartEnabled)
             .putBoolean(KEY_APPS_LINE_CHART, settings.appsLineChartEnabled)
             .putString(KEY_APP_SEARCH_HISTORY, AppSearchHistory.encode(settings.appSearchHistory))
+            .putInt(KEY_MONITOR_TARGET_UID, settings.monitorTarget.uid)
+            .putString(KEY_MONITOR_TARGET_PACKAGE, settings.monitorTarget.packageName)
+            .putString(KEY_MONITOR_TARGET_LABEL, settings.monitorTarget.label)
+            .putString(KEY_MONITOR_TARGET_ICON, settings.monitorTarget.iconPath)
+            .putString(
+                KEY_MONITOR_TARGET_HISTORY,
+                AppSearchHistory.encode(settings.monitorTargetHistory),
+            )
+            .putFloat(KEY_OVERLAY_ANCHOR_X, settings.overlayAnchorX)
+            .putFloat(KEY_OVERLAY_ANCHOR_Y, settings.overlayAnchorY)
+            .putString(KEY_OVERLAY_EDGE, settings.overlayEdge.name)
             .putString(KEY_THEME_MODE, settings.themeMode.name)
             .putString(KEY_LAYOUT_DIRECTION, settings.layoutDirection.name)
             .putLong(KEY_SESSION_START, settings.sessionStartMillis)
@@ -271,6 +336,11 @@ class SettingsStore(context: Context) {
             .putLong(KEY_SPEED_TIME, settings.lastSpeedTest?.timestampMillis ?: 0L)
             .putBoolean(KEY_SPEED_FAST, settings.lastSpeedTest?.usedFastCom ?: true)
             .putBoolean(KEY_SPEED_UPLOAD_OK, settings.lastSpeedTest?.uploadMeasured ?: true)
+            .putLong(KEY_SPEED_DATA_BYTES, settings.lastSpeedTest?.dataBytes ?: 0L)
+            .putLong(
+                KEY_SPEED_WARNING_SNOOZED_UNTIL,
+                settings.speedTestWarningSnoozedUntilMillis,
+            )
             .putString(KEY_SPEED_HISTORY, SpeedTestHistory.encode(settings.speedTestHistory))
             .apply()
     }
@@ -320,10 +390,20 @@ class SettingsStore(context: Context) {
         private const val KEY_TRACKING = "tracking_enabled"
         private const val KEY_HIDE_STATUS_BAR_ICON = "hide_status_bar_icon"
         private const val KEY_USAGE_CARD_STYLE = "usage_card_style"
+        private const val KEY_HISTORY_RETENTION = "history_retention_months"
+        private const val KEY_USAGE_CARD_STYLE_VERSION = "usage_card_style_version"
         private const val KEY_DASHBOARD_LAYOUT = "dashboard_layout"
         private const val KEY_HISTORY_LINE_CHART = "history_line_chart_enabled"
         private const val KEY_APPS_LINE_CHART = "apps_line_chart_enabled"
         private const val KEY_APP_SEARCH_HISTORY = "app_search_selection_history"
+        private const val KEY_MONITOR_TARGET_UID = "monitor_target_uid"
+        private const val KEY_MONITOR_TARGET_PACKAGE = "monitor_target_package"
+        private const val KEY_MONITOR_TARGET_LABEL = "monitor_target_label"
+        private const val KEY_MONITOR_TARGET_ICON = "monitor_target_icon"
+        private const val KEY_MONITOR_TARGET_HISTORY = "monitor_target_history"
+        private const val KEY_OVERLAY_ANCHOR_X = "overlay_anchor_x"
+        private const val KEY_OVERLAY_ANCHOR_Y = "overlay_anchor_y"
+        private const val KEY_OVERLAY_EDGE = "overlay_edge"
         private const val KEY_SESSION_START = "session_start"
         private const val KEY_SESSION_RX = "session_baseline_rx"
         private const val KEY_SESSION_TX = "session_baseline_tx"
@@ -336,6 +416,8 @@ class SettingsStore(context: Context) {
         private const val KEY_SPEED_TIME = "speed_test_time"
         private const val KEY_SPEED_FAST = "speed_test_source_fast"
         private const val KEY_SPEED_UPLOAD_OK = "speed_test_upload_ok"
+        private const val KEY_SPEED_DATA_BYTES = "speed_test_data_bytes"
+        private const val KEY_SPEED_WARNING_SNOOZED_UNTIL = "speed_test_warning_snoozed_until"
         private const val KEY_SPEED_HISTORY = "speed_test_history"
     }
 }

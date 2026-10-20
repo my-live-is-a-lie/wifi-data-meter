@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.mywifiadata.app.core.AppsSortOrder
 import com.mywifiadata.app.core.AppsUsageScope
 import com.mywifiadata.app.core.HistoryPlanSortOrder
+import com.mywifiadata.app.core.HistoryRetention
 import com.mywifiadata.app.core.HistorySection
 import com.mywifiadata.app.core.HistoryYearMonth
 import com.mywifiadata.app.core.UsageNetwork
@@ -24,11 +25,13 @@ import com.mywifiadata.app.core.historyApps
 import com.mywifiadata.app.core.Format
 import com.mywifiadata.app.core.LauncherIconVisibility
 import com.mywifiadata.app.core.SamplingIntervals
+import com.mywifiadata.app.core.SpeedTestDataUsage
 import com.mywifiadata.app.core.SpeedTestEngine
 import com.mywifiadata.app.core.TimeRange
 import com.mywifiadata.app.core.TimeRanges
 import com.mywifiadata.app.core.UsagePeriod
 import com.mywifiadata.app.data.AppSearchHistory
+import com.mywifiadata.app.data.NetworkStatsGate
 import com.mywifiadata.app.data.UsageRepository
 import com.mywifiadata.app.data.model.AccentColor
 import com.mywifiadata.app.data.model.AdditionalPlanDraft
@@ -40,6 +43,7 @@ import com.mywifiadata.app.data.model.CompletedPlanRecord
 import com.mywifiadata.app.data.model.DayUsage
 import com.mywifiadata.app.data.model.DashboardLayout
 import com.mywifiadata.app.data.model.DataPlan
+import com.mywifiadata.app.data.model.MonitorTarget
 import com.mywifiadata.app.data.model.PlanDraft
 import com.mywifiadata.app.data.model.PlanNetworkType
 import com.mywifiadata.app.data.model.SpeedSample
@@ -111,6 +115,11 @@ data class UiState(
     val samples: List<SpeedSample> = emptyList(),
     val speedTest: SpeedTestState = SpeedTestState.Idle,
     val speedTestHistory: List<SpeedTestRecord> = emptyList(),
+    /**
+     * تحذير استهلاك بيانات الهاتف قبل بدء اختبار السرعة، أو null إن لم يكن
+     * هناك تحذير معروض. يستخدم [SpeedTestDataUsage.estimate] تقديرًا متكيّفًا.
+     */
+    val speedTestDataWarning: SpeedTestDataUsage.Estimate? = null,
     val daily: List<DayUsage> = emptyList(),
     /**
      * أعلى يوم استهلاكًا خلال آخر 30 يومًا — مرجع ثابت للمقارنة مهما كانت
@@ -147,6 +156,10 @@ data class UiState(
     val appsSortOrder: AppsSortOrder = AppsSortOrder.HIGHEST_USAGE,
     val appsSearchActive: Boolean = false,
     val appsSearchQuery: String = "",
+    /** حوار اختيار هدف النافذة العائمة وقائمة تطبيقاته. */
+    val monitorPickerVisible: Boolean = false,
+    val monitorApps: List<AppUsage> = emptyList(),
+    val isMonitorAppsLoading: Boolean = false,
     // تفصيل قسم التطبيقات: أسابيع/أيام/ساعات مع الشريحة المختارة حاليًا.
     val appsWeeks: List<UsageSlice> = emptyList(),
     val appsDays: List<UsageSlice> = emptyList(),
@@ -357,6 +370,28 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         viewModelScope.launch { refreshLoop() }
     }
 
+    /**
+     * هل واجهة التطبيق ظاهرة؟ لا نقرأ إحصاءات الشبكة في الخلفية كي لا نستهلك
+     * فُرص التحديث التي تحتاجها النافذة العائمة (أندرويد يسمح بتحديث كل 15 ثانية).
+     */
+    @Volatile
+    private var uiVisible = true
+
+    fun setUiVisible(visible: Boolean) {
+        uiVisible = visible
+    }
+
+    /**
+     * أثناء عمل النافذة العائمة نترك قراءة إحصاءات الشبكة لها وحدها: أندرويد يسمح
+     * بتحديث واحد كل 15 ثانية لكل الجهاز، فقراءات الواجهة تسرق الدورة من النافذة.
+     */
+    @Volatile
+    private var overlayActive = false
+
+    fun setOverlayActive(active: Boolean) {
+        overlayActive = active
+    }
+
     private suspend fun refreshLoop() {
         while (viewModelScope.isActive) {
             runCatching { refresh() }
@@ -369,46 +404,63 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         val now = System.currentTimeMillis()
         var settings = repository.settingsStore.current
         val hasAccess = repository.hasUsageAccess()
+        val previous = _uiState.value
+        // قراءة نظام واحدة كل 16 ثانية على الأكثر؛ بينها نُبقي آخر القيم المعروضة.
+        val queryStats = hasAccess && uiVisible && !overlayActive &&
+            (force || NetworkStatsGate.tryAcquire(now))
 
         val wifi = repository.wifiStatus()
-        val today = if (hasAccess) repository.todayTotals(now) else TrafficTotals.Empty
-        val cycle = if (hasAccess) {
-            repository.cycleTotals(settings.cycleStartDay, now)
-        } else {
-            TrafficTotals.Empty
+        val today = when {
+            !hasAccess -> TrafficTotals.Empty
+            queryStats -> repository.todayTotals(now)
+            else -> previous.today
         }
-        var wifiPlanUsage = if (hasAccess) {
-            repository.planTotals(settings, now)
-        } else {
-            TrafficTotals.Empty
+        val cycle = when {
+            !hasAccess -> TrafficTotals.Empty
+            queryStats -> repository.cycleTotals(settings.cycleStartDay, now)
+            else -> previous.cycle
         }
-        var mobileCycle = if (hasAccess) {
-            repository.mobilePlanTotals(settings, now)
-        } else {
-            TrafficTotals.Empty
+        var wifiPlanUsage: TrafficTotals? = when {
+            !hasAccess -> TrafficTotals.Empty
+            queryStats -> repository.planTotals(settings, now)
+            else -> previous.wifiPlanUsage
+        }
+        var mobileCycle = when {
+            !hasAccess -> TrafficTotals.Empty
+            queryStats -> repository.mobilePlanTotals(settings, now)
+            else -> previous.mobileCycle
         }
 
         val promotedSettings = settings.promoteExpiredPlansIfNeeded(
-            wifiUsedBytes = wifiPlanUsage.totalBytes,
+            wifiUsedBytes = wifiPlanUsage?.totalBytes ?: 0L,
             mobileUsedBytes = mobileCycle.totalBytes,
             now = now,
         )
         if (promotedSettings != settings) {
             repository.settingsStore.update { promotedSettings }
             settings = repository.settingsStore.current
-            wifiPlanUsage = if (hasAccess) repository.planTotals(settings, now) else TrafficTotals.Empty
-            mobileCycle = if (hasAccess) repository.mobilePlanTotals(settings, now) else TrafficTotals.Empty
+            wifiPlanUsage = if (hasAccess && queryStats) {
+                repository.planTotals(settings, now)
+            } else {
+                wifiPlanUsage
+            }
+            mobileCycle = if (hasAccess && queryStats) {
+                repository.mobilePlanTotals(settings, now)
+            } else {
+                mobileCycle
+            }
         }
 
-        val session = if (hasAccess) {
-            repository.deviceTotals(
+        val session = when {
+            !hasAccess -> TrafficTotals.Empty
+            queryStats -> repository.deviceTotals(
                 com.mywifiadata.app.core.TimeRange(settings.sessionStartMillis, now),
             )
-        } else {
-            TrafficTotals.Empty
+            else -> previous.session
         }
 
-        val sample = buildSample(now, today)
+        // معدّل السرعة يُحسب بين قراءتين حقيقيتين فقط، فلا يهبط إلى الصفر بينهما.
+        val sample = if (queryStats) buildSample(now, today) else null
 
         _uiState.update { state ->
             val currentYm = TimeRanges.currentYearMonth(now)
@@ -437,16 +489,21 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
             todayUpload = today.txBytes,
             cycleUsage = currentState.activeCycle.totalBytes,
             quota = currentState.quotaBytes,
+            daysLeft = currentState.daysLeft,
+            styleIndex = settings.usageCardStyleIndex,
         )
 
         val sameHistorySelection = dailyLoadedNetwork == currentState.historyNetwork &&
             dailyLoadedYear == currentState.historyYear &&
             dailyLoadedMonth == currentState.historyMonth
-        if (hasAccess && (force || now - dailyLoadedAt > DAILY_TTL_MILLIS || !sameHistorySelection)) {
+        // لا نحمّل بيانات الشاشات وهي في الخلفية: كل قراءة تُهدر فرصة تحديث النافذة العائمة.
+        if (uiVisible && !overlayActive && hasAccess &&
+            (force || now - dailyLoadedAt > DAILY_TTL_MILLIS || !sameHistorySelection)
+        ) {
             loadHistory(now = now)
         }
 
-        if (hasAccess && (force || now - appsLoadedAt > APPS_TTL_MILLIS)) {
+        if (uiVisible && !overlayActive && hasAccess && (force || now - appsLoadedAt > APPS_TTL_MILLIS)) {
             loadApps()
             loadAppsSlices()
             repository.captureUsageArchive(now)
@@ -641,6 +698,41 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
             _uiState.update { it.copy(settings = repository.settingsStore.current) }
         }
         openAppDetail(app, state.appsNetwork)
+    }
+
+    /** يفتح قائمة اختيار هدف النافذة العائمة ويحمّل التطبيقات المثبّتة. */
+    fun openMonitorPicker() {
+        if (_uiState.value.monitorPickerVisible) return
+        _uiState.update { it.copy(monitorPickerVisible = true, isMonitorAppsLoading = true) }
+        viewModelScope.launch {
+            val apps = runCatching { repository.installedApps() }.getOrDefault(emptyList())
+            _uiState.update { it.copy(monitorApps = apps, isMonitorAppsLoading = false) }
+        }
+    }
+
+    fun closeMonitorPicker() {
+        _uiState.update { it.copy(monitorPickerVisible = false) }
+    }
+
+    /**
+     * يثبّت هدف النافذة العائمة ويسجّل الاختيار ليرتفع التطبيق في القائمة لاحقًا.
+     * تغيير الهدف يُصفّر عدّادات النافذة ووقتها (تتولاه الخدمة عند رؤية الهدف الجديد).
+     */
+    fun selectMonitorTarget(target: MonitorTarget) {
+        val now = System.currentTimeMillis()
+        repository.settingsStore.update { settings ->
+            settings.copy(
+                monitorTarget = target,
+                monitorTargetHistory = if (target.isAllApps) {
+                    settings.monitorTargetHistory
+                } else {
+                    AppSearchHistory.record(settings.monitorTargetHistory, target.asUsage(), now)
+                },
+            )
+        }
+        _uiState.update {
+            it.copy(settings = repository.settingsStore.current, monitorPickerVisible = false)
+        }
     }
 
     fun setAppsSortOrder(sortOrder: AppsSortOrder) {
@@ -1021,6 +1113,8 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
     fun setAppLanguage(languageTag: String) {
         val language = AppLanguage.normalize(languageTag)
         repository.settingsStore.update { it.copy(appLanguage = language) }
+        // نصوص الأداة بلغة التطبيق أيضًا، فنعيد رسمها فور تغيير اللغة.
+        UsageWidgetProvider.updateAll(repository.context)
     }
 
     /** Changes the launcher alias only after the recovery tile has actually been added. */
@@ -1203,14 +1297,13 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
     }
 
     fun setUsageCardStyle(styleIndex: Int) {
-        repository.settingsStore.update {
-            it.copy(
-                usageCardStyleIndex = styleIndex.coerceIn(
-                    UsageWidgetProvider.DEFAULT_USAGE_CARD_STYLE,
-                    UsageWidgetProvider.MAX_USAGE_CARD_STYLE_INDEX,
-                ),
-            )
-        }
+        val safeStyle = styleIndex.coerceIn(
+            UsageWidgetProvider.DEFAULT_USAGE_CARD_STYLE,
+            UsageWidgetProvider.MAX_USAGE_CARD_STYLE_INDEX,
+        )
+        repository.settingsStore.update { it.copy(usageCardStyleIndex = safeStyle) }
+        // الأداة تتبع شكل البطاقة المختار، فتتغيّر كل الأدوات المضافة فورًا.
+        UsageWidgetUpdater.syncStyle(repository.context, safeStyle)
     }
 
     fun setDashboardLayout(layout: DashboardLayout) {
@@ -1245,6 +1338,16 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
     fun setSampleInterval(index: Int) {
         repository.settingsStore.update {
             it.copy(sampleIntervalIndex = SamplingIntervals.coerceIndex(index))
+        }
+    }
+
+    fun setHistoryRetention(months: Int) {
+        val safeMonths = HistoryRetention.normalize(months)
+        repository.settingsStore.update { it.copy(historyRetentionMonths = safeMonths) }
+        // تقليل المدة يحذف ما تجاوزها فورًا؛ الزيادة لا تعيد ما حُذف.
+        viewModelScope.launch {
+            repository.pruneUsageArchive()
+            if (repository.hasUsageAccess()) loadHistory(adjustSelectionToRecorded = true)
         }
     }
 
@@ -1306,11 +1409,69 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
      * بدء اختبار السرعة عبر fast.com (مع رجوع تلقائي إلى Cloudflare إذا حُجب).
      *
      * - قبل البدء: إن لم يكن هناك اتصال تظهر رسالة فورية بلا أي تحميل.
+     * - على بيانات الهاتف: يظهر أولًا تحذير بكمية الاستهلاك التقديرية، ويبدأ
+     *   الاختبار بعد اختيار «متابعة» فقط، ما لم يكن المستخدم قد اختار تجاهل
+     *   التحذير خلال آخر يوم كامل.
      * - أثناء الاختبار: إن انقطع الاتصال أو مرّ وقت طويل دون نتيجة يوقف
      *   المحرّك التحميل ويصل السبب إلى الواجهة لتظهر رسالته.
      * - بعد النجاح: تُحفظ النتيجة محليًا فتبقى ظاهرة بعد إعادة التشغيل.
      */
     fun startSpeedTest() {
+        if (_uiState.value.speedTest is SpeedTestState.Running) return
+        if (_uiState.value.speedTestDataWarning != null) return
+
+        val wifi = repository.wifiStatus()
+        if (!wifi.isOnline) {
+            _uiState.update {
+                it.copy(speedTest = SpeedTestState.Failed(SpeedTestEngine.Failure.NO_CONNECTION))
+            }
+            return
+        }
+
+        val onMobileData = wifi.isMobileConnected && !wifi.isWifiConnected
+        val settings = repository.settingsStore.current
+        if (onMobileData && SpeedTestDataUsage.shouldWarn(settings.speedTestWarningSnoozedUntilMillis)) {
+            _uiState.update { state ->
+                state.copy(
+                    speedTestDataWarning = SpeedTestDataUsage.estimate(settings.speedTestHistory),
+                )
+            }
+            return
+        }
+
+        launchSpeedTest()
+    }
+
+    /** «متابعة الاختبار» من تحذير بيانات الهاتف: يغلق التحذير ويبدأ القياس. */
+    fun continueSpeedTestAfterWarning() {
+        if (_uiState.value.speedTestDataWarning == null) return
+        _uiState.update { it.copy(speedTestDataWarning = null) }
+        launchSpeedTest()
+    }
+
+    /** «إلغاء» من تحذير بيانات الهاتف: لا يبدأ أي تحميل ولا يُستهلك أي بيانات. */
+    fun cancelSpeedTestWarning() {
+        _uiState.update { it.copy(speedTestDataWarning = null) }
+    }
+
+    /**
+     * «تجاهل لمدة يوم»: يبدأ الاختبار الآن ويُخفى التحذير ليوم كامل، ثم يعود
+     * تلقائيًا في الاختبار التالي بعد انقضاء المدة.
+     */
+    fun ignoreSpeedTestWarningForDay() {
+        if (_uiState.value.speedTestDataWarning == null) return
+        repository.settingsStore.snoozeSpeedTestWarning()
+        _uiState.update { state ->
+            state.copy(
+                speedTestDataWarning = null,
+                settings = repository.settingsStore.current,
+            )
+        }
+        launchSpeedTest()
+    }
+
+    /** تشغيل الاختبار فعليًا بعد اجتياز فحوص الاتصال والتحذير. */
+    private fun launchSpeedTest() {
         if (_uiState.value.speedTest is SpeedTestState.Running) return
 
         if (!repository.wifiStatus().isOnline) {
@@ -1343,6 +1504,8 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
                     timestampMillis = System.currentTimeMillis(),
                     usedFastCom = result.usedFastCom,
                     uploadMeasured = result.uploadMeasured,
+                    // كمية الاستهلاك الفعلية تُغذّي تقدير الاختبار القادم على بيانات الهاتف.
+                    dataBytes = result.dataBytes,
                 )
                 repository.settingsStore.saveSpeedTest(record)
                 _uiState.update {

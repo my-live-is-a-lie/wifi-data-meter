@@ -129,6 +129,7 @@ import com.mywifiadata.app.R
 import com.mywifiadata.app.core.Format
 import com.mywifiadata.app.data.model.AppUsage
 import com.mywifiadata.app.data.model.DashboardLayout
+import com.mywifiadata.app.data.model.MonitorTarget
 import com.mywifiadata.app.data.model.DashboardLayoutIds
 import com.mywifiadata.app.data.model.WifiBand
 import com.mywifiadata.app.data.model.WifiStatus
@@ -137,9 +138,12 @@ import com.mywifiadata.app.ui.components.AppName
 import com.mywifiadata.app.ui.components.AppIcon
 import com.mywifiadata.app.ui.components.Dot
 import com.mywifiadata.app.ui.components.DottedUsageGauge
+import com.mywifiadata.app.ui.components.ClockUsageGauge
 import com.mywifiadata.app.ui.components.EmptyState
 import com.mywifiadata.app.ui.components.ExpressiveCard
 import com.mywifiadata.app.ui.components.InfoRow
+import com.mywifiadata.app.ui.components.MonitorCard
+import com.mywifiadata.app.ui.components.MonitorTargetPickerDialog
 import com.mywifiadata.app.ui.components.PermissionCard
 import com.mywifiadata.app.ui.components.QuotaBar
 import com.mywifiadata.app.ui.components.SectionHeader
@@ -300,6 +304,11 @@ fun DashboardScreen(
     contentPadding: PaddingValues = PaddingValues(16.dp),
     onLoadTodayApps: () -> Unit = {},
     dashboardListState: LazyListState = rememberLazyListState(),
+    onOpenMonitorPicker: () -> Unit = {},
+    onSelectMonitorTarget: (MonitorTarget) -> Unit = {},
+    onDismissMonitorPicker: () -> Unit = {},
+    onStartOverlay: () -> Unit = {},
+    overlayRunning: Boolean = false,
 ) {
     var isHeroCompact by rememberSaveable { mutableStateOf(false) }
     var selectedCardStyle by rememberSaveable {
@@ -379,6 +388,17 @@ fun DashboardScreen(
 
             else -> true
         }
+    }
+
+    if (state.monitorPickerVisible) {
+        MonitorTargetPickerDialog(
+            apps = state.monitorApps,
+            isLoading = state.isMonitorAppsLoading,
+            selected = state.settings.monitorTarget,
+            history = state.settings.monitorTargetHistory,
+            onSelect = onSelectMonitorTarget,
+            onDismiss = onDismissMonitorPicker,
+        )
     }
 
     Column(modifier = modifier.fillMaxSize()) {
@@ -473,6 +493,7 @@ fun DashboardScreen(
                     },
                     showVisibilityButton = cardId !in DashboardLayoutIds.COMPOSITE_CARD_IDS,
                     dragShield = cardId == DashboardLayoutIds.USAGE_CARD ||
+                        cardId == DashboardLayoutIds.MONITOR_CARD ||
                         cardId == DashboardLayoutIds.WIFI_CARD ||
                         cardId == DashboardLayoutIds.SPEED_TEST_CARD ||
                         cardId == DashboardLayoutIds.SESSION_CARD,
@@ -483,7 +504,11 @@ fun DashboardScreen(
                             state = state,
                             isCompact = isHeroCompact && !isEditing,
                             isEditing = isEditing,
-                            selectedStyleIndex = selectedCardStyle,
+                            // قد تعود حالة محفوظة من نسخة سابقة بفهرس نمط أُزيل.
+                            selectedStyleIndex = selectedCardStyle.coerceIn(
+                                0,
+                                UsageCardStyle.entries.lastIndex,
+                            ),
                             onOpenQuotaSettings = onOpenQuotaSettings,
                             horizontalStartPadding = if (isEditing) 0.dp else horizontalStartPadding,
                             horizontalEndPadding = if (isEditing) 0.dp else horizontalEndPadding,
@@ -507,6 +532,16 @@ fun DashboardScreen(
                             itemBounds = quickActionBounds,
                             onLayoutChange = onDashboardLayoutChange,
                             dragState = dragState,
+                        )
+
+                        DashboardLayoutIds.MONITOR_CARD -> MonitorCard(
+                            target = state.settings.monitorTarget,
+                            isRunning = overlayRunning,
+                            isEditing = isEditing,
+                            onOpenPicker = onOpenMonitorPicker,
+                            onStart = onStartOverlay,
+                            // لا تُظهر التحذير أثناء التحميل الأول قبل معرفة الحالة.
+                            usageAccessGranted = state.hasUsageAccess || state.isLoading,
                         )
 
                         DashboardLayoutIds.WIFI_CARD -> {
@@ -1058,7 +1093,9 @@ private fun toggleId(ids: Set<String>, id: String): Set<String> =
 private enum class UsageCardStyle {
     RING,
     DOTTED_RING,
-    SPLIT,
+
+    /** ساعة حقيقية داخل ميناء منقّط، حولها قوس نسبة الاستهلاك. */
+    CLOCK,
 }
 
 @Composable
@@ -1200,48 +1237,17 @@ private fun FullUsageCard(
                     }
                 }
 
-                UsageCardStyle.SPLIT.ordinal -> {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        UsageRing(
-                            progress = progress,
-                            modifier = Modifier.size(148.dp),
-                            strokeWidth = 16.dp,
-                            startColor = gaugeStartColor,
-                            endColor = gaugeEndColor,
-                            contentDescription = stringResource(R.string.quota_ring_title),
-                        ) {
-                            Text(
-                                text = usageValue,
-                                style = MaterialTheme.typography.titleLargeEmphasized,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                textAlign = TextAlign.Center,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.Center,
-                        ) {
-                            Text(
-                                text = usageLabel,
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = usedValue,
-                                style = MaterialTheme.typography.titleMediumEmphasized,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
+                UsageCardStyle.CLOCK.ordinal -> {
+                    ClockUsageGauge(
+                        progress = progress,
+                        daysLeft = if (hasQuota) state.daysLeft else null,
+                        timeMillis = state.now,
+                        headline = usageValue,
+                        label = usageLabel,
+                        value = if (hasQuota) usedValue else "",
+                        exceeded = state.quotaExceeded,
+                        contentDescription = stringResource(R.string.quota_ring_title),
+                    )
                 }
 
                 else -> {

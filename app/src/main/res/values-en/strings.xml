@@ -70,6 +70,14 @@
     <string name="speed_test_age_days">%1$s d</string>
     <string name="speed_test_age_months">%1$s mo</string>
     <string name="speed_test_age_years">%1$s y</string>
+    <string name="speed_test_mobile_warning_title">Mobile data warning</string>
+    <string name="speed_test_mobile_warning_message">You are on mobile data. A speed test downloads and uploads real data to measure speed, so it can use a large part of your data plan.</string>
+    <string name="speed_test_mobile_warning_estimate_label">Estimated data use for this test</string>
+    <string name="speed_test_mobile_warning_estimate_from_history">This estimate adapts automatically from your previous test results.</string>
+    <string name="speed_test_mobile_warning_estimate_default">A starting estimate that will adjust automatically after your first test.</string>
+    <string name="speed_test_mobile_warning_continue">Continue test</string>
+    <string name="speed_test_mobile_warning_cancel">Cancel</string>
+    <string name="speed_test_mobile_warning_ignore">Ignore for a day</string>
     <string name="label_period">Period</string>
     <string name="label_average">Daily average</string>
     <string name="label_peak">Busiest day</string>
@@ -77,8 +85,8 @@
     <string name="label_days">Days</string>
 
     <string name="quota_ring_title">Billing cycle usage</string>
-    <string name="widget_title">Data usage</string>
-    <string name="widget_description">A card showing Wi-Fi data usage</string>
+    <string name="widget_title">Usage card</string>
+    <string name="widget_description">Wi-Fi usage card — follows the card style selected in the app</string>
     <string name="widget_traffic_line">%1$s %2$s</string>
     <string name="action_add_widget">Add to home screen</string>
     <string name="cd_previous_usage_card">Previous card style</string>
@@ -100,10 +108,14 @@
     <string name="plan_duration_label">Duration</string>
     <string name="plan_type_label">Plan type</string>
     <string name="plan_prevent_edit_label">Prevent editing</string>
+    <string name="plan_prevent_edit_subtitle">Prevent editing until the plan ends</string>
     <string name="plan_unit_mb">Megabytes</string>
     <string name="plan_unit_gb">Gigabytes</string>
     <string name="plan_unit_tb">Terabytes</string>
     <string name="plan_duration_day">Day</string>
+    <string name="clock_usage_time_am">AM</string>
+    <string name="clock_usage_time_pm">PM</string>
+    <string name="clock_usage_days_unit">days</string>
     <string name="plan_duration_week">Week</string>
     <string name="plan_duration_month">Month</string>
     <string name="plan_duration_year">Year</string>
@@ -132,7 +144,6 @@
     <string name="additional_plan_dialog_title_add">Add additional plan</string>
     <string name="additional_plan_dialog_title_update">Update additional plan</string>
     <string name="additional_plan_name_optional">Name (optional)</string>
-    <string name="additional_plan_prevent_edit_subtitle">Prevent editing until the plan ends</string>
     <string name="additional_plan_delete_confirm_title">Delete additional plan?</string>
     <string name="additional_plan_delete_confirm_body">Are you sure you want to delete this additional plan?</string>
     <string name="additional_plan_reorder_cd">Reorder additional plan</string>
@@ -242,7 +253,18 @@
     <string name="settings_interval_unit_hours">h</string>
     <string name="settings_dynamic_color">System colors (Material You)</string>
     <string name="settings_dynamic_color_desc">Use wallpaper‑based colors on Android 12+.</string>
-    <string name="settings_section_data">Permissions</string>
+    <string name="settings_section_data">Storage &amp; permissions</string>
+    <string name="settings_history_retention">History retention</string>
+    <string name="settings_history_retention_body">Choose how long app usage and archived data stay saved. Lowering the retention deletes older data right away.</string>
+    <plurals name="retention_months">
+        <item quantity="one">%d month</item>
+        <item quantity="other">%d months</item>
+    </plurals>
+    <plurals name="retention_years">
+        <item quantity="one">%d year</item>
+        <item quantity="other">%d years</item>
+    </plurals>
+    <string name="retention_unlimited">Unlimited</string>
     <string name="settings_section_appearance">Appearance</string>
     <string name="settings_accent_color">Accent color</string>
     <string name="settings_accent_color_system_active">System colors</string>
@@ -381,4 +403,36 @@
     <string name="plan_prevent_edit_warning_title">Enable prevent editing</string>
     <string name="plan_prevent_edit_warning_body">When “Prevent editing” is enabled and saved, you will not be able to modify the plan’s capacity or duration later (only name and logo can be changed).\n\nYou can disable this option later by tapping “Reset” to reset the plan’s usage.</string>
     <string name="apps_fast_scroll">App list position and fast scrolling</string>
+    <!-- Floating live usage window -->
+    <string name="monitor_card_title">Floating live usage window</string>
+    <string name="monitor_all_apps">All apps</string>
+    <string name="monitor_start">Show floating window</string>
+    <string name="monitor_pick_target">Choose monitored app</string>
+    <string name="monitor_picker_title">Choose apps</string>
+    <string name="monitor_picker_body">Pick the apps whose usage you want to monitor</string>
+    <string name="monitor_picker_search">Search for an app</string>
+    <string name="monitor_picker_empty">No matching app.</string>
+    <string name="monitor_picker_close">Close app picker</string>
+    <string name="monitor_picker_selected">Selected</string>
+    <string name="monitor_picker_unselected">Not selected</string>
+    <string name="overlay_time">Time</string>
+    <string name="overlay_pause">Pause</string>
+    <string name="overlay_resume">Resume</string>
+    <string name="overlay_minimize">Minimize window</string>
+    <string name="overlay_close">Close window</string>
+    <string name="overlay_change_target">Change monitored app</string>
+    <string name="overlay_usage_access_missing">Usage cannot be read: enable usage access to measure real traffic.</string>
+    <string name="overlay_no_usage_access_short">No usage access</string>
+    <string name="overlay_no_wifi_short">No Wi-Fi connection</string>
+    <string name="overlay_collecting">Measuring…</string>
+    <string name="overlay_read_failed">Couldn’t read network stats from the system. Retrying automatically.</string>
+    <string name="overlay_read_failed_short">Read failed</string>
+    <string name="overlay_no_traffic_yet">No usage recorded yet</string>
+    <string name="monitor_usage_access_hint">Usage access is needed to measure usage</string>
+    <string name="overlay_permission_title">Display over other apps</string>
+    <string name="overlay_permission_body">To show the floating window while you use other apps, allow Wi‑Fi Data to display over other apps.</string>
+    <string name="overlay_permission_open">Open settings</string>
+    <string name="channel_overlay_name">Floating window</string>
+    <string name="channel_overlay_desc">Persistent notification that keeps the floating usage window visible.</string>
+    <string name="overlay_notification_title">Floating usage window</string>
 </resources>

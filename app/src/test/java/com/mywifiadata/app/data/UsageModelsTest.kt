@@ -304,7 +304,7 @@ class UsageModelsTest {
         val decodedSaved = PlanStorageCodec.decodeSavedPlans(encodedSaved)
         assertEquals(switched.savedPlansFor(UsageNetwork.WIFI), decodedSaved)
 
-        // إعادة ترتيب الباقات في القائمة الموحدة (الباقة المفعلة والباقات المحفوظة)
+        // الباقة المفعلة مثبتة في أول القائمة الموحدة، ولا يمكن وضع باقة محفوظة فوقها
         val reordered = switched.reorderSavedPlans(
             network = UsageNetwork.WIFI,
             fromIndex = 1,
@@ -313,6 +313,10 @@ class UsageModelsTest {
         assertEquals(
             listOf("باقة احتياطية", "باقة أساسية"),
             reordered.allPlansFor(UsageNetwork.WIFI).map { it.name },
+        )
+        assertEquals(
+            listOf("باقة أساسية"),
+            reordered.savedPlansFor(UsageNetwork.WIFI).map { it.name },
         )
 
         // عند انتهاء الباقة بدون باقات إضافية تُسجّل في سجل الباقات المنتهية مع تاريخ البدء والانتهاء

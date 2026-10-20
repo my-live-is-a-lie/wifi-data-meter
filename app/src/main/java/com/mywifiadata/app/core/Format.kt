@@ -147,6 +147,22 @@ object Format {
         return pattern("MMMM yyyy/MM").format(Date(millis))
     }
 
+    /**
+     * زمن جلسة قصيرة: "05:09" أو "1:02:33" عند تجاوز الساعة.
+     * تُستخدم في النافذة العائمة لعدّاد وقت المراقبة.
+     */
+    fun elapsed(millis: Long): String {
+        val totalSeconds = millis.coerceAtLeast(0L) / 1_000L
+        val hours = totalSeconds / 3_600L
+        val minutes = (totalSeconds % 3_600L) / 60L
+        val seconds = totalSeconds % 60L
+        return if (hours > 0L) {
+            String.format(numbers, "%d:%02d:%02d", hours, minutes, seconds)
+        } else {
+            String.format(numbers, "%02d:%02d", minutes, seconds)
+        }
+    }
+
     /** عدد الأيام بين تاريخين (بحد أدنى 1). */
     fun daysBetween(startMillis: Long, endMillis: Long): Int {
         val millis = (endMillis - startMillis).coerceAtLeast(0L)

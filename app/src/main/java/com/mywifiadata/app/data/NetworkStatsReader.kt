@@ -52,9 +52,18 @@ class NetworkStatsReader(private val context: Context) {
     fun wifiDeviceTotals(startMillis: Long, endMillis: Long): TrafficTotals =
         deviceTotals(startMillis, endMillis, UsageNetwork.WIFI)
 
-    fun deviceTotals(startMillis: Long, endMillis: Long, network: UsageNetwork): TrafficTotals {
-        val statsManager = manager ?: return TrafficTotals.Empty
-        if (endMillis <= startMillis) return TrafficTotals.Empty
+    fun deviceTotals(startMillis: Long, endMillis: Long, network: UsageNetwork): TrafficTotals =
+        deviceTotalsOrNull(startMillis, endMillis, network) ?: TrafficTotals.Empty
+
+    /**
+     * مثل [deviceTotals] لكنها تعيد `null` عند تعذّر القراءة بدل صفر.
+     *
+     * يفرّق هذا بين «لا استهلاك» و«فشل الاستعلام»؛ النافذة العائمة تحتاج الفرق كي لا
+     * تتخذ صفرًا كخط أساس فتظهر قفزة وهمية عند أول قراءة ناجحة.
+     */
+    fun deviceTotalsOrNull(startMillis: Long, endMillis: Long, network: UsageNetwork): TrafficTotals? {
+        val statsManager = manager ?: return null
+        if (endMillis <= startMillis) return null
         return try {
             val bucket = statsManager.querySummaryForDevice(
                 if (network == UsageNetwork.WIFI) ConnectivityManager.TYPE_WIFI else ConnectivityManager.TYPE_MOBILE,
@@ -62,18 +71,29 @@ class NetworkStatsReader(private val context: Context) {
                 startMillis,
                 endMillis,
             )
-            if (bucket == null) TrafficTotals.Empty else TrafficTotals(bucket.rxBytes, bucket.txBytes)
+            if (bucket == null) null else TrafficTotals(bucket.rxBytes, bucket.txBytes)
         } catch (securityException: SecurityException) {
-            TrafficTotals.Empty
+            null
         } catch (exception: Exception) {
-            TrafficTotals.Empty
+            null
         }
     }
 
     /** استهلاك كل تطبيق (uid) على الشبكة المختارة؛ null يجمع اشتراكات الهاتف المتاحة. */
-    fun perUidTotals(startMillis: Long, endMillis: Long, network: UsageNetwork): Map<Int, TrafficTotals> {
-        val statsManager = manager ?: return emptyMap()
-        if (endMillis <= startMillis) return emptyMap()
+    fun perUidTotals(startMillis: Long, endMillis: Long, network: UsageNetwork): Map<Int, TrafficTotals> =
+        perUidTotalsOrNull(startMillis, endMillis, network) ?: emptyMap()
+
+    /**
+     * مثل [perUidTotals] لكنها تعيد `null` عند تعذّر القراءة بدل خريطة فارغة.
+     *
+     * تعتمد `querySummary` لأنها تُوزّع الحِزمة الزمنية الجارية نسبيًا (interpolation)
+     * فتظهر الحركة الحالية، بخلاف `queryDetailsForUid` التي تتجاهل أي حزمة جزئية
+     * «Since bucket length is in the order of hours, this method cannot be used to
+     * measure data usage on a fine grained time scale» — لذلك لا تصلح لعدّاد مباشر.
+     */
+    fun perUidTotalsOrNull(startMillis: Long, endMillis: Long, network: UsageNetwork): Map<Int, TrafficTotals>? {
+        val statsManager = manager ?: return null
+        if (endMillis <= startMillis) return null
 
         val result = HashMap<Int, TrafficTotals>()
         var stats: NetworkStats? = null
@@ -83,7 +103,7 @@ class NetworkStatsReader(private val context: Context) {
                 null,
                 startMillis,
                 endMillis,
-            ) ?: return emptyMap()
+            ) ?: return null
 
             val bucket = NetworkStats.Bucket()
             while (stats.getNextBucket(bucket)) {
@@ -93,9 +113,9 @@ class NetworkStatsReader(private val context: Context) {
                 result[uid] = result[uid]?.plus(totals) ?: totals
             }
         } catch (securityException: SecurityException) {
-            return emptyMap()
+            return null
         } catch (exception: Exception) {
-            return emptyMap()
+            return null
         } finally {
             try {
                 stats?.close()
