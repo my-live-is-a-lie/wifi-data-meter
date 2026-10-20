@@ -158,7 +158,14 @@ class UsageRepository(
      * ويتولّى سجل الاختيار ترتيب الأكثر اختيارًا في الواجهة.
      */
     suspend fun installedApps(): List<AppUsage> = withContext(Dispatchers.IO) {
-        appIdentities.installed()
+        val cached = appIdentities.installed()
+        // أول فتح بعد التثبيت قد يسبق مسح الهويات في الخلفية؛ نمسح هنا مرة واحدة.
+        if (cached.isNotEmpty()) {
+            cached
+        } else {
+            runCatching { appIdentities.captureInstalledApps() }
+            appIdentities.installed()
+        }
     }
 
     /** Details use the same live/archive merge as the list, not an unrelated reused UID. */
