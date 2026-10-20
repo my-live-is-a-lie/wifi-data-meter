@@ -9,6 +9,7 @@ import android.content.res.Configuration
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.IBinder
+import android.os.SystemClock
 import android.provider.Settings
 import android.util.Log
 import android.view.Gravity
@@ -49,6 +50,8 @@ import com.mywifiadata.app.core.TimeRanges
 import com.mywifiadata.app.core.UsageNetwork
 import com.mywifiadata.app.core.UsageSample
 import com.mywifiadata.app.data.AppSearchHistory
+import com.mywifiadata.app.data.LiveReading
+import com.mywifiadata.app.data.LiveTrafficReader
 import com.mywifiadata.app.data.NetworkStatsGate
 import com.mywifiadata.app.data.UsageRepository
 import com.mywifiadata.app.data.model.AppLayoutDirection
@@ -125,6 +128,12 @@ class UsageOverlayService :
     private val sampleHistory = mutableListOf<UsageSample>()
     private var rxSpeed = 0.0
     private var txSpeed = 0.0
+
+    /** آخر قراءة مباشرة من TrafficStats (null = لم تُؤخذ بعد في هذا المقطع). */
+    private var liveLast: LiveReading? = null
+
+    /** استهلاك المقطع الحالي المتراكم من فروق القراءات المباشرة. */
+    private var liveAccum = TrafficTotals.Empty
 
     private var frozenTotals = TrafficTotals.Empty
     private var frozenElapsedMillis = 0L
@@ -607,6 +616,8 @@ class UsageOverlayService :
             cumulativeStartMillis = TimeRanges.startOfToday(now)
         }
         baselineTotals = null
+        liveLast = null
+        liveAccum = TrafficTotals.Empty
         sampleHistory.clear()
         rxSpeed = 0.0
         txSpeed = 0.0
@@ -712,6 +723,12 @@ class UsageOverlayService :
         // الوقت يتقدّم كل ثانية (حساب محلي)، أما القراءة من النظام فتُؤخذ كل 16 ثانية
         // لأن أندرويد لا يسمح بإجبار تحديث الإحصاءات أكثر من مرة كل 15 ثانية.
         ui.value = ui.value.copy(elapsedMillis = frozenElapsedMillis + (now - start))
+
+        // المسار الرئيسي: قراءة مباشرة كل ثانية من TrafficStats.
+        if (refreshLive()) return
+
+        // المسار البديل (جهاز لا يعطي عدّادات مباشرة لهذا الهدف): NetworkStatsManager كل 16 ثانية.
+        liveLast = null
         if (now - lastSampleMillis < SAMPLE_MILLIS) return
         // قراءة نظام واحدة كل 16 ثانية على مستوى التطبيق؛ إن كانت مأخوذة الآن
         // نعيد المحاولة في الدورة التالية (كل ثانية) بدل إحداث نداء يمنع التحديث.
@@ -805,6 +822,86 @@ class UsageOverlayService :
     }
 
     /**
+     * قراءة مباشرة كل ثانية من `TrafficStats`.
+     *
+     * - المعدّل = فرق الاستهلاك المتراكم ÷ الزمن الفعلي (متوسط آخر 3 ثوانٍ).
+     * - «جميع التطبيقات»: واي فاي = فرق إجمالي الجهاز − فرق بيانات الجوال.
+     * - تطبيق واحد: لا يفصل العدّاد الشبكتين، فنحتسب الفرق فقط وقت الاتصال بالواي فاي.
+     * - الزمن يُقاس بـ `elapsedRealtime` فلا يتأثر بتغيير ساعة الجهاز.
+     *
+     * @return `true` إن عُولجت هذه الدورة هنا، و`false` ليستعمل المتّصل المسار البديل.
+     */
+    private suspend fun refreshLive(): Boolean {
+        val target = ui.value.target
+        val (reading, wifiConnected) = withContext(Dispatchers.IO) {
+            val live = if (target.isAllApps) {
+                LiveTrafficReader.readDevice()
+            } else {
+                LiveTrafficReader.readUid(target.uid)
+            }
+            live to repository.isWifiConnected()
+        }
+        if (reading == null) return false
+
+        val nowReal = SystemClock.elapsedRealtime()
+        val previous = liveLast
+        liveLast = reading
+
+        if (previous == null) {
+            // أول قراءة في المقطع = خط الأساس فقط.
+            sampleHistory.clear()
+            sampleHistory.add(UsageSample(nowReal, liveAccum))
+            ui.value = ui.value.copy(
+                usageAccessMissing = false,
+                readFailed = false,
+                collecting = false,
+                wifiConnected = wifiConnected,
+                totals = frozenTotals + liveAccum,
+                rxSpeed = 0.0,
+                txSpeed = 0.0,
+            )
+            return true
+        }
+
+        val previousMobile = previous.mobile
+        val currentMobile = reading.mobile
+        val delta = when {
+            previousMobile != null && currentMobile != null ->
+                OverlaySampling.wifiDelta(previous.total, reading.total, previousMobile, currentMobile)
+
+            wifiConnected -> OverlaySampling.delta(previous.total, reading.total)
+            else -> TrafficTotals.Empty
+        }
+        liveAccum += delta
+
+        sampleHistory.add(UsageSample(nowReal, liveAccum))
+        val windowStart = OverlaySampling.rateWindowStart(
+            sampleHistory,
+            nowReal,
+            OverlaySampling.LIVE_RATE_WINDOW_MILLIS,
+        )
+        if (windowStart != null && sampleHistory.size > 1) {
+            val rate = OverlaySampling.rate(windowStart, sampleHistory.last())
+            rxSpeed = rate.rxBytesPerSecond
+            txSpeed = rate.txBytesPerSecond
+        }
+        while (sampleHistory.size > MAX_LIVE_SAMPLES) {
+            sampleHistory.removeAt(0)
+        }
+
+        ui.value = ui.value.copy(
+            usageAccessMissing = false,
+            readFailed = false,
+            collecting = false,
+            wifiConnected = wifiConnected,
+            totals = frozenTotals + liveAccum,
+            rxSpeed = rxSpeed,
+            txSpeed = txSpeed,
+        )
+        return true
+    }
+
+    /**
      * قراءة تراكمية واحدة من إحصاءات النظام للهدف المختار على شبكة الواي فاي.
      *
      * نستخدم ملخّص الاستهلاك لكل uid (`querySummary`) لأنه يوزّع الحزمة الزمنية الجارية
@@ -892,6 +989,9 @@ class UsageOverlayService :
 
         /** يكفي لأربع قراءات (دقيقة) فتغطي نافذة المعدّل (16 ثانية) كاملة. */
         private const val MAX_RATE_SAMPLES = 4
+
+        /** قراءات المسار المباشر (كل ثانية): تكفي لنافذة 3 ثوانٍ مع هامش. */
+        private const val MAX_LIVE_SAMPLES = 8
 
         const val ACTION_SHOW = "com.mywifiadata.app.overlay.SHOW"
         const val ACTION_CLOSE = "com.mywifiadata.app.overlay.CLOSE"
