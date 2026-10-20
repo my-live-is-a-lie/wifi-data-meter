@@ -19,10 +19,13 @@ data class DashboardLayout(
         val hasLegacySpeedTestSection = DashboardLayoutIds.TODAY_SPEED_TEST in todaySectionOrder
         val hidesLegacySpeedTest = DashboardLayoutIds.TODAY_SPEED_TEST in hiddenTodaySections
         // بطاقة النافذة العائمة تُضاف بعد الأزرار السريعة مباشرةً في التخطيطات المحفوظة قبل وجودها.
-        val cardOrderWithMonitor = if (DashboardLayoutIds.MONITOR_CARD !in cardOrder) {
+        // إن غابت الأزرار السريعة نفسها فترك البطاقة للترتيب المرجعي يضعها في موضعها الصحيح.
+        val quickActionsIndex = cardOrder.indexOf(DashboardLayoutIds.QUICK_ACTIONS_CARD)
+        val cardOrderWithMonitor = if (
+            DashboardLayoutIds.MONITOR_CARD !in cardOrder && quickActionsIndex >= 0
+        ) {
             cardOrder.toMutableList().apply {
-                val quickActionsIndex = indexOf(DashboardLayoutIds.QUICK_ACTIONS_CARD)
-                add(if (quickActionsIndex >= 0) quickActionsIndex + 1 else size, DashboardLayoutIds.MONITOR_CARD)
+                add(quickActionsIndex + 1, DashboardLayoutIds.MONITOR_CARD)
             }
         } else {
             cardOrder

@@ -78,7 +78,7 @@ fun MonitorCard(
 
             Column(
                 modifier = Modifier.weight(1f),
-                horizontalAlignment = Alignment.End,
+                horizontalAlignment = Alignment.Start,
             ) {
                 Text(
                     text = stringResource(R.string.monitor_card_title),
