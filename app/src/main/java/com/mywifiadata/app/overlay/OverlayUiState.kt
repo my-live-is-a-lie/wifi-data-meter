@@ -27,6 +27,10 @@ data class OverlayUiState(
     val usageAccessMissing: Boolean = false,
     /** القياس على الواي فاي؛ بلا اتصال لن تتغيّر الأرقام، فنقولها صراحة. */
     val wifiConnected: Boolean = true,
+    /** أُخذ خط الأساس ولم تصل قراءة تالية بعد؛ لا نعرض صفرًا مضلّلًا. */
+    val collecting: Boolean = false,
+    /** فشلت قراءة إحصاءات النظام في هذه الدورة (تمييزًا عن الاستهلاك الصفري). */
+    val readFailed: Boolean = false,
     /** تُستخدم لإبراز منطقة الإغلاق أثناء سحب النافذة المصغرة. */
     val dismissArmed: Boolean = false,
     val pickerVisible: Boolean = false,

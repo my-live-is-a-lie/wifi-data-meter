@@ -61,13 +61,13 @@ class OverlaySamplingTest {
     }
 
     @Test
-    fun `rate window starts at the oldest reading inside the last ten seconds`() {
-        val samples = (0..6).map { index ->
-            UsageSample(index * 2_000L, TrafficTotals(rxBytes = index * 1_000L, txBytes = 0L))
+    fun `rate window starts at the oldest reading inside the window`() {
+        val samples = (0..5).map { index ->
+            UsageSample(index * 4_000L, TrafficTotals(rxBytes = index * 1_000L, txBytes = 0L))
         }
 
-        // الآن = 12 ثانية، فالنافذة تبدأ من القراءة عند 2 ثانية (عمرها 10 ثوانٍ).
-        assertEquals(samples[1], OverlaySampling.rateWindowStart(samples, 12_000L))
+        // النافذة 16 ثانية: عند اللحظة 20 ثانية تبدأ من القراءة عند 4 ثوانٍ.
+        assertEquals(samples[1], OverlaySampling.rateWindowStart(samples, 20_000L))
     }
 
     @Test
@@ -86,7 +86,8 @@ class OverlaySamplingTest {
     }
 
     @Test
-    fun `rate window is longer than the sampling period`() {
-        assertEquals(10_000L, OverlaySampling.RATE_WINDOW_MILLIS)
+    fun `rate window matches the platform refresh cadence`() {
+        // أندرويد لا يسمح بتحديث الإحصاءات أكثر من مرة كل 15 ثانية للمستخدم العادي.
+        assertEquals(16_000L, OverlaySampling.RATE_WINDOW_MILLIS)
     }
 }

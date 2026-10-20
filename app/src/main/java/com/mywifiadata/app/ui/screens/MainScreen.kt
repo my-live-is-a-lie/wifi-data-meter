@@ -69,6 +69,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -94,6 +95,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mywifiadata.app.R
 import com.mywifiadata.app.core.HistorySection
@@ -147,6 +151,25 @@ fun MainScreen(
     val historySearchListState = rememberLazyListState()
     val overlayRunning by UsageOverlayService.running.collectAsStateWithLifecycle()
     var showOverlayPermissionDialog by rememberSaveable { mutableStateOf(false) }
+
+    // لا نقرأ إحصاءات الشبكة من الواجهة وهي في الخلفية: أندرويد يسمح بتحديث
+    // واحد كل 15 ثانية، ونتركه للنافذة العائمة كي لا تتجمد أرقامها.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> viewModel.setUiVisible(true)
+                Lifecycle.Event.ON_PAUSE -> viewModel.setUiVisible(false)
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    LaunchedEffect(overlayRunning) {
+        viewModel.setOverlayActive(overlayRunning)
+    }
 
     // النافذة العائمة تحتاج صلاحية «العرض فوق التطبيقات»؛ نطلبها مرة واحدة من هنا.
     fun startOverlay() {

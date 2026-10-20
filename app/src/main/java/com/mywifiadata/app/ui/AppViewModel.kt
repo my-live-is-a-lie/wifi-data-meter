@@ -31,6 +31,7 @@ import com.mywifiadata.app.core.TimeRange
 import com.mywifiadata.app.core.TimeRanges
 import com.mywifiadata.app.core.UsagePeriod
 import com.mywifiadata.app.data.AppSearchHistory
+import com.mywifiadata.app.data.NetworkStatsGate
 import com.mywifiadata.app.data.UsageRepository
 import com.mywifiadata.app.data.model.AccentColor
 import com.mywifiadata.app.data.model.AdditionalPlanDraft
@@ -369,6 +370,28 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         viewModelScope.launch { refreshLoop() }
     }
 
+    /**
+     * هل واجهة التطبيق ظاهرة؟ لا نقرأ إحصاءات الشبكة في الخلفية كي لا نستهلك
+     * فُرص التحديث التي تحتاجها النافذة العائمة (أندرويد يسمح بتحديث كل 15 ثانية).
+     */
+    @Volatile
+    private var uiVisible = true
+
+    fun setUiVisible(visible: Boolean) {
+        uiVisible = visible
+    }
+
+    /**
+     * أثناء عمل النافذة العائمة نترك قراءة إحصاءات الشبكة لها وحدها: أندرويد يسمح
+     * بتحديث واحد كل 15 ثانية لكل الجهاز، فقراءات الواجهة تسرق الدورة من النافذة.
+     */
+    @Volatile
+    private var overlayActive = false
+
+    fun setOverlayActive(active: Boolean) {
+        overlayActive = active
+    }
+
     private suspend fun refreshLoop() {
         while (viewModelScope.isActive) {
             runCatching { refresh() }
@@ -381,46 +404,63 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         val now = System.currentTimeMillis()
         var settings = repository.settingsStore.current
         val hasAccess = repository.hasUsageAccess()
+        val previous = _uiState.value
+        // قراءة نظام واحدة كل 16 ثانية على الأكثر؛ بينها نُبقي آخر القيم المعروضة.
+        val queryStats = hasAccess && uiVisible && !overlayActive &&
+            (force || NetworkStatsGate.tryAcquire(now))
 
         val wifi = repository.wifiStatus()
-        val today = if (hasAccess) repository.todayTotals(now) else TrafficTotals.Empty
-        val cycle = if (hasAccess) {
-            repository.cycleTotals(settings.cycleStartDay, now)
-        } else {
-            TrafficTotals.Empty
+        val today = when {
+            !hasAccess -> TrafficTotals.Empty
+            queryStats -> repository.todayTotals(now)
+            else -> previous.today
         }
-        var wifiPlanUsage = if (hasAccess) {
-            repository.planTotals(settings, now)
-        } else {
-            TrafficTotals.Empty
+        val cycle = when {
+            !hasAccess -> TrafficTotals.Empty
+            queryStats -> repository.cycleTotals(settings.cycleStartDay, now)
+            else -> previous.cycle
         }
-        var mobileCycle = if (hasAccess) {
-            repository.mobilePlanTotals(settings, now)
-        } else {
-            TrafficTotals.Empty
+        var wifiPlanUsage: TrafficTotals? = when {
+            !hasAccess -> TrafficTotals.Empty
+            queryStats -> repository.planTotals(settings, now)
+            else -> previous.wifiPlanUsage
+        }
+        var mobileCycle = when {
+            !hasAccess -> TrafficTotals.Empty
+            queryStats -> repository.mobilePlanTotals(settings, now)
+            else -> previous.mobileCycle
         }
 
         val promotedSettings = settings.promoteExpiredPlansIfNeeded(
-            wifiUsedBytes = wifiPlanUsage.totalBytes,
+            wifiUsedBytes = wifiPlanUsage?.totalBytes ?: 0L,
             mobileUsedBytes = mobileCycle.totalBytes,
             now = now,
         )
         if (promotedSettings != settings) {
             repository.settingsStore.update { promotedSettings }
             settings = repository.settingsStore.current
-            wifiPlanUsage = if (hasAccess) repository.planTotals(settings, now) else TrafficTotals.Empty
-            mobileCycle = if (hasAccess) repository.mobilePlanTotals(settings, now) else TrafficTotals.Empty
+            wifiPlanUsage = if (hasAccess && queryStats) {
+                repository.planTotals(settings, now)
+            } else {
+                wifiPlanUsage
+            }
+            mobileCycle = if (hasAccess && queryStats) {
+                repository.mobilePlanTotals(settings, now)
+            } else {
+                mobileCycle
+            }
         }
 
-        val session = if (hasAccess) {
-            repository.deviceTotals(
+        val session = when {
+            !hasAccess -> TrafficTotals.Empty
+            queryStats -> repository.deviceTotals(
                 com.mywifiadata.app.core.TimeRange(settings.sessionStartMillis, now),
             )
-        } else {
-            TrafficTotals.Empty
+            else -> previous.session
         }
 
-        val sample = buildSample(now, today)
+        // معدّل السرعة يُحسب بين قراءتين حقيقيتين فقط، فلا يهبط إلى الصفر بينهما.
+        val sample = if (queryStats) buildSample(now, today) else null
 
         _uiState.update { state ->
             val currentYm = TimeRanges.currentYearMonth(now)
@@ -456,11 +496,14 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         val sameHistorySelection = dailyLoadedNetwork == currentState.historyNetwork &&
             dailyLoadedYear == currentState.historyYear &&
             dailyLoadedMonth == currentState.historyMonth
-        if (hasAccess && (force || now - dailyLoadedAt > DAILY_TTL_MILLIS || !sameHistorySelection)) {
+        // لا نحمّل بيانات الشاشات وهي في الخلفية: كل قراءة تُهدر فرصة تحديث النافذة العائمة.
+        if (uiVisible && !overlayActive && hasAccess &&
+            (force || now - dailyLoadedAt > DAILY_TTL_MILLIS || !sameHistorySelection)
+        ) {
             loadHistory(now = now)
         }
 
-        if (hasAccess && (force || now - appsLoadedAt > APPS_TTL_MILLIS)) {
+        if (uiVisible && !overlayActive && hasAccess && (force || now - appsLoadedAt > APPS_TTL_MILLIS)) {
             loadApps()
             loadAppsSlices()
             repository.captureUsageArchive(now)

@@ -46,6 +46,7 @@ import com.mywifiadata.app.core.TimeRanges
 import com.mywifiadata.app.core.UsageNetwork
 import com.mywifiadata.app.core.UsageSample
 import com.mywifiadata.app.data.AppSearchHistory
+import com.mywifiadata.app.data.NetworkStatsGate
 import com.mywifiadata.app.data.UsageRepository
 import com.mywifiadata.app.data.model.AppLayoutDirection
 import com.mywifiadata.app.data.model.AppSettings
@@ -487,6 +488,8 @@ class UsageOverlayService :
             rxSpeed = 0.0,
             txSpeed = 0.0,
             usageAccessMissing = !repository.hasUsageAccess(),
+            collecting = false,
+            readFailed = false,
         )
     }
 
@@ -497,7 +500,8 @@ class UsageOverlayService :
     private fun startNewSegment() {
         val now = System.currentTimeMillis()
         segmentStartMillis = now
-        lastSampleMillis = now
+        // صفر كي تُلتقط قراءة خط الأساس في أول دورة (خلال ثانية) لا بعد 16 ثانية.
+        lastSampleMillis = 0L
         if (cumulativeStartMillis <= 0L) {
             cumulativeStartMillis = TimeRanges.startOfToday(now)
         }
@@ -592,6 +596,7 @@ class UsageOverlayService :
         tickerJob = scope.launch {
             while (isActive) {
                 runCatching { refreshUsage() }
+                    .onFailure { Log.e(TAG, "Usage refresh failed", it) }
                 delay(TICK_MILLIS)
             }
         }
@@ -603,9 +608,13 @@ class UsageOverlayService :
         val now = System.currentTimeMillis()
         if (start <= 0L || now <= start) return
 
-        // الوقت يتقدّم كل ثانية (حساب محلي)، أما القراءة من النظام فأثقل وتُؤخذ كل ثانيتين.
+        // الوقت يتقدّم كل ثانية (حساب محلي)، أما القراءة من النظام فتُؤخذ كل 16 ثانية
+        // لأن أندرويد لا يسمح بإجبار تحديث الإحصاءات أكثر من مرة كل 15 ثانية.
         ui.value = ui.value.copy(elapsedMillis = frozenElapsedMillis + (now - start))
         if (now - lastSampleMillis < SAMPLE_MILLIS) return
+        // قراءة نظام واحدة كل 16 ثانية على مستوى التطبيق؛ إن كانت مأخوذة الآن
+        // نعيد المحاولة في الدورة التالية (كل ثانية) بدل إحداث نداء يمنع التحديث.
+        if (!NetworkStatsGate.tryAcquire(now)) return
         lastSampleMillis = now
 
         // فحص الصلاحية وحالة الواي فاي خارج الخيط الرئيسي (نداءات نظام).
@@ -615,12 +624,14 @@ class UsageOverlayService :
 
         // بلا صلاحية «الوصول إلى الاستخدام» لا يمكن قراءة أي إحصاء؛ نُعلن ذلك بدل صفر صامت.
         if (!hasUsageAccess) {
+            // نُبقي آخر إجمالي قيس فعلًا بدل إعادته إلى الصفر، لكن نُعلن سبب توقّفه.
             ui.value = ui.value.copy(
                 usageAccessMissing = true,
                 wifiConnected = wifiConnected,
-                totals = frozenTotals,
                 rxSpeed = 0.0,
                 txSpeed = 0.0,
+                collecting = false,
+                readFailed = false,
             )
             return
         }
@@ -629,15 +640,23 @@ class UsageOverlayService :
 
         val target = ui.value.target
         // قراءة فاشلة ليست صفرًا: نتجاهل هذه الدورة ونبقي خط الأساس كما هو.
-        val current = readCumulativeTotals(target, cumulativeStartMillis, now) ?: return
+        val current = readCumulativeTotals(target, cumulativeStartMillis, now)
+        if (current == null) {
+            if (!ui.value.readFailed) {
+                ui.value = ui.value.copy(readFailed = true, usageAccessMissing = false)
+            }
+            return
+        }
         val baseline = baselineTotals
         if (baseline == null) {
-            // أول قراءة في المقطع هي خط الأساس؛ لا تُعرض بعد (لا استهلاك معروف بعد).
+            // أول قراءة في المقطع هي خط الأساس؛ لا استهلاك معروفًا بعد فنُعلن «جارٍ القياس».
             baselineTotals = current
             sampleHistory.clear()
             sampleHistory.add(UsageSample(now, current))
             ui.value = ui.value.copy(
                 usageAccessMissing = false,
+                readFailed = false,
+                collecting = true,
                 totals = frozenTotals,
                 rxSpeed = 0.0,
                 txSpeed = 0.0,
@@ -652,6 +671,8 @@ class UsageOverlayService :
             sampleHistory.add(UsageSample(now, current))
             ui.value = ui.value.copy(
                 usageAccessMissing = false,
+                readFailed = false,
+                collecting = true,
                 totals = frozenTotals,
                 rxSpeed = 0.0,
                 txSpeed = 0.0,
@@ -674,6 +695,8 @@ class UsageOverlayService :
         val session = OverlaySampling.sessionTotals(baseline, current)
         ui.value = ui.value.copy(
             usageAccessMissing = false,
+            readFailed = false,
+            collecting = false,
             totals = frozenTotals + session,
             rxSpeed = rxSpeed,
             txSpeed = txSpeed,
@@ -682,6 +705,10 @@ class UsageOverlayService :
 
     /**
      * قراءة تراكمية واحدة من إحصاءات النظام للهدف المختار على شبكة الواي فاي.
+     *
+     * نستخدم ملخّص الاستهلاك لكل uid (`querySummary`) لأنه يوزّع الحزمة الزمنية الجارية
+     * نسبيًا فيرى الحركة الحديثة؛ أما `queryDetailsForUid` فتتجاهل الحزم الجزئية ولا
+     * تصلح لقياس لحظي. «جميع التطبيقات» = مجموع التطبيقات الظاهرة للنظام.
      * `null` تعني أن القراءة فشلت الآن، لا أن الاستهلاك صفر.
      */
     private suspend fun readCumulativeTotals(
@@ -689,11 +716,14 @@ class UsageOverlayService :
         fromMillis: Long,
         toMillis: Long,
     ): TrafficTotals? {
-        val range = TimeRange(fromMillis, toMillis)
+        val totals = repository.perUidTotalsOrNull(
+            TimeRange(fromMillis, toMillis),
+            UsageNetwork.WIFI,
+        ) ?: return null
         return if (target.isAllApps) {
-            repository.deviceTotalsOrNull(range, UsageNetwork.WIFI)
+            totals.values.fold(TrafficTotals.Empty) { sum, part -> sum + part }
         } else {
-            repository.uidTotalsOrNull(target.uid, range, UsageNetwork.WIFI)
+            totals[target.uid] ?: TrafficTotals.Empty
         }
     }
 
@@ -748,10 +778,19 @@ class UsageOverlayService :
     companion object {
         private const val TAG = "UsageOverlayService"
         private const val TICK_MILLIS = 1_000L
-        private const val SAMPLE_MILLIS = 2_000L
 
-        /** يكفي لثمانِ قراءات (16 ثانية) فتغطي نافذة المعدّل (10 ثوانٍ) كاملة. */
-        private const val MAX_RATE_SAMPLES = 8
+        /**
+         * فترة القراءة من إحصاءات النظام.
+         *
+         * أندرويد يسمح بنداء نظام واحد يفرض تحديث الإحصاءات على الأكثر كل **15 ثانية**
+         * (`POLL_RATE_LIMIT_MS` في NetworkStatsService)، وأي نداء جديد يعيد ضبط المهلة.
+         * لذلك كل قراءة أسرع من ذلك تمنع التحديث كليًا وتُرجع نفس الأرقام القديمة — وهو
+         * سبب بقاء العدّاد على صفر. نقرأ كل 16 ثانية كي تفرض كل قراءة تحديثًا فعليًا.
+         */
+        private const val SAMPLE_MILLIS = 16_000L
+
+        /** يكفي لأربع قراءات (دقيقة) فتغطي نافذة المعدّل (16 ثانية) كاملة. */
+        private const val MAX_RATE_SAMPLES = 4
 
         const val ACTION_SHOW = "com.mywifiadata.app.overlay.SHOW"
         const val ACTION_CLOSE = "com.mywifiadata.app.overlay.CLOSE"
