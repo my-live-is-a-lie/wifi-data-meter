@@ -17,6 +17,16 @@ data class OverlayUiState(
     val totals: TrafficTotals = TrafficTotals.Empty,
     val elapsedMillis: Long = 0L,
     val paused: Boolean = false,
+    /** معدّل لحظي حقيقي (بايت/ثانية) محسوب من فرق قراءتين لإحصاءات الشبكة. */
+    val rxSpeed: Double = 0.0,
+    val txSpeed: Double = 0.0,
+    /**
+     * صلاحية «الوصول إلى الاستخدام» غير ممنوحة، فلا يمكن قراءة أي إحصاءات.
+     * تُعرض عندها لافتة صريحة بدل أرقام صامتة تساوي صفرًا.
+     */
+    val usageAccessMissing: Boolean = false,
+    /** القياس على الواي فاي؛ بلا اتصال لن تتغيّر الأرقام، فنقولها صراحة. */
+    val wifiConnected: Boolean = true,
     /** تُستخدم لإبراز منطقة الإغلاق أثناء سحب النافذة المصغرة. */
     val dismissArmed: Boolean = false,
     val pickerVisible: Boolean = false,
@@ -33,6 +43,8 @@ class OverlayActions(
     val minimize: () -> Unit,
     val close: () -> Unit,
     val togglePause: () -> Unit,
+    /** فتح إعدادات النظام لمنح صلاحية «الوصول إلى الاستخدام» من داخل النافذة. */
+    val openUsageAccess: () -> Unit,
     val openPicker: () -> Unit,
     val closePicker: () -> Unit,
     val selectTarget: (MonitorTarget) -> Unit,

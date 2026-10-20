@@ -540,6 +540,7 @@ fun DashboardScreen(
                             isEditing = isEditing,
                             onOpenPicker = onOpenMonitorPicker,
                             onStart = onStartOverlay,
+                            usageAccessGranted = state.hasUsageAccess,
                         )
 
                         DashboardLayoutIds.WIFI_CARD -> {

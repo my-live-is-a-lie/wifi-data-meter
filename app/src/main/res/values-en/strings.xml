@@ -421,6 +421,10 @@
     <string name="overlay_minimize">Minimize window</string>
     <string name="overlay_close">Close window</string>
     <string name="overlay_change_target">Change monitored app</string>
+    <string name="overlay_usage_access_missing">Usage cannot be read: enable usage access to measure real traffic.</string>
+    <string name="overlay_no_usage_access_short">No usage access</string>
+    <string name="overlay_no_wifi_short">No Wi-Fi connection</string>
+    <string name="monitor_usage_access_hint">Usage access is needed to measure usage</string>
     <string name="overlay_permission_title">Display over other apps</string>
     <string name="overlay_permission_body">To show the floating window while you use other apps, allow Wi‑Fi Data to display over other apps.</string>
     <string name="overlay_permission_open">Open settings</string>

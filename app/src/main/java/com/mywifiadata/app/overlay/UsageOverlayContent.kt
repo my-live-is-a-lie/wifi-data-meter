@@ -25,6 +25,7 @@ import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -112,7 +113,7 @@ private fun OverlayPill(state: OverlayUiState, actions: OverlayActions) {
         ) {
             TargetIcon(target = state.target, size = 30.dp)
             Text(
-                text = Format.bytes(state.totals.totalBytes),
+                text = if (state.usageAccessMissing) "—" else Format.bytes(state.totals.totalBytes),
                 style = MaterialTheme.typography.titleMedium,
                 maxLines = 1,
                 softWrap = false,
@@ -137,7 +138,11 @@ private fun OverlayEdgeTab(state: OverlayUiState, actions: OverlayActions) {
     } else {
         AbsoluteRoundedCornerShape(topLeft = 18.dp, topRight = 0.dp, bottomRight = 0.dp, bottomLeft = 18.dp)
     }
-    val (amount, unit) = Format.bytesParts(state.totals.totalBytes)
+    val (amount, unit) = if (state.usageAccessMissing) {
+        "—" to ""
+    } else {
+        Format.bytesParts(state.totals.totalBytes)
+    }
     Surface(
         modifier = Modifier
             .widthIn(min = 46.dp)
@@ -217,6 +222,10 @@ private fun OverlayExpanded(state: OverlayUiState, actions: OverlayActions) {
                     listMaxHeight = 230.dp,
                 )
             } else {
+                if (state.usageAccessMissing) {
+                    UsageAccessNotice(onOpen = actions.openUsageAccess)
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
                 OverlayMetrics(state = state)
             }
         }
@@ -323,10 +332,65 @@ private fun OverlayMetrics(state: OverlayUiState) {
             icon = Icons.Rounded.ArrowUpward,
         )
         Spacer(modifier = Modifier.weight(1f))
-        ByteValue(
-            bytes = state.totals.totalBytes,
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onSurface,
+        Column(horizontalAlignment = Alignment.End) {
+            ByteValue(
+                bytes = state.totals.totalBytes,
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            // معدّل حقيقي من فرق قراءتين؛ يبقى صفرًا حين لا يسجّل النظام أي حركة.
+            Text(
+                text = when {
+                    state.usageAccessMissing -> stringResource(R.string.overlay_no_usage_access_short)
+                    !state.wifiConnected -> stringResource(R.string.overlay_no_wifi_short)
+                    else -> Format.speed(state.rxSpeed + state.txSpeed)
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                softWrap = false,
+            )
+        }
+    }
+}
+
+/**
+ * لافتة صريحة عندما تكون صلاحية «الوصول إلى الاستخدام» غير ممنوحة:
+ * بلا هذه الصلاحية لا يمكن قراءة أي إحصاء، فالأرقام التي تبقى صفرًا ليست قياسًا.
+ */
+@Composable
+private fun UsageAccessNotice(onOpen: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.errorContainer)
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.Info,
+            contentDescription = null,
+            modifier = Modifier.size(16.dp),
+            tint = MaterialTheme.colorScheme.onErrorContainer,
+        )
+        Text(
+            text = stringResource(R.string.overlay_usage_access_missing),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onErrorContainer,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = stringResource(R.string.action_open_usage_access),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onErrorContainer,
+            maxLines = 1,
+            softWrap = false,
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .clickable(onClick = onOpen)
+                .padding(horizontal = 6.dp, vertical = 4.dp),
         )
     }
 }
