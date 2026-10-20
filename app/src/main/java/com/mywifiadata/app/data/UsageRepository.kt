@@ -137,6 +137,36 @@ class UsageRepository(
         (live + removed).sortedByDescending { it.totals.totalBytes }
     }
 
+    /**
+     * إجمالي استهلاك تطبيق واحد خلال نطاق قصير — للنافذة العائمة.
+     * لا يكتب الأرشيف ولا يحلّ هوية التطبيق، فلا يثقل التحديث كل ثانية.
+     */
+    suspend fun uidTotals(
+        uid: Int,
+        range: TimeRange,
+        network: UsageNetwork = UsageNetwork.WIFI,
+    ): TrafficTotals = withContext(Dispatchers.IO) {
+        if (uid < 0 || !statsReader.hasUsageAccess()) return@withContext TrafficTotals.Empty
+        val end = minOf(range.endMillis, System.currentTimeMillis())
+        if (end <= range.startMillis) return@withContext TrafficTotals.Empty
+        statsReader.perUidTotals(range.startMillis, end, network)[uid] ?: TrafficTotals.Empty
+    }
+
+    /**
+     * التطبيقات المثبّتة مع إجمالي استهلاكها لاختيار هدف النافذة العائمة.
+     * الترتيب المبدئي بحسب الاستهلاك، ثم تعيد الواجهة الترتيب بحسب تكرار الاختيار.
+     */
+    suspend fun installedApps(network: UsageNetwork = UsageNetwork.WIFI): List<AppUsage> =
+        withContext(Dispatchers.IO) {
+            val now = System.currentTimeMillis()
+            val totals = if (statsReader.hasUsageAccess()) {
+                statsReader.perUidTotals(0L, now, network)
+            } else {
+                emptyMap()
+            }
+            appIdentities.installed(totals)
+        }
+
     /** Details use the same live/archive merge as the list, not an unrelated reused UID. */
     suspend fun appTotals(
         uid: Int,

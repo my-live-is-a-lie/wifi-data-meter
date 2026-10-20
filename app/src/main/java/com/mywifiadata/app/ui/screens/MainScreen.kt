@@ -11,6 +11,8 @@ import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.drawable.Icon as AndroidIcon
+import android.net.Uri
+import android.provider.Settings
 import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -109,6 +111,7 @@ import com.mywifiadata.app.ui.components.HistoryPlanFilterBar
 import com.mywifiadata.app.ui.components.HistoryUsageFilterBar
 import com.mywifiadata.app.ui.components.SpeedTestDataWarningDialog
 import com.mywifiadata.app.ui.AppViewModel
+import com.mywifiadata.app.overlay.UsageOverlayService
 import com.mywifiadata.app.ui.theme.AppButtonShape
 import com.mywifiadata.app.widget.UsageWidgetProvider
 import com.mywifiadata.app.widget.UsageWidgetUpdater
@@ -142,6 +145,23 @@ fun MainScreen(
     val appsSearchListState = rememberLazyListState()
     val historyListState = rememberLazyListState()
     val historySearchListState = rememberLazyListState()
+    val overlayRunning by UsageOverlayService.running.collectAsStateWithLifecycle()
+    var showOverlayPermissionDialog by rememberSaveable { mutableStateOf(false) }
+
+    // النافذة العائمة تحتاج صلاحية «العرض فوق التطبيقات»؛ نطلبها مرة واحدة من هنا.
+    fun startOverlay() {
+        if (!Settings.canDrawOverlays(context)) {
+            showOverlayPermissionDialog = true
+            return
+        }
+        runCatching {
+            ContextCompat.startForegroundService(
+                context,
+                Intent(context, UsageOverlayService::class.java)
+                    .setAction(UsageOverlayService.ACTION_SHOW),
+            )
+        }
+    }
 
     var selectedTabIndex by rememberSaveable { mutableIntStateOf(0) }
     var pageEntrySide by remember { mutableIntStateOf(0) }
@@ -379,6 +399,40 @@ fun MainScreen(
         )
     }
 
+    if (showOverlayPermissionDialog) {
+        AlertDialog(
+            onDismissRequest = { showOverlayPermissionDialog = false },
+            title = { Text(text = stringResource(R.string.overlay_permission_title)) },
+            text = { Text(text = stringResource(R.string.overlay_permission_body)) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showOverlayPermissionDialog = false
+                        runCatching {
+                            context.startActivity(
+                                Intent(
+                                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                    Uri.parse("package:${context.packageName}"),
+                                ),
+                            )
+                        }
+                    },
+                    shape = AppButtonShape,
+                ) {
+                    Text(text = stringResource(R.string.overlay_permission_open))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showOverlayPermissionDialog = false },
+                    shape = AppButtonShape,
+                ) {
+                    Text(text = stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
+
     // تحذير استهلاك بيانات الهاتف قبل بدء اختبار السرعة، مع تقدير متكيّف
     // وخيار تجاهله ليوم كامل.
     state.speedTestDataWarning?.let { estimate ->
@@ -587,6 +641,11 @@ fun MainScreen(
                     onDashboardLayoutChange = { dashboardLayoutDraft = it.normalized() },
                     onSaveDashboardLayout = { saveDashboardEditing() },
                     onCancelDashboardLayout = { cancelDashboardEditing() },
+                    onOpenMonitorPicker = viewModel::openMonitorPicker,
+                    onSelectMonitorTarget = viewModel::selectMonitorTarget,
+                    onDismissMonitorPicker = viewModel::closeMonitorPicker,
+                    onStartOverlay = { startOverlay() },
+                    overlayRunning = overlayRunning,
                 )
 
                 AppTab.APPS -> {

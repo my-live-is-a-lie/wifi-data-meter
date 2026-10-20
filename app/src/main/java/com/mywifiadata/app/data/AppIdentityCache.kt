@@ -67,6 +67,17 @@ class AppIdentityCache(private val context: Context) {
         return AppUsage(uid, null, context.getString(R.string.unknown_app_label), true, totals)
     }
 
+    /**
+     * كل التطبيقات المثبّتة المعروفة محليًا مع إجماليات اختيارية بحسب uid.
+     * تُستخدم لقائمة اختيار هدف النافذة العائمة حتى تظهر التطبيقات بلا استهلاك سابق.
+     */
+    @Synchronized
+    fun installed(totals: Map<Int, TrafficTotals> = emptyMap()): List<AppUsage> =
+        store.all()
+            .filter { it.isInstalled && it.packageName.isNotBlank() }
+            .map { identity -> identity.asUsage(totals[identity.uid] ?: TrafficTotals.Empty) }
+            .sortedByDescending { it.totals.totalBytes }
+
     @Synchronized
     fun clear() = store.clear()
 

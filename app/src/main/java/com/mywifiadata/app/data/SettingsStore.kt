@@ -10,6 +10,8 @@ import com.mywifiadata.app.data.model.AccentColor
 import com.mywifiadata.app.data.model.AppLayoutDirection
 import com.mywifiadata.app.data.model.AppSettings
 import com.mywifiadata.app.data.model.DashboardLayout
+import com.mywifiadata.app.data.model.MonitorTarget
+import com.mywifiadata.app.data.model.OverlayEdge
 import com.mywifiadata.app.data.model.DataPlan
 import com.mywifiadata.app.data.model.PlanCapacityUnit
 import com.mywifiadata.app.data.model.PlanDurationUnit
@@ -179,6 +181,18 @@ class SettingsStore(context: Context) {
         historyLineChartEnabled = prefs.getBoolean(KEY_HISTORY_LINE_CHART, false),
         appsLineChartEnabled = prefs.getBoolean(KEY_APPS_LINE_CHART, false),
         appSearchHistory = AppSearchHistory.decode(prefs.getString(KEY_APP_SEARCH_HISTORY, null)),
+        monitorTarget = MonitorTarget(
+            uid = prefs.getInt(KEY_MONITOR_TARGET_UID, MonitorTarget.NO_APP),
+            packageName = prefs.getString(KEY_MONITOR_TARGET_PACKAGE, null).orEmpty(),
+            label = prefs.getString(KEY_MONITOR_TARGET_LABEL, null).orEmpty(),
+            iconPath = prefs.getString(KEY_MONITOR_TARGET_ICON, null).orEmpty(),
+        ).let { target -> if (target.uid < 0) MonitorTarget.AllApps else target },
+        monitorTargetHistory = AppSearchHistory.decode(prefs.getString(KEY_MONITOR_TARGET_HISTORY, null)),
+        overlayAnchorX = prefs.getFloat(KEY_OVERLAY_ANCHOR_X, 0.5f),
+        overlayAnchorY = prefs.getFloat(KEY_OVERLAY_ANCHOR_Y, 0.24f),
+        overlayEdge = prefs.getString(KEY_OVERLAY_EDGE, null)
+            ?.let { stored -> OverlayEdge.entries.firstOrNull { it.name == stored } }
+            ?: OverlayEdge.LEFT,
         themeMode = prefs.getString(KEY_THEME_MODE, null)
             ?.let { stored -> ThemeMode.entries.firstOrNull { it.name == stored } }
             ?: ThemeMode.SYSTEM,
@@ -299,6 +313,17 @@ class SettingsStore(context: Context) {
             .putBoolean(KEY_HISTORY_LINE_CHART, settings.historyLineChartEnabled)
             .putBoolean(KEY_APPS_LINE_CHART, settings.appsLineChartEnabled)
             .putString(KEY_APP_SEARCH_HISTORY, AppSearchHistory.encode(settings.appSearchHistory))
+            .putInt(KEY_MONITOR_TARGET_UID, settings.monitorTarget.uid)
+            .putString(KEY_MONITOR_TARGET_PACKAGE, settings.monitorTarget.packageName)
+            .putString(KEY_MONITOR_TARGET_LABEL, settings.monitorTarget.label)
+            .putString(KEY_MONITOR_TARGET_ICON, settings.monitorTarget.iconPath)
+            .putString(
+                KEY_MONITOR_TARGET_HISTORY,
+                AppSearchHistory.encode(settings.monitorTargetHistory),
+            )
+            .putFloat(KEY_OVERLAY_ANCHOR_X, settings.overlayAnchorX)
+            .putFloat(KEY_OVERLAY_ANCHOR_Y, settings.overlayAnchorY)
+            .putString(KEY_OVERLAY_EDGE, settings.overlayEdge.name)
             .putString(KEY_THEME_MODE, settings.themeMode.name)
             .putString(KEY_LAYOUT_DIRECTION, settings.layoutDirection.name)
             .putLong(KEY_SESSION_START, settings.sessionStartMillis)
@@ -371,6 +396,14 @@ class SettingsStore(context: Context) {
         private const val KEY_HISTORY_LINE_CHART = "history_line_chart_enabled"
         private const val KEY_APPS_LINE_CHART = "apps_line_chart_enabled"
         private const val KEY_APP_SEARCH_HISTORY = "app_search_selection_history"
+        private const val KEY_MONITOR_TARGET_UID = "monitor_target_uid"
+        private const val KEY_MONITOR_TARGET_PACKAGE = "monitor_target_package"
+        private const val KEY_MONITOR_TARGET_LABEL = "monitor_target_label"
+        private const val KEY_MONITOR_TARGET_ICON = "monitor_target_icon"
+        private const val KEY_MONITOR_TARGET_HISTORY = "monitor_target_history"
+        private const val KEY_OVERLAY_ANCHOR_X = "overlay_anchor_x"
+        private const val KEY_OVERLAY_ANCHOR_Y = "overlay_anchor_y"
+        private const val KEY_OVERLAY_EDGE = "overlay_edge"
         private const val KEY_SESSION_START = "session_start"
         private const val KEY_SESSION_RX = "session_baseline_rx"
         private const val KEY_SESSION_TX = "session_baseline_tx"

@@ -424,4 +424,28 @@
     <string name="plan_prevent_edit_warning_title">تفعيل منع التعديل</string>
     <string name="plan_prevent_edit_warning_body">عند تفعيل «امنع التعديل» وحفظ الباقة، لن تتمكن من تعديل سعة الباقة أو مدتها لاحقًا (يُسمح فقط بتغيير الاسم والشعار).\n\nيمكنك تعطيل هذا الخيار لاحقًا عن طريق الضغط على زر «إعادة تعيين» لإعادة ضبط استهلاك الباقة.</string>
     <string name="apps_fast_scroll">موضع القائمة والسحب السريع بين التطبيقات</string>
+    <!-- النافذة العائمة للاستهلاك المباشر -->
+    <string name="monitor_card_title">النافذة العائمة للاستهلاك المباشر</string>
+    <string name="monitor_all_apps">جميع التطبيقات</string>
+    <string name="monitor_start">بدء عرض النافذة العائمة</string>
+    <string name="monitor_pick_target">اختيار التطبيق المراقب</string>
+    <string name="monitor_picker_title">اختر التطبيقات</string>
+    <string name="monitor_picker_body">حدد التطبيقات التي تريد مراقبة استهلاكها</string>
+    <string name="monitor_picker_search">البحث عن تطبيق</string>
+    <string name="monitor_picker_empty">لا يوجد تطبيق مطابق.</string>
+    <string name="monitor_picker_close">إغلاق قائمة الاختيار</string>
+    <string name="monitor_picker_selected">محدد</string>
+    <string name="monitor_picker_unselected">غير محدد</string>
+    <string name="overlay_time">الوقت</string>
+    <string name="overlay_pause">إيقاف مؤقت</string>
+    <string name="overlay_resume">متابعة</string>
+    <string name="overlay_minimize">تصغير النافذة</string>
+    <string name="overlay_close">إغلاق النافذة</string>
+    <string name="overlay_change_target">تغيير التطبيق المراقب</string>
+    <string name="overlay_permission_title">العرض فوق التطبيقات</string>
+    <string name="overlay_permission_body">لعرض النافذة العائمة أثناء استخدام تطبيقات أخرى، اسمح لـ«بيانات الواي فاي» بالعرض فوق التطبيقات.</string>
+    <string name="overlay_permission_open">فتح الإعدادات</string>
+    <string name="channel_overlay_name">النافذة العائمة</string>
+    <string name="channel_overlay_desc">إشعار دائم يُبقي نافذة الاستهلاك العائمة ظاهرة.</string>
+    <string name="overlay_notification_title">النافذة العائمة للاستهلاك</string>
 </resources>
