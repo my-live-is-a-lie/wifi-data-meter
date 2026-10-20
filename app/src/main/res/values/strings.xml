@@ -445,6 +445,10 @@
     <string name="overlay_usage_access_missing">لا يمكن قراءة الاستهلاك: فعّل صلاحية «الوصول إلى الاستخدام» لقياس الحركة الفعلية.</string>
     <string name="overlay_no_usage_access_short">بلا صلاحية الاستخدام</string>
     <string name="overlay_no_wifi_short">غير متصل بالواي فاي</string>
+    <string name="overlay_collecting">جارٍ القياس…</string>
+    <string name="overlay_read_failed">تعذّرت قراءة إحصاءات الشبكة من النظام، وسنعيد المحاولة تلقائيًا.</string>
+    <string name="overlay_read_failed_short">تعذّرت القراءة</string>
+    <string name="overlay_no_traffic_yet">لم يسجّل النظام أي استهلاك بعد</string>
     <string name="monitor_usage_access_hint">صلاحية الاستخدام مطلوبة لقياس الاستهلاك</string>
     <string name="overlay_permission_title">العرض فوق التطبيقات</string>
     <string name="overlay_permission_body">لعرض النافذة العائمة أثناء استخدام تطبيقات أخرى، اسمح لـ«بيانات الواي فاي» بالعرض فوق التطبيقات.</string>

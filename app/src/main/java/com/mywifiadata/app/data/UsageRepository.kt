@@ -75,14 +75,6 @@ class UsageRepository(
         statsReader.deviceTotals(range.startMillis, range.endMillis, network)
     }
 
-    /** مثل [deviceTotals] لكنها تعيد `null` إذا تعذّرت القراءة (لا إذا كان الاستهلاك صفرًا). */
-    suspend fun deviceTotalsOrNull(
-        range: TimeRange,
-        network: UsageNetwork = UsageNetwork.WIFI,
-    ): TrafficTotals? = withContext(Dispatchers.IO) {
-        statsReader.deviceTotalsOrNull(range.startMillis, range.endMillis, network)
-    }
-
     suspend fun todayTotals(now: Long = System.currentTimeMillis()): TrafficTotals =
         deviceTotals(TimeRange(TimeRanges.startOfToday(now), now))
 
@@ -149,26 +141,18 @@ class UsageRepository(
     }
 
     /**
-     * إجمالي استهلاك تطبيق واحد خلال نطاق زمني — للنافذة العائمة.
-     * لا يكتب الأرشيف ولا يحلّ هوية التطبيق، ويستخدم استعلامًا موجّهًا إلى uid واحد
-     * كي يبقى خفيفًا مع نطاق تراكمي واسع (منذ منتصف الليل).
+     * استهلاك كل تطبيق على الشبكة المختارة خلال نطاق زمني — للنافذة العائمة.
+     * لا يكتب الأرشيف ولا يحلّ هوية التطبيق، ويعيد `null` إذا تعذّرت القراءة
+     * (لا إذا كان الاستهلاك صفرًا) كي لا يُتخذ صفر خط أساس.
      */
-    suspend fun uidTotals(
-        uid: Int,
+    suspend fun perUidTotalsOrNull(
         range: TimeRange,
         network: UsageNetwork = UsageNetwork.WIFI,
-    ): TrafficTotals = uidTotalsOrNull(uid, range, network) ?: TrafficTotals.Empty
-
-    /** مثل [uidTotals] لكنها تعيد `null` إذا تعذّرت القراءة (لا إذا كان الاستهلاك صفرًا). */
-    suspend fun uidTotalsOrNull(
-        uid: Int,
-        range: TimeRange,
-        network: UsageNetwork = UsageNetwork.WIFI,
-    ): TrafficTotals? = withContext(Dispatchers.IO) {
-        if (uid < 0 || !statsReader.hasUsageAccess()) return@withContext null
+    ): Map<Int, TrafficTotals>? = withContext(Dispatchers.IO) {
+        if (!statsReader.hasUsageAccess()) return@withContext null
         val end = minOf(range.endMillis, System.currentTimeMillis())
         if (end <= range.startMillis) return@withContext null
-        statsReader.uidTotalsOrNull(uid, range.startMillis, end, network)
+        statsReader.perUidTotalsOrNull(range.startMillis, end, network)
     }
 
     /**

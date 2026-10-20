@@ -57,6 +57,9 @@ import com.mywifiadata.app.ui.components.MonitorPickerContent
 import com.mywifiadata.app.ui.theme.LocalDownloadColor
 import com.mywifiadata.app.ui.theme.LocalUploadColor
 
+/** بعد هذه المدة من القياس بلا أي بايت نُصرّح بأن النظام لم يسجّل حركة بعد. */
+private const val NO_TRAFFIC_HINT_MILLIS = 20_000L
+
 /**
  * محتوى النافذة العائمة: بطاقة كاملة، أو كبسولة صغيرة، أو لسان ملتصق بالحافة.
  * النافذة نفسها تتكفّل بالتحريك والإفلات؛ هذا الملف للعرض والتفاعلات فقط.
@@ -113,7 +116,11 @@ private fun OverlayPill(state: OverlayUiState, actions: OverlayActions) {
         ) {
             TargetIcon(target = state.target, size = 30.dp)
             Text(
-                text = if (state.usageAccessMissing) "—" else Format.bytes(state.totals.totalBytes),
+                text = if (state.usageAccessMissing || state.collecting) {
+                    "—"
+                } else {
+                    Format.bytes(state.totals.totalBytes)
+                },
                 style = MaterialTheme.typography.titleMedium,
                 maxLines = 1,
                 softWrap = false,
@@ -138,7 +145,7 @@ private fun OverlayEdgeTab(state: OverlayUiState, actions: OverlayActions) {
     } else {
         AbsoluteRoundedCornerShape(topLeft = 18.dp, topRight = 0.dp, bottomRight = 0.dp, bottomLeft = 18.dp)
     }
-    val (amount, unit) = if (state.usageAccessMissing) {
+    val (amount, unit) = if (state.usageAccessMissing || state.collecting) {
         "—" to ""
     } else {
         Format.bytesParts(state.totals.totalBytes)
@@ -223,7 +230,14 @@ private fun OverlayExpanded(state: OverlayUiState, actions: OverlayActions) {
                 )
             } else {
                 if (state.usageAccessMissing) {
-                    UsageAccessNotice(onOpen = actions.openUsageAccess)
+                    OverlayNotice(
+                        text = stringResource(R.string.overlay_usage_access_missing),
+                        actionLabel = stringResource(R.string.action_open_usage_access),
+                        onAction = actions.openUsageAccess,
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                } else if (state.readFailed) {
+                    OverlayNotice(text = stringResource(R.string.overlay_read_failed))
                     Spacer(modifier = Modifier.height(8.dp))
                 }
                 OverlayMetrics(state = state)
@@ -333,16 +347,29 @@ private fun OverlayMetrics(state: OverlayUiState) {
         )
         Spacer(modifier = Modifier.weight(1f))
         Column(horizontalAlignment = Alignment.End) {
-            ByteValue(
-                bytes = state.totals.totalBytes,
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
+            if (state.usageAccessMissing || state.collecting) {
+                Text(
+                    text = "—",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                ByteValue(
+                    bytes = state.totals.totalBytes,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
             // معدّل حقيقي من فرق قراءتين؛ يبقى صفرًا حين لا يسجّل النظام أي حركة.
             Text(
                 text = when {
                     state.usageAccessMissing -> stringResource(R.string.overlay_no_usage_access_short)
+                    state.readFailed -> stringResource(R.string.overlay_read_failed_short)
                     !state.wifiConnected -> stringResource(R.string.overlay_no_wifi_short)
+                    state.collecting -> stringResource(R.string.overlay_collecting)
+                    // صفر حقيقي: النظام لم يسجّل حركة لهذا الهدف بعد — نقولها بدل معدّل 0.
+                    state.totals.totalBytes == 0L && state.elapsedMillis >= NO_TRAFFIC_HINT_MILLIS ->
+                        stringResource(R.string.overlay_no_traffic_yet)
                     else -> Format.speed(state.rxSpeed + state.txSpeed)
                 },
                 style = MaterialTheme.typography.labelSmall,
@@ -355,11 +382,16 @@ private fun OverlayMetrics(state: OverlayUiState) {
 }
 
 /**
- * لافتة صريحة عندما تكون صلاحية «الوصول إلى الاستخدام» غير ممنوحة:
- * بلا هذه الصلاحية لا يمكن قراءة أي إحصاء، فالأرقام التي تبقى صفرًا ليست قياسًا.
+ * لافتة صريحة داخل البطاقة: صلاحية «الوصول إلى الاستخدام» غير ممنوحة، أو تعذّرت
+ * قراءة إحصاءات النظام. بلا هذه الصلاحية/القراءة لا يمكن قياس أي استهلاك، فالأرقام
+ * التي تبقى صفرًا ليست قياسًا.
  */
 @Composable
-private fun UsageAccessNotice(onOpen: () -> Unit) {
+private fun OverlayNotice(
+    text: String,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -376,22 +408,24 @@ private fun UsageAccessNotice(onOpen: () -> Unit) {
             tint = MaterialTheme.colorScheme.onErrorContainer,
         )
         Text(
-            text = stringResource(R.string.overlay_usage_access_missing),
+            text = text,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onErrorContainer,
             modifier = Modifier.weight(1f),
         )
-        Text(
-            text = stringResource(R.string.action_open_usage_access),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onErrorContainer,
-            maxLines = 1,
-            softWrap = false,
-            modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .clickable(onClick = onOpen)
-                .padding(horizontal = 6.dp, vertical = 4.dp),
-        )
+        if (actionLabel != null && onAction != null) {
+            Text(
+                text = actionLabel,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+                maxLines = 1,
+                softWrap = false,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(onClick = onAction)
+                    .padding(horizontal = 6.dp, vertical = 4.dp),
+            )
+        }
     }
 }
 
