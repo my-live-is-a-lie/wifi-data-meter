@@ -52,9 +52,18 @@ class NetworkStatsReader(private val context: Context) {
     fun wifiDeviceTotals(startMillis: Long, endMillis: Long): TrafficTotals =
         deviceTotals(startMillis, endMillis, UsageNetwork.WIFI)
 
-    fun deviceTotals(startMillis: Long, endMillis: Long, network: UsageNetwork): TrafficTotals {
-        val statsManager = manager ?: return TrafficTotals.Empty
-        if (endMillis <= startMillis) return TrafficTotals.Empty
+    fun deviceTotals(startMillis: Long, endMillis: Long, network: UsageNetwork): TrafficTotals =
+        deviceTotalsOrNull(startMillis, endMillis, network) ?: TrafficTotals.Empty
+
+    /**
+     * مثل [deviceTotals] لكنها تعيد `null` عند تعذّر القراءة بدل صفر.
+     *
+     * يفرّق هذا بين «لا استهلاك» و«فشل الاستعلام»؛ النافذة العائمة تحتاج الفرق كي لا
+     * تتخذ صفرًا كخط أساس فتظهر قفزة وهمية عند أول قراءة ناجحة.
+     */
+    fun deviceTotalsOrNull(startMillis: Long, endMillis: Long, network: UsageNetwork): TrafficTotals? {
+        val statsManager = manager ?: return null
+        if (endMillis <= startMillis) return null
         return try {
             val bucket = statsManager.querySummaryForDevice(
                 if (network == UsageNetwork.WIFI) ConnectivityManager.TYPE_WIFI else ConnectivityManager.TYPE_MOBILE,
@@ -62,11 +71,55 @@ class NetworkStatsReader(private val context: Context) {
                 startMillis,
                 endMillis,
             )
-            if (bucket == null) TrafficTotals.Empty else TrafficTotals(bucket.rxBytes, bucket.txBytes)
+            if (bucket == null) null else TrafficTotals(bucket.rxBytes, bucket.txBytes)
         } catch (securityException: SecurityException) {
-            TrafficTotals.Empty
+            null
         } catch (exception: Exception) {
-            TrafficTotals.Empty
+            null
+        }
+    }
+
+    /**
+     * إجمالي استهلاك تطبيق واحد على الشبكة المختارة.
+     *
+     * استعلام موجّه إلى uid واحد ([NetworkStatsManager.queryDetailsForUid]) أخف بكثير من
+     * قراءة كل التطبيقات ثم اختيار واحد، وهو ما تحتاجه النافذة العائمة كل ثانيتين.
+     */
+    fun uidTotals(uid: Int, startMillis: Long, endMillis: Long, network: UsageNetwork): TrafficTotals =
+        uidTotalsOrNull(uid, startMillis, endMillis, network) ?: TrafficTotals.Empty
+
+    /** مثل [uidTotals] لكنها تعيد `null` عند تعذّر القراءة بدل صفر (انظر [deviceTotalsOrNull]). */
+    fun uidTotalsOrNull(uid: Int, startMillis: Long, endMillis: Long, network: UsageNetwork): TrafficTotals? {
+        val statsManager = manager ?: return null
+        if (uid < 0 || endMillis <= startMillis) return null
+
+        var stats: NetworkStats? = null
+        return try {
+            stats = statsManager.queryDetailsForUid(
+                if (network == UsageNetwork.WIFI) ConnectivityManager.TYPE_WIFI else ConnectivityManager.TYPE_MOBILE,
+                null,
+                uid,
+                startMillis,
+                endMillis,
+            ) ?: return null
+            var rxBytes = 0L
+            var txBytes = 0L
+            val bucket = NetworkStats.Bucket()
+            while (stats.getNextBucket(bucket)) {
+                rxBytes += bucket.rxBytes
+                txBytes += bucket.txBytes
+            }
+            TrafficTotals(rxBytes, txBytes)
+        } catch (securityException: SecurityException) {
+            null
+        } catch (exception: Exception) {
+            null
+        } finally {
+            try {
+                stats?.close()
+            } catch (ignored: Exception) {
+                // تجاهل: إغلاق المؤشر ليس حرجًا
+            }
         }
     }
 

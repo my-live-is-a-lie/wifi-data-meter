@@ -65,11 +65,22 @@ class UsageRepository(
 
     fun wifiStatus(): WifiStatus = wifiReader.read()
 
+    /** هل الجهاز متصل حاليًا بشبكة واي فاي؟ (للنافذة العائمة التي تقيس الواي فاي فقط) */
+    fun isWifiConnected(): Boolean = wifiReader.isWifiConnected()
+
     suspend fun deviceTotals(
         range: TimeRange,
         network: UsageNetwork = UsageNetwork.WIFI,
     ): TrafficTotals = withContext(Dispatchers.IO) {
         statsReader.deviceTotals(range.startMillis, range.endMillis, network)
+    }
+
+    /** مثل [deviceTotals] لكنها تعيد `null` إذا تعذّرت القراءة (لا إذا كان الاستهلاك صفرًا). */
+    suspend fun deviceTotalsOrNull(
+        range: TimeRange,
+        network: UsageNetwork = UsageNetwork.WIFI,
+    ): TrafficTotals? = withContext(Dispatchers.IO) {
+        statsReader.deviceTotalsOrNull(range.startMillis, range.endMillis, network)
     }
 
     suspend fun todayTotals(now: Long = System.currentTimeMillis()): TrafficTotals =
@@ -138,18 +149,26 @@ class UsageRepository(
     }
 
     /**
-     * إجمالي استهلاك تطبيق واحد خلال نطاق قصير — للنافذة العائمة.
-     * لا يكتب الأرشيف ولا يحلّ هوية التطبيق، فلا يثقل التحديث كل ثانية.
+     * إجمالي استهلاك تطبيق واحد خلال نطاق زمني — للنافذة العائمة.
+     * لا يكتب الأرشيف ولا يحلّ هوية التطبيق، ويستخدم استعلامًا موجّهًا إلى uid واحد
+     * كي يبقى خفيفًا مع نطاق تراكمي واسع (منذ منتصف الليل).
      */
     suspend fun uidTotals(
         uid: Int,
         range: TimeRange,
         network: UsageNetwork = UsageNetwork.WIFI,
-    ): TrafficTotals = withContext(Dispatchers.IO) {
-        if (uid < 0 || !statsReader.hasUsageAccess()) return@withContext TrafficTotals.Empty
+    ): TrafficTotals = uidTotalsOrNull(uid, range, network) ?: TrafficTotals.Empty
+
+    /** مثل [uidTotals] لكنها تعيد `null` إذا تعذّرت القراءة (لا إذا كان الاستهلاك صفرًا). */
+    suspend fun uidTotalsOrNull(
+        uid: Int,
+        range: TimeRange,
+        network: UsageNetwork = UsageNetwork.WIFI,
+    ): TrafficTotals? = withContext(Dispatchers.IO) {
+        if (uid < 0 || !statsReader.hasUsageAccess()) return@withContext null
         val end = minOf(range.endMillis, System.currentTimeMillis())
-        if (end <= range.startMillis) return@withContext TrafficTotals.Empty
-        statsReader.perUidTotals(range.startMillis, end, network)[uid] ?: TrafficTotals.Empty
+        if (end <= range.startMillis) return@withContext null
+        statsReader.uidTotalsOrNull(uid, range.startMillis, end, network)
     }
 
     /**
