@@ -68,15 +68,15 @@ class AppIdentityCache(private val context: Context) {
     }
 
     /**
-     * كل التطبيقات المثبّتة المعروفة محليًا مع إجماليات اختيارية بحسب uid.
+     * كل التطبيقات المثبّتة المعروفة محليًا، مرتّبة بالاسم.
      * تُستخدم لقائمة اختيار هدف النافذة العائمة حتى تظهر التطبيقات بلا استهلاك سابق.
      */
     @Synchronized
-    fun installed(totals: Map<Int, TrafficTotals> = emptyMap()): List<AppUsage> =
+    fun installed(): List<AppUsage> =
         store.all()
             .filter { it.isInstalled && it.packageName.isNotBlank() }
-            .map { identity -> identity.asUsage(totals[identity.uid] ?: TrafficTotals.Empty) }
-            .sortedByDescending { it.totals.totalBytes }
+            .map { identity -> identity.asUsage(TrafficTotals.Empty) }
+            .sortedBy { it.label.lowercase() }
 
     @Synchronized
     fun clear() = store.clear()

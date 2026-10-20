@@ -69,7 +69,8 @@ import kotlin.math.roundToInt
  * بطاقة كاملة، أو كبسولة صغيرة قابلة للسحب، أو لسان على حافة الشاشة.
  *
  * العدّادات تبدأ عند فتح النافذة وتُصفَّر عند تغيير هدف المراقبة،
- * وتُجمَّد عند الإيقاف المؤقت.
+ * وتُجمَّد عند الإيقاف المؤقت. النافذة نافذة Compose تُضاف إلى [WindowManager]،
+ * لذا تُهيّأ هنا مالكو دورة الحياة والحالة المحفوظة التي تحتاجها Compose.
  */
 class UsageOverlayService :
     Service(),
@@ -102,6 +103,7 @@ class UsageOverlayService :
 
     private var currentTargetKey = MonitorTarget.AllApps.key
     private var segmentStartMillis = 0L
+    private var lastSampleMillis = 0L
     private var frozenTotals = TrafficTotals.Empty
     private var frozenElapsedMillis = 0L
     private var edgeInwardPx = 0f
@@ -113,7 +115,9 @@ class UsageOverlayService :
         notifier = Notifier(this)
         notifier.ensureChannels()
         windowManager = getSystemService(WindowManager::class.java)
+            ?: error("WindowManager is unavailable")
 
+        // Compose يحتاج مالكي شجرة العرض قبل تركيب المحتوى.
         savedStateController.performAttach()
         savedStateController.performRestore(null)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
@@ -123,6 +127,7 @@ class UsageOverlayService :
         val settings = repository.settingsStore.current
         currentTargetKey = settings.monitorTarget.key
         segmentStartMillis = System.currentTimeMillis()
+        lastSampleMillis = segmentStartMillis
         ui.value = ui.value.copy(
             target = settings.monitorTarget,
             history = settings.monitorTargetHistory,
@@ -332,11 +337,12 @@ class UsageOverlayService :
                 screenHeight = screenHeight,
             )
             if (inward >= OverlayGeometry.EDGE_RETURN_DP * resources.displayMetrics.density) {
+                // سحب اللسان إلى الداخل يعيد الكبسولة كما يفعل النقر عليه.
                 val centerX = if (ui.value.edge == OverlayEdge.LEFT) 0.3f else 0.7f
                 persistAnchor(centerX, centerY)
                 switchMode(OverlayMode.PILL)
             } else {
-                // البقاء على الحافة: يُحفظ الارتفاع فقط، ويُعاد الوضع الأفقي للإطار عند الخروج من الحافة.
+                // البقاء على الحافة: يُحفظ الارتفاع فقط، ويُعاد الوضع الأفقي عند الخروج من الحافة.
                 persistAnchorY(centerY)
                 positionWindow()
             }
@@ -409,8 +415,11 @@ class UsageOverlayService :
         }
         if (leavingEdge) {
             // الخروج من الحافة يعيد التمركز داخل الشاشة بدل الالتصاق بها.
-            val centerX = if (ui.value.edge == OverlayEdge.LEFT) 0.34f else 0.66f
-            persistAnchorY(repository.settingsStore.current.overlayAnchorY)
+            val centerX = when {
+                mode == OverlayMode.EXPANDED -> 0.5f
+                ui.value.edge == OverlayEdge.LEFT -> 0.34f
+                else -> 0.66f
+            }
             repository.settingsStore.update { it.copy(overlayAnchorX = centerX) }
         }
         ui.value = ui.value.copy(mode = mode, pickerVisible = false)
@@ -437,6 +446,7 @@ class UsageOverlayService :
     private fun togglePause() {
         if (ui.value.paused) {
             segmentStartMillis = System.currentTimeMillis()
+            lastSampleMillis = segmentStartMillis
             ui.value = ui.value.copy(paused = false)
         } else {
             frozenTotals = ui.value.totals
@@ -450,6 +460,7 @@ class UsageOverlayService :
         frozenTotals = TrafficTotals.Empty
         frozenElapsedMillis = 0L
         segmentStartMillis = System.currentTimeMillis()
+        lastSampleMillis = segmentStartMillis
         ui.value = ui.value.copy(totals = TrafficTotals.Empty, elapsedMillis = 0L, paused = false)
     }
 
@@ -466,8 +477,8 @@ class UsageOverlayService :
 
     private fun closePicker() {
         if (!ui.value.pickerVisible) return
-        ui.value = ui.value.copy(pickerVisible = false)
         hideKeyboard()
+        ui.value = ui.value.copy(pickerVisible = false)
         setWindowFocusable(false)
         rootView?.post { positionWindow() }
     }
@@ -549,32 +560,33 @@ class UsageOverlayService :
         val start = segmentStartMillis
         val now = System.currentTimeMillis()
         if (start <= 0L || now <= start) return
-        val range = TimeRange(start, now)
-        val delta = if (target.isAllApps) {
-            repository.deviceTotals(range, UsageNetwork.WIFI)
-        } else {
-            repository.uidTotals(target.uid, range, UsageNetwork.WIFI)
+        // الوقت يتقدّم كل ثانية، أما قراءة إحصاءات الشبكة فأثقل وتُؤخذ كل ثانيتين.
+        if (now - lastSampleMillis >= SAMPLE_MILLIS) {
+            lastSampleMillis = now
+            val range = TimeRange(start, now)
+            val delta = if (target.isAllApps) {
+                repository.deviceTotals(range, UsageNetwork.WIFI)
+            } else {
+                repository.uidTotals(target.uid, range, UsageNetwork.WIFI)
+            }
+            ui.value = ui.value.copy(totals = frozenTotals + delta)
         }
-        ui.value = ui.value.copy(
-            totals = frozenTotals + delta,
-            elapsedMillis = frozenElapsedMillis + (now - start),
-        )
+        ui.value = ui.value.copy(elapsedMillis = frozenElapsedMillis + (now - start))
     }
 
     // ————————————————————————— الخدمة الأمامية —————————————————————————
 
     private fun startAsForeground() {
-        val notification = notifier.buildOverlayNotification(targetLabel())
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            ServiceCompat.startForeground(
-                this,
-                Notifier.OVERLAY_ID,
-                notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
-            )
-        } else {
-            startForeground(Notifier.OVERLAY_ID, notification)
-        }
+        ServiceCompat.startForeground(
+            this,
+            Notifier.OVERLAY_ID,
+            notifier.buildOverlayNotification(targetLabel()),
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+            } else {
+                0
+            },
+        )
     }
 
     private fun refreshNotification() {
@@ -604,6 +616,7 @@ class UsageOverlayService :
     companion object {
         private const val TAG = "UsageOverlayService"
         private const val TICK_MILLIS = 1_000L
+        private const val SAMPLE_MILLIS = 2_000L
 
         const val ACTION_SHOW = "com.mywifiadata.app.overlay.SHOW"
         const val ACTION_CLOSE = "com.mywifiadata.app.overlay.CLOSE"

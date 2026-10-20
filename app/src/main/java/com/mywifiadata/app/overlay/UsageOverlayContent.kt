@@ -27,6 +27,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -231,13 +232,13 @@ private fun OverlayHeader(state: OverlayUiState, actions: OverlayActions) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
             modifier = Modifier
-                .size(34.dp)
+                .size(32.dp)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.surfaceContainerHighest)
                 .clickable(onClick = actions.openPicker),
             contentAlignment = Alignment.Center,
         ) {
-            TargetIcon(target = state.target, size = 24.dp)
+            TargetIcon(target = state.target, size = 22.dp)
         }
         Row(
             modifier = Modifier
@@ -262,25 +263,25 @@ private fun OverlayHeader(state: OverlayUiState, actions: OverlayActions) {
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        IconButton(onClick = actions.togglePause, modifier = Modifier.size(34.dp)) {
+        IconButton(onClick = actions.togglePause, modifier = Modifier.size(32.dp)) {
             Icon(
                 imageVector = if (state.paused) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
                 contentDescription = stringResource(
                     if (state.paused) R.string.overlay_resume else R.string.overlay_pause,
                 ),
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(18.dp),
             )
         }
-        IconButton(onClick = actions.minimize, modifier = Modifier.size(34.dp)) {
+        IconButton(onClick = actions.minimize, modifier = Modifier.size(32.dp)) {
             Icon(
-                imageVector = Icons.Rounded.KeyboardArrowDown,
+                imageVector = Icons.Rounded.Remove,
                 contentDescription = stringResource(R.string.overlay_minimize),
-                modifier = Modifier.size(24.dp),
+                modifier = Modifier.size(20.dp),
             )
         }
         Box(
             modifier = Modifier
-                .size(34.dp)
+                .size(32.dp)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.surfaceContainerHighest)
                 .clickable(onClick = actions.close),
@@ -289,7 +290,7 @@ private fun OverlayHeader(state: OverlayUiState, actions: OverlayActions) {
             Icon(
                 imageVector = Icons.Rounded.Close,
                 contentDescription = stringResource(R.string.overlay_close),
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(16.dp),
             )
         }
     }
@@ -302,7 +303,7 @@ private fun OverlayMetrics(state: OverlayUiState) {
             .fillMaxWidth()
             .padding(horizontal = 2.dp),
         verticalAlignment = Alignment.Bottom,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         OverlayMetric(
             label = stringResource(R.string.overlay_time),
@@ -323,7 +324,7 @@ private fun OverlayMetrics(state: OverlayUiState) {
         Spacer(modifier = Modifier.weight(1f))
         ByteValue(
             bytes = state.totals.totalBytes,
-            style = MaterialTheme.typography.headlineSmall,
+            style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.onSurface,
         )
     }

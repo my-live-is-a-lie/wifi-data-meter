@@ -226,6 +226,8 @@
 | `NEARBY_WIFI_DEVICES` (API 33+) | اسم الشبكة SSID على أندرويد 13+ دون طلب الموقع. |
 | `POST_NOTIFICATIONS` (API 33+) | إشعار المراقبة الدائم وتنبيهات الباقة. |
 | `FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_DATA_SYNC` | تشغيل المراقبة في الخلفية. |
+| `FOREGROUND_SERVICE_SPECIAL_USE` | خدمة النافذة العائمة (`specialUse`) التي تُبقي نافذة الاستهلاك ظاهرة فوق التطبيقات. |
+| `SYSTEM_ALERT_WINDOW` | رسم النافذة العائمة فوق التطبيقات الأخرى (تُمنح من إعدادات النظام). |
 | `PACKAGE_USAGE_STATS` | إحصاءات الاستهلاك من `NetworkStatsManager` (تُمنح يدويًا من إعدادات النظام). |
 | `INTERNET` | تُعلَن لأن التطبيق يقرأ حالة الاتصال؛ **لا يُرسل التطبيق أي بيانات إلى أي جهة**. |
 
@@ -249,11 +251,14 @@ app/src/main/java/com/mywifiadata/app/
 ├── core/                         # Format (وحدات/تواريخ) و TimeRanges و SystemActions
 │                                 # و SpeedTest + SpeedTestWatchdog (قياس fast.com والمهلات)
 │                                 # و SpeedTestDataUsage (تقدير استهلاك البيانات والتحذير)
+│                                 # و OverlayGeometry (موضع النافذة العائمة ومناطق الإفلات)
 ├── data/                         # SettingsStore، NetworkStatsReader، WifiNetworkReader، UsageRepository
 ├── data/model/                   # نماذج البيانات (TrafficTotals، WifiStatus، AppUsage …)
 ├── monitor/                      # MonitorService (خدمة أمامية) و Notifier
 │                                 # و MonitoringTileService (بلاطة الإعدادات السريعة)
 │                                 # و TileIconFrames / TileIconPainter (تحريك أيقونة البلاطة)
+├── overlay/                      # UsageOverlayService (نافذة عائمة) و UsageOverlayContent
+│                                 # و OverlayUiState (حالة النافذة وأشكالها الثلاثة)
 └── ui/
     ├── AppViewModel.kt           # حالة الواجهة والمنطق العرضي
     ├── theme/                    # AppTheme، Shapes، Typography
@@ -290,6 +295,10 @@ built with **Kotlin + Jetpack Compose + Material 3 Expressive**.
 - History: 7‑ or 30‑day bar chart with per‑day details and that day's top apps.
 - Settings: quota + cycle start day, alert threshold, sampling interval, background tracking, dynamic color.
 - Background monitoring through a `dataSync` foreground service with an ongoing notification and threshold alerts.
+- Floating live-usage window: a dashboard card below the quick actions opens a resizable overlay for all apps or
+  one chosen app. It comes in three shapes (full card, draggable pill, edge tab), resets its counters and clock
+  whenever the target changes, and pauses, minimises or closes from its own controls. The target picker always
+  lists “All apps” first and moves frequently chosen apps to the top with instant search.
 - A reference-matching “Today” card (blue download / purple upload tiles, total row, fast.com speed-test panel) with
   a collapsible history of the nine preceding tests; the latest ten results are saved on-device. The speed test
   also aborts its transfer with a clear message when the connection drops or no data arrives for too long (12 s
@@ -309,6 +318,12 @@ Everything stays on-device — no analytics, no network calls.
 - حقل البحث بارتفاع 48dp وحواف مستديرة، وزره الداخلي يمسح النص إذا وُجد، وإلا يغلق الحقل بحركة انكماش إلى أيقونة البحث. يبقى النص الإرشادي مخفيًا طوال فتح الحقل وحركة إغلاقه.
 - إغلاق البحث يعيد ترتيب الاستهلاك المحدد وموضع الصفحة السابق (العنصر وإزاحة التمرير)، دون إعادة التمرير المتحركة عند كل حرف. مسح بيانات التطبيق من الإعدادات يمسح سجل الاختيارات أيضًا.
 - تُستهلك حشوات Scaffold قبل تطبيق حشوة لوحة المفاتيح، لتجنب حجز مساحة شريط التنقل مرتين وترك مستطيل فارغ فوق لوحة المفاتيح.
+
+Overlay checks: grant “Display over other apps”, start the window from the dashboard card, then drag the pill to
+the bottom centre (must close), to either edge (must become a side tab) and inward again (must return as a pill).
+Switch the target from both the card picker and the window header and confirm the clock and counters restart;
+pause and resume, and confirm the numbers freeze and continue. Restart the app to verify the target, position and
+side persist.
 
 Manual UI checks: open Apps in Arabic, verify period buttons precede the summary, then open search beside the sort icon. Confirm rightward expansion, keyboard focus and scrolling to the pinned toolbar; try a name, a package, and no matches; clear/close search. Open a result, return, repeat selections and restart to check frequency/recency ordering. Repeat with top-5, mobile data, current plan, rotation, large text and English layout.
 

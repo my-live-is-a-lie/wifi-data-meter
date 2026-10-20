@@ -153,19 +153,13 @@ class UsageRepository(
     }
 
     /**
-     * التطبيقات المثبّتة مع إجمالي استهلاكها لاختيار هدف النافذة العائمة.
-     * الترتيب المبدئي بحسب الاستهلاك، ثم تعيد الواجهة الترتيب بحسب تكرار الاختيار.
+     * التطبيقات المثبّتة لاختيار هدف النافذة العائمة.
+     * لا تُقرأ إحصاءات الشبكة هنا كي تفتح القائمة فورًا بلا صلاحية استخدام،
+     * ويتولّى سجل الاختيار ترتيب الأكثر اختيارًا في الواجهة.
      */
-    suspend fun installedApps(network: UsageNetwork = UsageNetwork.WIFI): List<AppUsage> =
-        withContext(Dispatchers.IO) {
-            val now = System.currentTimeMillis()
-            val totals = if (statsReader.hasUsageAccess()) {
-                statsReader.perUidTotals(0L, now, network)
-            } else {
-                emptyMap()
-            }
-            appIdentities.installed(totals)
-        }
+    suspend fun installedApps(): List<AppUsage> = withContext(Dispatchers.IO) {
+        appIdentities.installed()
+    }
 
     /** Details use the same live/archive merge as the list, not an unrelated reused UID. */
     suspend fun appTotals(
