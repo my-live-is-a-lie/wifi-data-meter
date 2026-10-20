@@ -1,5 +1,6 @@
 package com.mywifiadata.app.overlay
 
+import android.animation.ValueAnimator
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -23,6 +24,7 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.core.animation.doOnEnd
 import androidx.core.app.ServiceCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
@@ -40,6 +42,7 @@ import com.mywifiadata.app.R
 import com.mywifiadata.app.core.AppLanguage
 import com.mywifiadata.app.core.OverlayDrop
 import com.mywifiadata.app.core.OverlayGeometry
+import com.mywifiadata.app.core.OverlayMotion
 import com.mywifiadata.app.core.OverlaySampling
 import com.mywifiadata.app.core.TimeRange
 import com.mywifiadata.app.core.TimeRanges
@@ -127,6 +130,9 @@ class UsageOverlayService :
     private var frozenElapsedMillis = 0L
     private var edgeInwardPx = 0f
 
+    /** انميشن الموضع الجاري أثناء تحوّل الشكل؛ وجوده يمنع القفز إلى الموضع النهائي. */
+    private var positionAnimator: ValueAnimator? = null
+
     override fun onCreate() {
         super.onCreate()
         val app = application as MyWifiApplication
@@ -183,6 +189,7 @@ class UsageOverlayService :
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
+        cancelPositionAnimation()
         rootView?.post { positionWindow() }
     }
 
@@ -190,6 +197,7 @@ class UsageOverlayService :
         _running.value = false
         tickerJob?.cancel()
         settingsJob?.cancel()
+        cancelPositionAnimation()
         rootView?.let { view -> runCatching { windowManager.removeViewImmediate(view) } }
         rootView = null
         layoutParams = null
@@ -246,6 +254,8 @@ class UsageOverlayService :
     }
 
     private fun positionWindow() {
+        // أثناء التحوّل يقود الانميشن الموضع؛ القفز إلى الهدف النهائي يقطعه.
+        if (positionAnimator != null) return
         val view = rootView ?: return
         val params = layoutParams ?: return
         if (view.width <= 0 || view.height <= 0) return
@@ -272,6 +282,83 @@ class UsageOverlayService :
         runCatching { windowManager.updateViewLayout(view, params) }
     }
 
+    /**
+     * يحرّك النافذة بسلاسة إلى موضعها الجديد بينما يتغيّر حجمها في الوقت نفسه.
+     *
+     * الهدف يُحسب في كل إطار من الحجم المقيس حينها، فيبقى مركز النافذة ملتصقًا
+     * بنقطة الارتساء وهو يتقلّص أو يتوسّع، بدل أن يقفز ثم يصحّح نفسه بعد القياس.
+     */
+    private fun animateTo(
+        expanding: Boolean,
+        target: (width: Int, height: Int, screenWidth: Int, screenHeight: Int) -> Pair<Int, Int>,
+    ) {
+        val view = rootView ?: return
+        val params = layoutParams ?: return
+        cancelPositionAnimation()
+        val startX = params.x
+        val startY = params.y
+        val animator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = OverlayMotion.durationMillis(expanding)
+            // التدرّج يُحسب في المستمع (OverlayMotion.easeOut)، فلا نضاعفه بمُنعِّم آخر.
+            interpolator = null
+        }
+        animator.addUpdateListener { animation ->
+            if (animation !== positionAnimator) return@addUpdateListener
+            if (view.width <= 0 || view.height <= 0) return@addUpdateListener
+            val eased = OverlayMotion.easeOut(animation.animatedValue as Float)
+            val (screenWidth, screenHeight) = screenSize()
+            val (endX, endY) = target(view.width, view.height, screenWidth, screenHeight)
+            params.x = OverlayMotion.lerp(startX, endX, eased)
+            params.y = OverlayMotion.lerp(startY, endY, eased)
+            runCatching { windowManager.updateViewLayout(view, params) }
+        }
+        animator.doOnEnd { finished ->
+            // الإلغاء يُفرغ الحقل أولًا، فلا يُثبَّت موضع انميشن لم يكتمل.
+            if (finished !== positionAnimator) return@doOnEnd
+            positionAnimator = null
+            // تثبيت نهائي بعد اكتمال القياس (قد يتغيّر الحجم في آخر إطار).
+            positionWindow()
+        }
+        positionAnimator = animator
+        animator.start()
+    }
+
+    /** يوقف حركة الموضع الجارية ويسلّم القيادة للمتّصل (سحب أو دوران الشاشة). */
+    private fun cancelPositionAnimation() {
+        val animator = positionAnimator ?: return
+        positionAnimator = null
+        animator.cancel()
+    }
+
+    /**
+     * موضع الشكل الجديد: البطاقة والكبسولة حول نقطة الارتساء المحفوظة،
+     * واللسان ملتصقًا بالحافة عند ارتفاع الكبسولة نفسه.
+     */
+    private fun animateToMode(mode: OverlayMode, expanding: Boolean) {
+        val settings = repository.settingsStore.current
+        val edge = ui.value.edge
+        animateTo(expanding) { width, height, screenWidth, screenHeight ->
+            if (mode == OverlayMode.EDGE) {
+                val x = if (edge == OverlayEdge.LEFT) 0 else screenWidth - width
+                val y = OverlayGeometry.clampY(
+                    (settings.overlayAnchorY * screenHeight - height / 2f).roundToInt(),
+                    height,
+                    screenHeight,
+                )
+                x to y
+            } else {
+                OverlayGeometry.topLeftFor(
+                    fractionX = settings.overlayAnchorX,
+                    fractionY = settings.overlayAnchorY,
+                    width = width,
+                    height = height,
+                    screenWidth = screenWidth,
+                    screenHeight = screenHeight,
+                )
+            }
+        }
+    }
+
     private fun screenSize(): Pair<Int, Int> {
         val metrics = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             val bounds = windowManager.currentWindowMetrics.bounds
@@ -292,7 +379,9 @@ class UsageOverlayService :
     // ————————————————————————— السحب والإفلات —————————————————————————
 
     private fun handleDragStart() {
-        ui.value = ui.value.copy(dismissArmed = false)
+        // وسط التحوّل: السحب يوقف الانميشن ويأخذ الموضع كما هو بدل انتظاره.
+        cancelPositionAnimation()
+        ui.value = ui.value.copy(dismissArmed = false, edgeArmed = null)
         edgeInwardPx = 0f
     }
 
@@ -332,8 +421,17 @@ class UsageOverlayService :
                     screenHeight = screenHeight,
                 )
                 val armed = ui.value.mode == OverlayMode.PILL && drop == OverlayDrop.DISMISS
-                if (ui.value.dismissArmed != armed) {
-                    ui.value = ui.value.copy(dismissArmed = armed)
+                val armedEdge = if (ui.value.mode == OverlayMode.PILL) {
+                    when (drop) {
+                        OverlayDrop.EDGE_LEFT -> OverlayEdge.LEFT
+                        OverlayDrop.EDGE_RIGHT -> OverlayEdge.RIGHT
+                        else -> null
+                    }
+                } else {
+                    null
+                }
+                if (ui.value.dismissArmed != armed || ui.value.edgeArmed != armedEdge) {
+                    ui.value = ui.value.copy(dismissArmed = armed, edgeArmed = armedEdge)
                 }
             }
         }
@@ -393,7 +491,7 @@ class UsageOverlayService :
                 positionWindow()
             }
         }
-        ui.value = ui.value.copy(dismissArmed = false)
+        ui.value = ui.value.copy(dismissArmed = false, edgeArmed = null)
     }
 
     private fun persistCurrentCenter() {
@@ -427,8 +525,9 @@ class UsageOverlayService :
     // ————————————————————————— الأشكال والأهداف —————————————————————————
 
     private fun switchMode(mode: OverlayMode) {
-        val leavingEdge = ui.value.mode == OverlayMode.EDGE && mode != OverlayMode.EDGE
-        if (ui.value.mode == mode && !ui.value.pickerVisible) {
+        val previousMode = ui.value.mode
+        val leavingEdge = previousMode == OverlayMode.EDGE && mode != OverlayMode.EDGE
+        if (previousMode == mode && !ui.value.pickerVisible) {
             rootView?.post { positionWindow() }
             return
         }
@@ -441,9 +540,10 @@ class UsageOverlayService :
             }
             repository.settingsStore.update { it.copy(overlayAnchorX = centerX) }
         }
-        ui.value = ui.value.copy(mode = mode, pickerVisible = false)
+        ui.value = ui.value.copy(mode = mode, pickerVisible = false, edgeArmed = null)
         setWindowFocusable(false)
-        rootView?.post { positionWindow() }
+        // المحتوى يتدرّج في الحجم، والنافذة تنزلق إلى موضعها الجديد في الوقت نفسه.
+        animateToMode(mode, expanding = previousMode.expandsTo(mode))
     }
 
     private fun switchToEdge(side: OverlayEdge) {
@@ -452,9 +552,10 @@ class UsageOverlayService :
         val (_, screenHeight) = screenSize()
         val centerY = ((params.y + view.height / 2f) / screenHeight).coerceIn(0.08f, 0.92f)
         repository.settingsStore.update { it.copy(overlayEdge = side, overlayAnchorY = centerY) }
-        ui.value = ui.value.copy(mode = OverlayMode.EDGE, edge = side, pickerVisible = false)
+        ui.value = ui.value.copy(mode = OverlayMode.EDGE, edge = side, pickerVisible = false, edgeArmed = null)
         setWindowFocusable(false)
-        rootView?.post { positionWindow() }
+        // الطيّ إلى الحافة تصغير دائمًا: ينزلق اللسان حتى يلتصق بالحرف.
+        animateToMode(OverlayMode.EDGE, expanding = false)
     }
 
     private fun closeOverlay() {

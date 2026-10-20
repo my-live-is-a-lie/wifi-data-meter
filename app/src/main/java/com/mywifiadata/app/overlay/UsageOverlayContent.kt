@@ -1,6 +1,17 @@
 package com.mywifiadata.app.overlay
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -49,6 +60,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.mywifiadata.app.R
 import com.mywifiadata.app.core.Format
+import com.mywifiadata.app.core.OverlayMotion
 import com.mywifiadata.app.data.model.MonitorTarget
 import com.mywifiadata.app.data.model.OverlayEdge
 import com.mywifiadata.app.ui.components.AppIcon
@@ -66,10 +78,40 @@ private const val NO_TRAFFIC_HINT_MILLIS = 20_000L
  */
 @Composable
 fun UsageOverlayContent(state: OverlayUiState, actions: OverlayActions) {
-    when (state.mode) {
-        OverlayMode.EDGE -> OverlayEdgeTab(state = state, actions = actions)
-        OverlayMode.PILL -> OverlayPill(state = state, actions = actions)
-        OverlayMode.EXPANDED -> OverlayExpanded(state = state, actions = actions)
+    // الشكل الجديد ينمو من الشكل القديم: الحجم يتدرّج، والمحتوى القديم يخفت
+    // متقلّصًا بينما يظهر الجديد متوسّعًا — بدل تبديل مفاجئ بين ثلاث نوافذ.
+    AnimatedContent(
+        targetState = state.mode,
+        transitionSpec = {
+            val expanding = initialState.expandsTo(targetState)
+            val duration = OverlayMotion.durationMillis(expanding).toInt()
+            val enter = fadeIn(
+                animationSpec = tween(durationMillis = duration / 2, delayMillis = duration / 5),
+            ) + scaleIn(
+                initialScale = if (expanding) 0.9f else 1.04f,
+                // نابض خفيف يعطي «نبضة» صغيرة عند الوصول بدل توقّف جاف.
+                animationSpec = spring(dampingRatio = 0.78f, stiffness = Spring.StiffnessMediumLow),
+            )
+            val exit = fadeOut(animationSpec = tween(durationMillis = duration / 2)) +
+                scaleOut(
+                    targetScale = if (expanding) 1.04f else 0.9f,
+                    animationSpec = tween(durationMillis = duration, easing = FastOutSlowInEasing),
+                )
+            (enter togetherWith exit) using SizeTransform(
+                clip = false,
+                sizeAnimationSpec = { _, _ ->
+                    tween(durationMillis = duration, easing = FastOutSlowInEasing)
+                },
+            )
+        },
+        contentAlignment = Alignment.Center,
+        label = "overlay-mode",
+    ) { mode ->
+        when (mode) {
+            OverlayMode.EDGE -> OverlayEdgeTab(state = state, actions = actions)
+            OverlayMode.PILL -> OverlayPill(state = state, actions = actions)
+            OverlayMode.EXPANDED -> OverlayExpanded(state = state, actions = actions)
+        }
     }
 }
 
@@ -77,18 +119,26 @@ fun UsageOverlayContent(state: OverlayUiState, actions: OverlayActions) {
 private fun OverlayPill(state: OverlayUiState, actions: OverlayActions) {
     val pillAlpha by animateFloatAsState(
         targetValue = if (state.dismissArmed) 0.62f else 1f,
+        animationSpec = tween(durationMillis = 160),
         label = "overlay-pill-alpha",
     )
     val pillScale by animateFloatAsState(
         targetValue = if (state.dismissArmed) 0.86f else 1f,
+        animationSpec = spring(dampingRatio = 0.72f, stiffness = Spring.StiffnessMedium),
         label = "overlay-pill-scale",
+    )
+    // تلميح «الالتصاق بالحافة»: تنضغط الكبسولة قليلًا حين يصبح الإفلات لسانًا.
+    val edgeSnap by animateFloatAsState(
+        targetValue = if (state.edgeArmed != null) 0.93f else 1f,
+        animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMedium),
+        label = "overlay-pill-edge",
     )
     Surface(
         modifier = Modifier
             .graphicsLayer {
                 this.alpha = pillAlpha
-                scaleX = pillScale
-                scaleY = pillScale
+                scaleX = pillScale * edgeSnap
+                scaleY = pillScale * edgeSnap
             }
             .pointerInput(Unit) {
                 detectTapGestures(onTap = { actions.expand() })

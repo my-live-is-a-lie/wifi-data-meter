@@ -9,6 +9,17 @@ import com.mywifiadata.app.data.model.TrafficTotals
 /** أشكال النافذة العائمة الثلاثة. */
 enum class OverlayMode { EXPANDED, PILL, EDGE }
 
+/**
+ * هل الانتقال من شكل إلى آخر «تكبير»؟ يحدّد مدة الحركة: التكبير أبطأ من الطيّ.
+ * الانتقال إلى اللسان تصغير دائمًا، والخروج منه تكبير دائمًا.
+ */
+fun OverlayMode.expandsTo(target: OverlayMode): Boolean = when {
+    target == OverlayMode.EDGE -> false
+    this == OverlayMode.EDGE -> true
+    target == OverlayMode.EXPANDED -> true
+    else -> false
+}
+
 /** حالة ما تعرضه النافذة العائمة في لحظة معيّنة. */
 data class OverlayUiState(
     val target: MonitorTarget = MonitorTarget.AllApps,
@@ -33,6 +44,8 @@ data class OverlayUiState(
     val readFailed: Boolean = false,
     /** تُستخدم لإبراز منطقة الإغلاق أثناء سحب النافذة المصغرة. */
     val dismissArmed: Boolean = false,
+    /** الحافة التي ستلتصق بها الكبسولة إن أُفلتت الآن؛ تلميح بصري أثناء السحب. */
+    val edgeArmed: OverlayEdge? = null,
     val pickerVisible: Boolean = false,
     val pickerApps: List<AppUsage> = emptyList(),
     val pickerLoading: Boolean = false,
