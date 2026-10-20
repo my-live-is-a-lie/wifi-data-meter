@@ -1,6 +1,7 @@
 package com.mywifiadata.app.data.model
 
 import com.mywifiadata.app.core.AppLanguage
+import com.mywifiadata.app.core.HistoryRetention
 import com.mywifiadata.app.core.SamplingIntervals
 import com.mywifiadata.app.core.UsageNetwork
 
@@ -123,6 +124,13 @@ data class SpeedTestRecord(
     val usedFastCom: Boolean,
     /** false إن تعذّر قياس الرفع في ذلك الاختبار. */
     val uploadMeasured: Boolean = true,
+    /**
+     * كمية البيانات التي استهلكها الاختبار فعليًا (تنزيل + رفع + تجهيز).
+     *
+     * صفر يعني أن الاختبار سُجّل قبل إضافة هذا القياس؛ فيُقدَّر استهلاكه من
+     * سرعتيه عند حساب تقدير الاستهلاك للاختبار القادم.
+     */
+    val dataBytes: Long = 0L,
 )
 
 /**
@@ -341,6 +349,8 @@ data class AppSettings(
     val hideStatusBarIcon: Boolean = false,
     /** فهرس تصميم بطاقة استهلاك الباقة المختار على لوحة المعلومات. */
     val usageCardStyleIndex: Int = 0,
+    /** مدة الاحتفاظ باستهلاك التطبيقات المؤرشف بالأشهر؛ صفر يعني «لا محدود». */
+    val historyRetentionMonths: Int = HistoryRetention.DEFAULT_MONTHS,
     /** ترتيب العناصر المخفية وترتيبها في الصفحة الرئيسية. */
     val dashboardLayout: DashboardLayout = DashboardLayout.Default,
     /** نمط مخطط السجل محفوظ بشكل مستقل عن نمط مخططات التطبيقات. */
@@ -348,6 +358,15 @@ data class AppSettings(
     /** نمط مخططات التطبيقات محفوظ ليستمر بعد إعادة تشغيل التطبيق. */
     val appsLineChartEnabled: Boolean = false,
     val appSearchHistory: List<AppSearchSelection> = emptyList(),
+    /** هدف النافذة العائمة للاستهلاك المباشر؛ الافتراضي «جميع التطبيقات». */
+    val monitorTarget: MonitorTarget = MonitorTarget.AllApps,
+    /** ترتيب التطبيقات بحسب تكرار اختيارها في نافذة المراقبة (منفصل عن بحث التطبيقات). */
+    val monitorTargetHistory: List<AppSearchSelection> = emptyList(),
+    /** مركز النافذة العائمة كنسبة من عرض/ارتفاع الشاشة. */
+    val overlayAnchorX: Float = 0.5f,
+    val overlayAnchorY: Float = 0.24f,
+    /** الحافة التي يلتصق بها اللسان الجانبي. */
+    val overlayEdge: OverlayEdge = OverlayEdge.LEFT,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val layoutDirection: AppLayoutDirection = AppLayoutDirection.AUTO,
     val sessionStartMillis: Long = System.currentTimeMillis(),
@@ -358,6 +377,11 @@ data class AppSettings(
     val speedTestHistory: List<SpeedTestRecord> = emptyList(),
     /** آخر نتيجة اختبار سرعة محفوظة؛ تبقى منفصلة لتوافق التخزين القديم وملخص البطاقة. */
     val lastSpeedTest: SpeedTestRecord? = null,
+    /**
+     * نهاية فترة تجاهل تحذير استهلاك البيانات في اختبار السرعة على بيانات
+     * الهاتف. صفر أو قيمة ماضية تعني أن التحذير يظهر من جديد.
+     */
+    val speedTestWarningSnoozedUntilMillis: Long = 0L,
 ) {
     val planTotalDays: Int
         get() = (planDurationValue.coerceAtLeast(1) * planDurationUnit.daysPerUnit).coerceAtLeast(1)
@@ -431,17 +455,17 @@ data class AppSettings(
     }
 
     /**
-     * قائمة جميع الباقات المعروضة في نافذة «الباقات» بالترتيب الذي اختاره المستخدم،
-     * بما في ذلك الباقة المفعلة والباقات المحفوظة.
+     * قائمة جميع الباقات المعروضة في نافذة «الباقات»: الباقة المفعلة مثبتة دائمًا
+     * في أول القائمة، ثم تأتي الباقات المحفوظة بترتيب المستخدم.
      */
     fun allPlansFor(network: UsageNetwork): List<DataPlan> {
         val active = planFor(network)
         val saved = savedPlansFor(network)
         if (!active.hasQuota) return saved
-        val list = saved.toMutableList()
-        val insertIndex = activePlanIndexFor(network).coerceIn(0, list.size)
-        list.add(insertIndex, active)
-        return list
+        return buildList {
+            add(active)
+            addAll(saved)
+        }
     }
 
     fun completedPlansFor(network: UsageNetwork): List<CompletedPlanRecord> = when (network) {
@@ -591,10 +615,9 @@ data class AppSettings(
         )
         if (!currentActive.hasQuota) {
             val remainingSaved = savedList.filterNot { it.id == planId }
-            val targetIdx = savedList.indexOfFirst { it.id == planId }.coerceIn(0, remainingSaved.size)
             return withPlanFor(network, activatedTarget)
                 .withSavedPlansFor(network, remainingSaved)
-                .withActivePlanIndexFor(network, targetIdx)
+                .withActivePlanIndexFor(network, 0)
         }
         val resetPrevious = currentActive.copy(
             id = currentActive.id.ifBlank { java.util.UUID.randomUUID().toString() },
@@ -602,7 +625,6 @@ data class AppSettings(
             activatedAtMillis = 0L,
         )
         val combined = allPlansFor(network)
-        val newActiveIdx = combined.indexOfFirst { it.id == planId }.coerceAtLeast(0)
         val updatedSaved = combined.mapNotNull { item ->
             when (item.id) {
                 planId -> null
@@ -612,7 +634,7 @@ data class AppSettings(
         }
         return withPlanFor(network, activatedTarget)
             .withSavedPlansFor(network, updatedSaved)
-            .withActivePlanIndexFor(network, newActiveIdx)
+            .withActivePlanIndexFor(network, 0)
     }
 
     fun deletePlan(
@@ -755,18 +777,24 @@ data class AppSettings(
             list.add(toIndex, moved)
             return withSavedPlansFor(network, list)
         }
-        val activeIndex = activePlanIndexFor(network).coerceIn(0, saved.size)
+        // الباقة المفعلة مثبتة دائمًا في أول القائمة: لا تُحرَّك ولا يمكن وضع باقة أخرى فوقها.
+        if (fromIndex == 0) {
+            return this
+        }
         val tagged = saved.map { it to false }.toMutableList()
-        tagged.add(activeIndex, active to true)
+        tagged.add(0, active to true)
         if (fromIndex !in tagged.indices || toIndex !in tagged.indices || fromIndex == toIndex) {
             return this
         }
+        val safeToIndex = toIndex.coerceAtLeast(1)
+        if (safeToIndex == fromIndex) {
+            return this
+        }
         val moved = tagged.removeAt(fromIndex)
-        tagged.add(toIndex, moved)
-        val newActiveIndex = tagged.indexOfFirst { it.second }.coerceAtLeast(0)
+        tagged.add(safeToIndex, moved)
         val newSaved = tagged.filterNot { it.second }.map { it.first }
         return withSavedPlansFor(network, newSaved)
-            .withActivePlanIndexFor(network, newActiveIndex)
+            .withActivePlanIndexFor(network, 0)
     }
 
     /**

@@ -40,6 +40,7 @@ class SpeedTestHistoryTest {
                 timestampMillis = 1_800_000_000_000L,
                 usedFastCom = false,
                 uploadMeasured = false,
+                dataBytes = 42_000_000L,
             ),
             record(1_799_000_000_000L),
         )
@@ -62,6 +63,23 @@ class SpeedTestHistoryTest {
         assertEquals(listOf(newer, older), decoded)
         assertTrue(SpeedTestHistory.decode("").isEmpty())
         assertFalse(SpeedTestHistory.decode("1,2,0,0,0").isNotEmpty())
+    }
+
+    @Test
+    fun `legacy five field rows decode with unknown data usage`() {
+        // 4607182418800017408 هي بتات العدد العشري 1.0 في تمثيل Double الخام.
+        val decoded = SpeedTestHistory.decode("4607182418800017408,4607182418800017408,1800000000000,1,1")
+
+        assertEquals(1, decoded.size)
+        assertEquals(0L, decoded.single().dataBytes)
+    }
+
+    @Test
+    fun `prepending keeps the newest copy of a test with the same timestamp`() {
+        val older = record(5L).copy(dataBytes = 0L)
+        val newer = record(5L).copy(dataBytes = 9_000_000L)
+
+        assertEquals(listOf(newer), SpeedTestHistory.prepend(listOf(older), newer))
     }
 
     private fun record(timestampMillis: Long) = SpeedTestRecord(

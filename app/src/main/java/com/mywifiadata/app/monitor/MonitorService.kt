@@ -16,6 +16,7 @@ import com.mywifiadata.app.core.Format
 import com.mywifiadata.app.core.SamplingIntervals
 import com.mywifiadata.app.core.TimeRange
 import com.mywifiadata.app.core.TimeRanges
+import com.mywifiadata.app.core.UsageNetwork
 import com.mywifiadata.app.data.UsageRepository
 import com.mywifiadata.app.data.model.AppSettings
 import com.mywifiadata.app.widget.UsageWidgetUpdater
@@ -164,12 +165,20 @@ class MonitorService : Service() {
         val today = repository.todayTotals(now)
         val cycle = repository.planTotals(settings, now)
         val session = repository.deviceTotals(TimeRange(settings.sessionStartMillis, now))
+        val plan = settings.planFor(UsageNetwork.WIFI)
+        val daysLeft = when {
+            plan.pendingActivation -> plan.totalDays
+            plan.activatedAtMillis > 0L -> plan.daysLeft(now)
+            else -> TimeRanges.daysLeftInCycle(settings.cycleStartDay, now)
+        }
         UsageWidgetUpdater.publish(
             context = this,
             todayDownload = today.rxBytes,
             todayUpload = today.txBytes,
             cycleUsage = cycle.totalBytes,
             quota = settings.quotaBytes,
+            daysLeft = daysLeft,
+            styleIndex = settings.usageCardStyleIndex,
         )
 
         // لا نعرض سرعة لحظية في الإشعار: قياسها من إجمالي الدورة غير دقيق ومشتّت،

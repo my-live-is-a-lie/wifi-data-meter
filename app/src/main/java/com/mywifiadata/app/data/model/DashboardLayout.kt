@@ -18,16 +18,28 @@ data class DashboardLayout(
     fun normalized(): DashboardLayout {
         val hasLegacySpeedTestSection = DashboardLayoutIds.TODAY_SPEED_TEST in todaySectionOrder
         val hidesLegacySpeedTest = DashboardLayoutIds.TODAY_SPEED_TEST in hiddenTodaySections
+        // بطاقة النافذة العائمة تُضاف بعد الأزرار السريعة مباشرةً في التخطيطات المحفوظة قبل وجودها.
+        // إن غابت الأزرار السريعة نفسها فترك البطاقة للترتيب المرجعي يضعها في موضعها الصحيح.
+        val quickActionsIndex = cardOrder.indexOf(DashboardLayoutIds.QUICK_ACTIONS_CARD)
+        val cardOrderWithMonitor = if (
+            DashboardLayoutIds.MONITOR_CARD !in cardOrder && quickActionsIndex >= 0
+        ) {
+            cardOrder.toMutableList().apply {
+                add(quickActionsIndex + 1, DashboardLayoutIds.MONITOR_CARD)
+            }
+        } else {
+            cardOrder
+        }
         val cardOrderWithSpeedTest = if (
             DashboardLayoutIds.SPEED_TEST_CARD !in cardOrder &&
             (hasLegacySpeedTestSection || hidesLegacySpeedTest)
         ) {
-            cardOrder.toMutableList().apply {
+            cardOrderWithMonitor.toMutableList().apply {
                 val todayIndex = indexOf(DashboardLayoutIds.TODAY_CARD)
                 add(if (todayIndex >= 0) todayIndex + 1 else size, DashboardLayoutIds.SPEED_TEST_CARD)
             }
         } else {
-            cardOrder
+            cardOrderWithMonitor
         }
         val hiddenCardsWithMigratedSpeedTest = if (hidesLegacySpeedTest) {
             hiddenCards + DashboardLayoutIds.SPEED_TEST_CARD
@@ -120,6 +132,7 @@ data class DashboardLayout(
 object DashboardLayoutIds {
     const val USAGE_CARD = "usage_card"
     const val QUICK_ACTIONS_CARD = "quick_actions_card"
+    const val MONITOR_CARD = "monitor_card"
     const val WIFI_CARD = "wifi_card"
     const val TODAY_CARD = "today_card"
     const val SPEED_TEST_CARD = "speed_test_card"
@@ -140,6 +153,7 @@ object DashboardLayoutIds {
     val CARD_ORDER = listOf(
         USAGE_CARD,
         QUICK_ACTIONS_CARD,
+        MONITOR_CARD,
         WIFI_CARD,
         TODAY_CARD,
         SPEED_TEST_CARD,

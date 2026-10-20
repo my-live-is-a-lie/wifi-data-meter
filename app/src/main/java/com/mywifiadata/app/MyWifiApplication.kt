@@ -41,6 +41,8 @@ class MyWifiApplication : Application() {
             ContextCompat.RECEIVER_NOT_EXPORTED,
         )
         applicationScope.launch {
+            // يطبّق مدة الاحتفاظ المختارة على الأرشيف حتى قبل فتح شاشة السجل.
+            runCatching { repository.pruneUsageArchive() }
             runCatching { repository.appIdentities.captureInstalledApps() }
             runCatching { repository.captureUsageArchive() }
         }

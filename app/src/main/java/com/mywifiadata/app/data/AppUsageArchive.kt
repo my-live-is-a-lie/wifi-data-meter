@@ -10,8 +10,20 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.Base64
 
-/** Only observations read before uninstall are archived, never inferred shares of UID_REMOVED. */
-class AppUsageArchive(private val directory: File) {
+/**
+ * أرشيف استهلاك التطبيقات اليومي، ويُستخدم لاستعادة تطبيق أُزيل قبل قراءة
+ * استهلاكه. Only observations read before uninstall are archived, never
+ * inferred shares of UID_REMOVED.
+ *
+ * تُقرأ ملفات الأرشيف عند الحاجة فقط بدل تحميلها كلها، فلا يكبر استهلاك
+ * الذاكرة عند اختيار مدة احتفاظ طويلة (حتى ثلاث سنوات أو لا محدود). وتمسح
+ * [prune] ما تجاوز المدة التي يختارها المستخدم في الإعدادات.
+ */
+class AppUsageArchive(
+    private val directory: File,
+    /** مدة الاحتفاظ بالمللي ثانية، وصفر يعني «لا محدود». */
+    private val retentionMillis: () -> Long = { DEFAULT_RETENTION_MILLIS },
+) {
     data class SavedUsage(
         val uid: Int,
         val packageName: String,
@@ -29,16 +41,18 @@ class AppUsageArchive(private val directory: File) {
         val totals: TrafficTotals,
     )
 
+    /**
+     * ذاكرة مؤقتة للفترات التي قُرئت مؤخرًا فقط. تُفرَّغ عند تجاوز السقف
+     * فتُقرأ الملفات من جديد عند الحاجة بدل أن تكبر الذاكرة بلا حد.
+     */
     private val slots = mutableMapOf<String, List<Observation>>()
-    private var loaded = false
 
     @Synchronized
     fun record(range: TimeRange, network: UsageNetwork, apps: List<AppUsage>, capturedAt: Long) {
         if (range.startMillis < 0 || range.endMillis <= range.startMillis || range.endMillis > capturedAt) return
-        load()
-        prune(capturedAt)
         val key = slotKey(range, network)
-        val records = slots[key].orEmpty().associateBy { it.uid to it.packageName }.toMutableMap()
+        val current = readSlot(key)
+        val records = current.associateBy { it.uid to it.packageName }.toMutableMap()
         apps.filter { it.uid >= 0 && it.packageName != null && !it.isArchivedUsage && it.totals.totalBytes > 0 }.forEach { app ->
             val packageName = app.packageName ?: return@forEach
             val identity = app.uid to packageName
@@ -49,7 +63,7 @@ class AppUsageArchive(private val directory: File) {
         }
         // Missing UIDs may have just been removed. Keep their original timestamps and totals.
         val updated = records.values.toList()
-        if (updated.isEmpty() || updated == slots[key]) return
+        if (updated.isEmpty() || updated == current) return
         slots[key] = updated
         runCatching { write(key, updated) }
         prune(capturedAt)
@@ -58,16 +72,26 @@ class AppUsageArchive(private val directory: File) {
     @Synchronized
     fun read(range: TimeRange, network: UsageNetwork): List<SavedUsage> {
         if (range.endMillis <= range.startMillis) return emptyList()
-        load()
-        return slots.values.flatten().filter {
-            it.network == network && it.start >= range.startMillis && it.end <= range.endMillis
-        }.groupBy { it.uid to it.packageName }.mapNotNull { (identity, observations) ->
-            val best = nonOverlappingCoverage(observations)
-            if (best.totals.totalBytes == 0L) null else SavedUsage(identity.first, identity.second, best.totals, best.captured)
-        }
+        return candidateKeys(range, network)
+            .flatMap { readSlot(it) }
+            .filter {
+                it.network == network &&
+                    it.start >= range.startMillis &&
+                    it.end <= range.endMillis
+            }
+            .groupBy { it.uid to it.packageName }
+            .mapNotNull { (identity, observations) ->
+                val best = nonOverlappingCoverage(observations)
+                if (best.totals.totalBytes == 0L) {
+                    null
+                } else {
+                    SavedUsage(identity.first, identity.second, best.totals, best.captured)
+                }
+            }
     }
 
     /** Restore only an absent UID whose cached owner is now uninstalled and still matches. */
+    @Synchronized
     fun restoreMissing(
         systemUids: Set<Int>,
         range: TimeRange,
@@ -81,18 +105,87 @@ class AppUsageArchive(private val directory: File) {
     }
 
     @Synchronized
-    fun hasCompleteDay(range: TimeRange, network: UsageNetwork): Boolean {
-        load()
-        return slots[slotKey(range, network)].orEmpty().any {
+    fun hasCompleteDay(range: TimeRange, network: UsageNetwork): Boolean =
+        readSlot(slotKey(range, network)).any {
             it.network == network && it.start == range.startMillis && it.end == range.endMillis
         }
+
+    /** يطبّق مدة الاحتفاظ الحالية فورًا، مثلًا بعد تقليلها من الإعدادات. */
+    @Synchronized
+    fun pruneNow(now: Long = System.currentTimeMillis()) {
+        prune(now)
     }
 
     @Synchronized
     fun clear() {
         directory.deleteRecursively()
         slots.clear()
-        loaded = true
+    }
+
+    /** يقرأ فترة واحدة من الملف عند أول طلب فقط ثم يحتفظ بها في الذاكرة. */
+    private fun readSlot(key: String): List<Observation> {
+        slots[key]?.let { return it }
+        val file = File(directory, "$key.usage")
+        if (!file.isFile || file.length() > MAX_FILE_BYTES) return emptyList()
+        val records = runCatching { file.readLines().mapNotNull(::decode) }.getOrDefault(emptyList())
+        if (records.isEmpty()) return emptyList()
+        if (slots.size >= MAX_CACHED_SLOTS) slots.clear()
+        slots[key] = records
+        return records
+    }
+
+    /**
+     * مفاتيح الفترات التي قد تحتوي قراءات داخل [range]: من أسماء الملفات
+     * (بدل تحميلها) ومن الذاكرة المؤقتة للقراءات التي لم تُكتب بعد.
+     */
+    private fun candidateKeys(range: TimeRange, network: UsageNetwork): Set<String> {
+        val prefix = network.name + "-"
+        val keys = linkedSetOf<String>()
+        directory.listFiles()?.forEach { file ->
+            if (!file.isFile || file.extension != "usage") return@forEach
+            val key = file.nameWithoutExtension
+            if (key.startsWith(prefix) && keyStart(key) in range.startMillis until range.endMillis) {
+                keys += key
+            }
+        }
+        slots.keys.forEach { key ->
+            if (key.startsWith(prefix) && keyStart(key) in range.startMillis until range.endMillis) {
+                keys += key
+            }
+        }
+        return keys
+    }
+
+    private fun keyStart(key: String): Long {
+        val start = key.split('-', limit = 3).getOrNull(1)?.toLongOrNull() ?: return -1L
+        return if (start >= 0L) start else -1L
+    }
+
+    /**
+     * أحدث وقت ممكن لقراءة داخل الفترة المسمّاة بالمفتاح؛ يُستخدم للحذف
+     * بالعمر من اسم الملف دون تحميل محتواه.
+     */
+    private fun slotEnd(key: String): Long {
+        val parts = key.split('-')
+        val start = parts.getOrNull(1)?.toLongOrNull() ?: return Long.MIN_VALUE
+        val suffix = parts.drop(2).joinToString("-")
+        return when {
+            suffix == "hour" -> start + HOUR
+            suffix == "day" -> start + 26 * HOUR
+            suffix.startsWith("range-") -> {
+                val dayIndex = suffix.removePrefix("range-").toLongOrNull() ?: return start + 26 * HOUR
+                (dayIndex + 1) * DAY
+            }
+            else -> start + 26 * HOUR
+        }
+    }
+
+    /** سقف الملفات يتّسع للمدة المختارة، مع حد أمان أعلى عند «لا محدود». */
+    private fun maxFilesFor(retention: Long): Int {
+        if (retention <= 0L) return MAX_FILES_UNLIMITED
+        val days = retention / DAY
+        val needed = (days * 2L + 16L).coerceAtMost(MAX_FILES_UNLIMITED.toLong())
+        return maxOf(DEFAULT_MAX_FILES, needed.toInt())
     }
 
     private data class Coverage(val millis: Long = 0, val captured: Long = 0, val totals: TrafficTotals = TrafficTotals.Empty)
@@ -127,21 +220,41 @@ class AppUsageArchive(private val directory: File) {
         return "${network.name}-${range.startMillis}-$suffix"
     }
 
-    private fun load() {
-        if (loaded) return
-        directory.listFiles()?.filter { it.extension == "usage" && it.length() <= MAX_FILE_BYTES }?.forEach { file ->
-            val records = runCatching { file.readLines().mapNotNull(::decode) }.getOrDefault(emptyList())
-            if (records.isNotEmpty()) slots[file.nameWithoutExtension] = records
-        }
-        loaded = true
-    }
-
+    /**
+     * يحذف الفترات الأقدم من مدة الاحتفاظ ويبقي عدد الملفات داخل السقف.
+     * يعمل بالاسم وتاريخ آخر كتابة، فلا يحمّل كل الأرشيف إلى الذاكرة.
+     */
     private fun prune(now: Long) {
-        val expired = slots.filterValues { values -> values.all { it.end < now - RETENTION } }.keys.toSet()
-        val overflow = (slots.keys - expired).sortedByDescending { key -> slots.getValue(key).maxOf { it.captured } }.drop(MAX_FILES)
-        (expired + overflow).forEach { key ->
-            slots.remove(key)
-            File(directory, "$key.usage").delete()
+        val retention = retentionMillis().coerceAtLeast(0L)
+        val cutoff = if (retention > 0L) now - retention else Long.MIN_VALUE
+        val files = directory.listFiles()?.filter { it.isFile && it.extension == "usage" }.orEmpty()
+
+        // الحذف بالعمر: من اسم الملف وحده.
+        val expired = mutableSetOf<String>()
+        files.forEach { file ->
+            val key = file.nameWithoutExtension
+            if (slotEnd(key) < cutoff) {
+                expired += key
+                runCatching { file.delete() }
+            }
+        }
+        slots.keys.filter { slotEnd(it) < cutoff }.forEach { expired += it }
+        expired.forEach { slots.remove(it) }
+
+        // حد أمان للعدد حتى مع «لا محدود»، مع إبقاء الأحدث.
+        val limit = maxFilesFor(retention)
+        val remaining = directory.listFiles()?.filter { it.isFile && it.extension == "usage" }.orEmpty()
+        if (remaining.size <= limit) return
+        val kept = remaining
+            .sortedWith(
+                compareByDescending<File> { it.lastModified() }
+                    .thenByDescending { keyStart(it.nameWithoutExtension) },
+            )
+            .take(limit)
+            .mapTo(mutableSetOf()) { it.nameWithoutExtension }
+        remaining.filter { it.nameWithoutExtension !in kept }.forEach { file ->
+            slots.remove(file.nameWithoutExtension)
+            runCatching { file.delete() }
         }
     }
 
@@ -182,8 +295,10 @@ class AppUsageArchive(private val directory: File) {
     companion object {
         private const val HOUR = 3_600_000L
         private const val DAY = 24 * HOUR
-        private const val RETENTION = 45 * DAY
-        private const val MAX_FILES = 256
+        private const val DEFAULT_RETENTION_MILLIS = 30 * DAY
+        private const val DEFAULT_MAX_FILES = 256
+        private const val MAX_FILES_UNLIMITED = 8192
+        private const val MAX_CACHED_SLOTS = 128
         private const val MAX_FILE_BYTES = 4 * 1024 * 1024L
     }
 }

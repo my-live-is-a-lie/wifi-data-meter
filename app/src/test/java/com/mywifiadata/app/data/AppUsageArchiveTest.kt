@@ -144,4 +144,47 @@ class AppUsageArchiveTest {
         assertTrue(reopened.read(TimeRange(0, hour), wifi).isEmpty())
         assertEquals(100L, reopened.read(TimeRange(256 * hour, 257 * hour), wifi).single().totals.rxBytes)
     }
+
+    @Test
+    fun `a shorter chosen retention keeps only its window`() {
+        val directory = temporary.newFolder()
+        val retention = { 30 * day }
+        val archive = AppUsageArchive(directory, retention)
+        archive.record(TimeRange(0, day), wifi, listOf(app()), day)
+        archive.record(TimeRange(40 * day, 41 * day), wifi, listOf(app(200)), 41 * day)
+
+        assertTrue(archive.read(TimeRange(0, day), wifi).isEmpty())
+        // الأرشيف الجديد يقرأ المدة نفسها من الإعدادات فلا يعيد ما حُذف.
+        assertTrue(AppUsageArchive(directory, retention).read(TimeRange(0, day), wifi).isEmpty())
+        assertEquals(1, directory.listFiles()!!.count { it.extension == "usage" })
+    }
+
+    @Test
+    fun `unlimited retention keeps observations from previous years`() {
+        val directory = temporary.newFolder()
+        val archive = AppUsageArchive(directory) { 0L }
+        archive.record(TimeRange(0, day), wifi, listOf(app()), day)
+        archive.record(TimeRange(1_200 * day, 1_201 * day), wifi, listOf(app(300)), 1_201 * day)
+
+        val saved = AppUsageArchive(directory) { 0L }.read(TimeRange(0, day), wifi).single()
+        assertEquals(TrafficTotals(100, 10), saved.totals)
+        assertEquals(2, directory.listFiles()!!.count { it.extension == "usage" })
+    }
+
+    @Test
+    fun `lowering the retention prunes immediately without reopening`() {
+        val directory = temporary.newFolder()
+        var retention = 0L
+        val archive = AppUsageArchive(directory) { retention }
+        archive.record(TimeRange(0, day), wifi, listOf(app()), day)
+        archive.record(TimeRange(50 * day, 51 * day), wifi, listOf(app(200)), 51 * day)
+        assertEquals(2, directory.listFiles()!!.count { it.extension == "usage" })
+
+        retention = 30 * day
+        archive.pruneNow(now = 51 * day)
+
+        assertTrue(archive.read(TimeRange(0, day), wifi).isEmpty())
+        assertEquals(1, directory.listFiles()!!.count { it.extension == "usage" })
+        assertEquals(200L, archive.read(TimeRange(50 * day, 51 * day), wifi).single().totals.rxBytes)
+    }
 }

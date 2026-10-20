@@ -28,6 +28,14 @@ class WifiNetworkReader(context: Context) {
     private val telephonyManager: TelephonyManager? =
         appContext.getSystemService(TelephonyManager::class.java)
 
+    /** فحص خفيف: هل الشبكة النشطة حاليًا واي فاي؟ (بلا قراءة تفاصيل الشبكة) */
+    fun isWifiConnected(): Boolean = runCatching {
+        val manager = connectivityManager
+        val network = manager?.activeNetwork
+        network != null && manager?.getNetworkCapabilities(network)
+            ?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
+    }.getOrDefault(false)
+
     fun read(): WifiStatus {
         val manager = connectivityManager ?: return WifiStatus()
         val isWifiToggleOn = runCatching { wifiManager?.isWifiEnabled == true }.getOrDefault(false)

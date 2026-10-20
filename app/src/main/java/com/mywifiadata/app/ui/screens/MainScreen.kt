@@ -11,8 +11,9 @@ import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.drawable.Icon as AndroidIcon
+import android.net.Uri
+import android.provider.Settings
 import android.os.Build
-import android.os.Bundle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -68,6 +69,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -93,6 +95,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mywifiadata.app.R
 import com.mywifiadata.app.core.HistorySection
@@ -108,9 +113,12 @@ import com.mywifiadata.app.ui.components.DragNavigationItem
 import com.mywifiadata.app.ui.components.AppsUsageFilterBar
 import com.mywifiadata.app.ui.components.HistoryPlanFilterBar
 import com.mywifiadata.app.ui.components.HistoryUsageFilterBar
+import com.mywifiadata.app.ui.components.SpeedTestDataWarningDialog
 import com.mywifiadata.app.ui.AppViewModel
+import com.mywifiadata.app.overlay.UsageOverlayService
 import com.mywifiadata.app.ui.theme.AppButtonShape
 import com.mywifiadata.app.widget.UsageWidgetProvider
+import com.mywifiadata.app.widget.UsageWidgetUpdater
 import kotlinx.coroutines.launch
 
 private enum class AppTab(val labelRes: Int, val icon: ImageVector) {
@@ -141,6 +149,42 @@ fun MainScreen(
     val appsSearchListState = rememberLazyListState()
     val historyListState = rememberLazyListState()
     val historySearchListState = rememberLazyListState()
+    val overlayRunning by UsageOverlayService.running.collectAsStateWithLifecycle()
+    var showOverlayPermissionDialog by rememberSaveable { mutableStateOf(false) }
+
+    // لا نقرأ إحصاءات الشبكة من الواجهة وهي في الخلفية: أندرويد يسمح بتحديث
+    // واحد كل 15 ثانية، ونتركه للنافذة العائمة كي لا تتجمد أرقامها.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> viewModel.setUiVisible(true)
+                Lifecycle.Event.ON_PAUSE -> viewModel.setUiVisible(false)
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    LaunchedEffect(overlayRunning) {
+        viewModel.setOverlayActive(overlayRunning)
+    }
+
+    // النافذة العائمة تحتاج صلاحية «العرض فوق التطبيقات»؛ نطلبها مرة واحدة من هنا.
+    fun startOverlay() {
+        if (!Settings.canDrawOverlays(context)) {
+            showOverlayPermissionDialog = true
+            return
+        }
+        runCatching {
+            ContextCompat.startForegroundService(
+                context,
+                Intent(context, UsageOverlayService::class.java)
+                    .setAction(UsageOverlayService.ACTION_SHOW),
+            )
+        }
+    }
 
     var selectedTabIndex by rememberSaveable { mutableIntStateOf(0) }
     var pageEntrySide by remember { mutableIntStateOf(0) }
@@ -320,9 +364,11 @@ fun MainScreen(
             UsageWidgetProvider.DEFAULT_USAGE_CARD_STYLE,
             UsageWidgetProvider.MAX_USAGE_CARD_STYLE_INDEX,
         )
+        // الأداة واحدة وتتبع شكل البطاقة المختار: نزامن الشكل أولًا ثم نطلب
+        // إضافتها، فتظهر بالشكل المعروض في التطبيق لا بشكل افتراضي مختلف.
+        UsageWidgetUpdater.syncStyle(context, safeStyleIndex)
         val pinResultIntent = Intent(context, UsageWidgetProvider::class.java).apply {
             action = UsageWidgetProvider.ACTION_WIDGET_PINNED
-            putExtra(UsageWidgetProvider.EXTRA_USAGE_CARD_STYLE, safeStyleIndex)
         }
         val mutableFlag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             PendingIntent.FLAG_MUTABLE
@@ -331,16 +377,13 @@ fun MainScreen(
         }
         val pinResult = PendingIntent.getBroadcast(
             context,
-            safeStyleIndex,
+            0,
             pinResultIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or mutableFlag,
         )
-        val initialOptions = Bundle().apply {
-            putInt(UsageWidgetProvider.EXTRA_USAGE_CARD_STYLE, safeStyleIndex)
-        }
         val requested = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
             widgetManager.isRequestPinAppWidgetSupported &&
-            widgetManager.requestPinAppWidget(provider, initialOptions, pinResult)
+            widgetManager.requestPinAppWidget(provider, null, pinResult)
         scope.launch {
             snackbarHostState.showSnackbar(
                 if (requested) widgetPinRequestedMessage else widgetPinUnsupportedMessage,
@@ -376,6 +419,51 @@ fun MainScreen(
                     Text(text = stringResource(R.string.action_cancel))
                 }
             },
+        )
+    }
+
+    if (showOverlayPermissionDialog) {
+        AlertDialog(
+            onDismissRequest = { showOverlayPermissionDialog = false },
+            title = { Text(text = stringResource(R.string.overlay_permission_title)) },
+            text = { Text(text = stringResource(R.string.overlay_permission_body)) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showOverlayPermissionDialog = false
+                        runCatching {
+                            context.startActivity(
+                                Intent(
+                                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                    Uri.parse("package:${context.packageName}"),
+                                ),
+                            )
+                        }
+                    },
+                    shape = AppButtonShape,
+                ) {
+                    Text(text = stringResource(R.string.overlay_permission_open))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showOverlayPermissionDialog = false },
+                    shape = AppButtonShape,
+                ) {
+                    Text(text = stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
+
+    // تحذير استهلاك بيانات الهاتف قبل بدء اختبار السرعة، مع تقدير متكيّف
+    // وخيار تجاهله ليوم كامل.
+    state.speedTestDataWarning?.let { estimate ->
+        SpeedTestDataWarningDialog(
+            estimate = estimate,
+            onContinue = viewModel::continueSpeedTestAfterWarning,
+            onCancel = viewModel::cancelSpeedTestWarning,
+            onIgnoreForDay = viewModel::ignoreSpeedTestWarningForDay,
         )
     }
 
@@ -576,6 +664,11 @@ fun MainScreen(
                     onDashboardLayoutChange = { dashboardLayoutDraft = it.normalized() },
                     onSaveDashboardLayout = { saveDashboardEditing() },
                     onCancelDashboardLayout = { cancelDashboardEditing() },
+                    onOpenMonitorPicker = viewModel::openMonitorPicker,
+                    onSelectMonitorTarget = viewModel::selectMonitorTarget,
+                    onDismissMonitorPicker = viewModel::closeMonitorPicker,
+                    onStartOverlay = { startOverlay() },
+                    overlayRunning = overlayRunning,
                 )
 
                 AppTab.APPS -> {
@@ -717,6 +810,7 @@ fun MainScreen(
                     onOpenWifiSettings = { SystemActions.openWifiSettings(context) },
                     onClearData = { viewModel.clearData() },
                     onLayoutDirectionChange = { viewModel.setLayoutDirection(it) },
+                    onHistoryRetentionChange = { viewModel.setHistoryRetention(it) },
                     onSavePlan = { viewModel.savePlan(it) },
                     onActivatePlan = { viewModel.activatePlan(it) },
                     onAddPlanToSavedList = { viewModel.addPlanToSavedList(it) },

@@ -82,11 +82,19 @@
     <string name="speed_test_age_days">%1$sي</string>
     <string name="speed_test_age_months">%1$sش</string>
     <string name="speed_test_age_years">%1$sسنة</string>
+    <string name="speed_test_mobile_warning_title">تحذير: استهلاك بيانات الهاتف</string>
+    <string name="speed_test_mobile_warning_message">أنت متصل ببيانات الهاتف. اختبار السرعة يحمّل ويرفع بيانات حقيقية لقياس السرعة، لذا قد يستهلك كمية كبيرة من رصيد باقتك.</string>
+    <string name="speed_test_mobile_warning_estimate_label">الاستهلاك التقديري لهذا الاختبار</string>
+    <string name="speed_test_mobile_warning_estimate_from_history">يتكيّف هذا التقدير تلقائيًا حسب نتائج اختباراتك السابقة.</string>
+    <string name="speed_test_mobile_warning_estimate_default">تقدير أولي سيُضبط تلقائيًا بعد إجرائك أول اختبار.</string>
+    <string name="speed_test_mobile_warning_continue">متابعة الاختبار</string>
+    <string name="speed_test_mobile_warning_cancel">إلغاء</string>
+    <string name="speed_test_mobile_warning_ignore">تجاهل لمدة يوم</string>
 
     <!-- البطاقة الرئيسية (الحلقة) -->
     <string name="quota_ring_title">استهلاك دورة الفاتورة</string>
-    <string name="widget_title">استهلاك البيانات</string>
-    <string name="widget_description">بطاقة تعرض استهلاك بيانات الواي فاي</string>
+    <string name="widget_title">بطاقة الاستهلاك</string>
+    <string name="widget_description">بطاقة استهلاك الواي فاي — تتبع شكل البطاقة المختار في التطبيق</string>
     <string name="widget_traffic_line">%1$s %2$s</string>
     <string name="action_add_widget">إضافة للشاشة الرئيسية</string>
     <string name="cd_previous_usage_card">شكل البطاقة السابق</string>
@@ -108,10 +116,14 @@
     <string name="plan_duration_label">المدة</string>
     <string name="plan_type_label">نوع الباقة</string>
     <string name="plan_prevent_edit_label">امنع التعديل</string>
+    <string name="plan_prevent_edit_subtitle">منع التعديل حتى انتهاء الباقة</string>
     <string name="plan_unit_mb">ميجابايت</string>
     <string name="plan_unit_gb">جيجابايت</string>
     <string name="plan_unit_tb">تيرابايت</string>
     <string name="plan_duration_day">يوم</string>
+    <string name="clock_usage_time_am">ص</string>
+    <string name="clock_usage_time_pm">م</string>
+    <string name="clock_usage_days_unit">يوم</string>
     <string name="plan_duration_week">أسبوع</string>
     <string name="plan_duration_month">شهر</string>
     <string name="plan_duration_year">سنة</string>
@@ -140,7 +152,6 @@
     <string name="additional_plan_dialog_title_add">إضافة باقة إضافية</string>
     <string name="additional_plan_dialog_title_update">تحديث باقة إضافية</string>
     <string name="additional_plan_name_optional">الاسم (إختياري)</string>
-    <string name="additional_plan_prevent_edit_subtitle">منع التعديل حتي إنتهاء الباقة</string>
     <string name="additional_plan_delete_confirm_title">حذف الباقة الإضافية؟</string>
     <string name="additional_plan_delete_confirm_body">هل أنت متأكد من حذف هذه الباقة الإضافية؟</string>
     <string name="additional_plan_reorder_cd">تغيير ترتيب الباقة الإضافية</string>
@@ -255,7 +266,24 @@
     <string name="settings_interval_unit_hours">س</string>
     <string name="settings_dynamic_color">ألوان النظام (Material You)</string>
     <string name="settings_dynamic_color_desc">استخدام ألوان خلفية الشاشة على أندرويد 12 وما بعده.</string>
-    <string name="settings_section_data">الصلاحيات</string>
+    <string name="settings_section_data">التخزين والصلاحيات</string>
+    <string name="settings_history_retention">مدة الاحتفاظ بالسجل</string>
+    <string name="settings_history_retention_body">اختر كم يبقى استهلاك التطبيقات وبياناته المؤرشفة محفوظًا في السجل. تقليل المدة يحذف الأقدم فورًا.</string>
+    <plurals name="retention_months">
+        <item quantity="one">شهر واحد</item>
+        <item quantity="two">شهران</item>
+        <item quantity="few">%d أشهر</item>
+        <item quantity="many">%d شهرًا</item>
+        <item quantity="other">%d شهر</item>
+    </plurals>
+    <plurals name="retention_years">
+        <item quantity="one">سنة واحدة</item>
+        <item quantity="two">سنتان</item>
+        <item quantity="few">%d سنوات</item>
+        <item quantity="many">%d سنة</item>
+        <item quantity="other">%d سنة</item>
+    </plurals>
+    <string name="retention_unlimited">لا محدود</string>
     <string name="settings_section_appearance">المظهر</string>
     <string name="settings_accent_color">لون التمييز</string>
     <string name="settings_accent_color_system_active">ألوان النظام</string>
@@ -396,4 +424,36 @@
     <string name="plan_prevent_edit_warning_title">تفعيل منع التعديل</string>
     <string name="plan_prevent_edit_warning_body">عند تفعيل «امنع التعديل» وحفظ الباقة، لن تتمكن من تعديل سعة الباقة أو مدتها لاحقًا (يُسمح فقط بتغيير الاسم والشعار).\n\nيمكنك تعطيل هذا الخيار لاحقًا عن طريق الضغط على زر «إعادة تعيين» لإعادة ضبط استهلاك الباقة.</string>
     <string name="apps_fast_scroll">موضع القائمة والسحب السريع بين التطبيقات</string>
+    <!-- النافذة العائمة للاستهلاك المباشر -->
+    <string name="monitor_card_title">النافذة العائمة للاستهلاك المباشر</string>
+    <string name="monitor_all_apps">جميع التطبيقات</string>
+    <string name="monitor_start">بدء عرض النافذة العائمة</string>
+    <string name="monitor_pick_target">اختيار التطبيق المراقب</string>
+    <string name="monitor_picker_title">اختر التطبيقات</string>
+    <string name="monitor_picker_body">حدد التطبيقات التي تريد مراقبة استهلاكها</string>
+    <string name="monitor_picker_search">البحث عن تطبيق</string>
+    <string name="monitor_picker_empty">لا يوجد تطبيق مطابق.</string>
+    <string name="monitor_picker_close">إغلاق قائمة الاختيار</string>
+    <string name="monitor_picker_selected">محدد</string>
+    <string name="monitor_picker_unselected">غير محدد</string>
+    <string name="overlay_time">الوقت</string>
+    <string name="overlay_pause">إيقاف مؤقت</string>
+    <string name="overlay_resume">متابعة</string>
+    <string name="overlay_minimize">تصغير النافذة</string>
+    <string name="overlay_close">إغلاق النافذة</string>
+    <string name="overlay_change_target">تغيير التطبيق المراقب</string>
+    <string name="overlay_usage_access_missing">لا يمكن قراءة الاستهلاك: فعّل صلاحية «الوصول إلى الاستخدام» لقياس الحركة الفعلية.</string>
+    <string name="overlay_no_usage_access_short">بلا صلاحية الاستخدام</string>
+    <string name="overlay_no_wifi_short">غير متصل بالواي فاي</string>
+    <string name="overlay_collecting">جارٍ القياس…</string>
+    <string name="overlay_read_failed">تعذّرت قراءة إحصاءات الشبكة من النظام، وسنعيد المحاولة تلقائيًا.</string>
+    <string name="overlay_read_failed_short">تعذّرت القراءة</string>
+    <string name="overlay_no_traffic_yet">لم يسجّل النظام أي استهلاك بعد</string>
+    <string name="monitor_usage_access_hint">صلاحية الاستخدام مطلوبة لقياس الاستهلاك</string>
+    <string name="overlay_permission_title">العرض فوق التطبيقات</string>
+    <string name="overlay_permission_body">لعرض النافذة العائمة أثناء استخدام تطبيقات أخرى، اسمح لـ«بيانات الواي فاي» بالعرض فوق التطبيقات.</string>
+    <string name="overlay_permission_open">فتح الإعدادات</string>
+    <string name="channel_overlay_name">النافذة العائمة</string>
+    <string name="channel_overlay_desc">إشعار دائم يُبقي نافذة الاستهلاك العائمة ظاهرة.</string>
+    <string name="overlay_notification_title">النافذة العائمة للاستهلاك</string>
 </resources>
