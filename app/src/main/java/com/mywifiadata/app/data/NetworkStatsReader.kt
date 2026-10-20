@@ -95,12 +95,13 @@ class NetworkStatsReader(private val context: Context) {
 
         var stats: NetworkStats? = null
         return try {
+            // ترتيب الوسائط في النظام: النوع، المشترك، البداية، النهاية، ثم uid.
             stats = statsManager.queryDetailsForUid(
                 if (network == UsageNetwork.WIFI) ConnectivityManager.TYPE_WIFI else ConnectivityManager.TYPE_MOBILE,
                 null,
-                uid,
                 startMillis,
                 endMillis,
+                uid,
             ) ?: return null
             var rxBytes = 0L
             var txBytes = 0L
