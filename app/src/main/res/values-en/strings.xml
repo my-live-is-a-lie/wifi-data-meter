@@ -200,7 +200,6 @@
     <string name="apps_slices_weeks">Weeks</string>
     <string name="apps_slices_hours">Hours</string>
     <string name="app_archived_usage">Last saved reading: %1$s</string>
-    <string name="apps_archived_usage_summary">Usage includes readings saved before apps were uninstalled; activity not observed before removal may be missing.</string>
     <string name="app_not_installed">Not installed</string>
     <string name="unknown_app_label">Unknown app</string>
     <string name="apps_count">%1$d apps</string>
