@@ -323,7 +323,7 @@
     <string name="apps_usage_filter_percent_value">٪%1$d</string>
     <string name="apps_usage_filter_decrease">تقليل النسبة المئوية</string>
     <string name="apps_usage_filter_increase">زيادة النسبة المئوية</string>
-    <string name="apps_usage_filter_slider_description">اسحب من المنتصف إلى اليمين لزيادة النسبة، أو إلى اليسار لتقليلها</string>
+    <string name="apps_usage_filter_slider_description">اسحب المقبض إلى اليسار لزيادة النسبة، وإلى اليمين لتقليلها. تزداد سرعة التغيير كلما ابتعد عن المنتصف، والعودة إليه توقفها.</string>
     <string name="settings_quick_settings_tile">زر مراقبة الشبكة في الإعدادات السريعة</string>
     <string name="settings_quick_settings_tile_desc">إضافة زر لتشغيل المراقبة من لوحة الإعدادات السريعة. قد يطلب النظام موافقتك أو يتطلب إضافته يدويًا. إيقاف هذا الخيار يعطّل الزر داخل التطبيق ولا يحذفه؛ أزِله يدويًا من اللوحة.</string>
     <string name="settings_hide_status_bar_icon">إخفاء أيقونة المراقبة من شريط الحالة</string>
