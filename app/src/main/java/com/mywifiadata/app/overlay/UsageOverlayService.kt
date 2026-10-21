@@ -20,7 +20,6 @@ import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
@@ -332,8 +331,10 @@ class UsageOverlayService :
                     // ارتساء مطلق بأعلى يسار النافذة (لا TopStart فيتقلب مع الاتجاه):
                     // نافذة الشريط بعرض الشاشة كله، والمحتوى المتحوّل يلتصق بحرف
                     // النافذة فينمو من موضعها بدل أن يقفز إلى وسطها.
+                    // بلا fillMaxSize قصدًا: حجم الغلاف = حجم المحتوى، فيبقى إطار
+                    // النافذة بحجم الشكل الظاهر فقط؛ لو ملأ الشاشة لابتلع كل لمسة
+                    // خارج الشريط ومنعها عن التطبيقات خلفه.
                     Box(
-                        modifier = Modifier.fillMaxSize(),
                         contentAlignment = AbsoluteAlignment.TopLeft,
                     ) {
                         UsageOverlayContent(state = ui.value, actions = overlayActions)
@@ -1235,7 +1236,11 @@ class UsageOverlayService :
         const val ACTION_SHOW = "com.mywifiadata.app.overlay.SHOW"
         const val ACTION_CLOSE = "com.mywifiadata.app.overlay.CLOSE"
 
+        // NOT_TOUCH_MODAL صريحةً: كل لمسة خارج إطار النافذة تمرّ إلى التطبيقات
+        // خلفها؛ بلا هذه الراية يصبح إطار النافذة (وبخاصة الشريط بعرض الشاشة)
+        // حاجزًا يبتلع لمسات المستخدم كلها.
         private val BASE_WINDOW_FLAGS = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
             WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
             WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
 
