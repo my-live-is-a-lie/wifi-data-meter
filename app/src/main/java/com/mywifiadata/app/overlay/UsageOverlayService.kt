@@ -12,7 +12,6 @@ import android.os.Build
 import android.os.IBinder
 import android.os.SystemClock
 import android.provider.Settings
-import android.util.DisplayMetrics
 import android.util.Log
 import android.view.Display
 import android.view.Gravity
@@ -108,6 +107,14 @@ class UsageOverlayService :
     private lateinit var repository: UsageRepository
     private lateinit var notifier: Notifier
     private lateinit var windowManager: WindowManager
+
+    /**
+     * مدير نوافذ لقياس الشاشة من **سياق التطبيق** (بلا تهيئة مُجاوَزة)، لأن قياس
+     * الخدمة نفسه يتجمّد على لحظة إنشائها (الشرح في [screenSize]).
+     */
+    private val metricsWindowManager: WindowManager by lazy(LazyThreadSafetyMode.NONE) {
+        applicationContext.getSystemService(WindowManager::class.java) ?: windowManager
+    }
 
     private var rootView: ComposeView? = null
     private var layoutParams: WindowManager.LayoutParams? = null
@@ -459,31 +466,33 @@ class UsageOverlayService :
     }
 
     /**
-     * مقاس الشاشة كلها بالبكسل في دورانها الحالي — لا مقاس نافذة التطبيق.
+     * مقاس مساحة النافذة بالبكسل في دورانها الحالي.
      *
-     * نافذة `TYPE_APPLICATION_OVERLAY` تُرسَم فوق الشاشة كاملة، فمرجعها الصحيح هو
-     * مقاس العرض لا حدود مهمة التطبيق: `currentWindowMetrics` يُبلغ حدود نافذة
-     * التطبيق، وهي نصف الشاشة في تقسيم الشاشة أو أصغر في النوافذ الحرّة، وحينها
-     * تُحسب حافة اللسان من عرض ناقص فيقف بعيدًا عن الحافة (منتصف الشاشة). ولذلك
-     * نقرأ المقاس «الحقيقي» من [Display]، وهو ما كان يستعمله هذا الكود أصلًا قبل
-     * المستوى 30؛ نوحّد المسارين الآن بدل تفريع حسب إصدار أندرويد.
-     *
-     * المقاس مأخوذ بحسب دوران العرض الحالي، فيتبدّل مع تدوير الهاتف فورًا.
+     * يُقرأ من مدير نوافذ مأخوذ من **سياق التطبيق** لا من سياق الخدمة: هذا السياق
+     * (وسياق النشاط) مبني على `createConfigurationContext` في [AppLanguage]، وأندرويد
+     * يطبّق التهيئة المُجاوَزة **فوق** التهيئة الحيّة عند كل تغيّر
+     * (`tmpConfig.updateFrom(mOverrideConfiguration)`)، فتُثبَّت معها
+     * `windowConfiguration` — الحدود والدوران — على قيمتها لحظة إنشاء المكوّن.
+     * عندها لا ترى خدمة النافذة العائمة تدوير الشاشة أبدًا، فتبقى النافذة عند
+     * إحداثيات الوضع القديم: يظهر اللسان في **منتصف** الشاشة الأفقية بدل حافتها.
+     * سياق التطبيق بلا تهيئة مُجاوَزة، فمقاسه يتبدّل مع الدوران فورًا.
      */
-    @Suppress("DEPRECATION") // قراءة مقاس العرض الكامل؛ البديل يبلّغ حدود نافذة التطبيق.
     private fun screenSize(): Pair<Int, Int> {
-        // شاشة النافذة نفسها متى كانت مُلحَقة، وإلا الشاشة الافتراضية قبل الإضافة.
-        val display = rootView?.display
-            ?: runCatching { windowManager.defaultDisplay }.getOrNull()
-        if (display != null) {
-            val metrics = DisplayMetrics()
-            display.getRealMetrics(metrics)
-            if (metrics.widthPixels > 0 && metrics.heightPixels > 0) {
-                return metrics.widthPixels to metrics.heightPixels
-            }
+        val manager = metricsWindowManager
+        val metrics = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val bounds = manager.currentWindowMetrics.bounds
+            bounds.width() to bounds.height()
+        } else {
+            val point = android.graphics.Point()
+            @Suppress("DEPRECATION")
+            manager.defaultDisplay.getRealSize(point)
+            point.x to point.y
         }
-        val fallback = resources.displayMetrics
-        return fallback.widthPixels to fallback.heightPixels
+        return if (metrics.first > 0 && metrics.second > 0) {
+            metrics
+        } else {
+            resources.displayMetrics.widthPixels to resources.displayMetrics.heightPixels
+        }
     }
 
     // ————————————————————————— السحب والإفلات —————————————————————————
