@@ -41,6 +41,71 @@ class OverlayGeometryTest {
     }
 
     @Test
+    fun `dropping the window at the top asks for the status-bar strip`() {
+        val statusBarHeight = 100
+        // البطاقة الكبيرة ملتصقة بأعلى الشاشة: حرفها الأعلى داخل المنطقة.
+        assertEquals(
+            OverlayDrop.TOP_BAR,
+            OverlayGeometry.dropTarget(
+                x = 200,
+                y = 0,
+                width = 700,
+                height = 600,
+                screenWidth = screenWidth,
+                screenHeight = screenHeight,
+                statusBarHeight = statusBarHeight,
+            ),
+        )
+        // والكبسولة قرب الأعلى كذلك.
+        assertEquals(
+            OverlayDrop.TOP_BAR,
+            OverlayGeometry.dropTarget(
+                x = 400,
+                y = statusBarHeight + 120,
+                width = pillWidth,
+                height = pillHeight,
+                screenWidth = screenWidth,
+                screenHeight = screenHeight,
+                statusBarHeight = statusBarHeight,
+            ),
+        )
+    }
+
+    @Test
+    fun `the top zone ends below the status bar margin`() {
+        val statusBarHeight = 100
+        val zoneBottom = statusBarHeight + screenHeight * OverlayGeometry.TOP_BAR_ZONE_FRACTION
+        assertEquals(
+            OverlayDrop.NONE,
+            OverlayGeometry.dropTarget(
+                x = 400,
+                y = zoneBottom.toInt() + 40,
+                width = pillWidth,
+                height = pillHeight,
+                screenWidth = screenWidth,
+                screenHeight = screenHeight,
+                statusBarHeight = statusBarHeight,
+            ),
+        )
+    }
+
+    @Test
+    fun `the top strip wins over the side tabs in the top corners`() {
+        assertEquals(
+            OverlayDrop.TOP_BAR,
+            OverlayGeometry.dropTarget(
+                x = 0,
+                y = 10,
+                width = pillWidth,
+                height = pillHeight,
+                screenWidth = screenWidth,
+                screenHeight = screenHeight,
+                statusBarHeight = 100,
+            ),
+        )
+    }
+
+    @Test
     fun `a pill dropped in the middle stays free`() {
         assertEquals(
             OverlayDrop.NONE,
