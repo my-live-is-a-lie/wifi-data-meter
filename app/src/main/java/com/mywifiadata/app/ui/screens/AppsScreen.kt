@@ -508,14 +508,6 @@ private fun SummaryCard(state: UiState) {
                     modifier = Modifier.weight(1f),
                 )
             }
-            if (periodApps.any { it.isArchivedUsage }) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = stringResource(R.string.apps_archived_usage_summary),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
             if (topApp != null) {
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
