@@ -94,7 +94,7 @@ fun AppDetailScreen(
                         text = stringResource(
                             R.string.app_archived_usage,
                             "${Format.shortDate(detail.app.usageRecordedAt)} ${Format.clock(detail.app.usageRecordedAt)}",
-                        ) + " · " + stringResource(R.string.apps_archived_usage_summary),
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

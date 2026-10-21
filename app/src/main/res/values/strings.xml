@@ -211,7 +211,6 @@
     <string name="apps_slices_weeks">الأسابيع</string>
     <string name="apps_slices_hours">الساعات</string>
     <string name="app_archived_usage">آخر قراءة محفوظة: %1$s</string>
-    <string name="apps_archived_usage_summary">يتضمن الاستهلاك قراءات محفوظة قبل حذف التطبيقات؛ قد لا تشمل ما لم يُرصد قبل الحذف.</string>
     <string name="app_not_installed">غير مثبت</string>
     <string name="unknown_app_label">تطبيق غير معروف</string>
     <string name="apps_count">%1$d تطبيقًا</string>
