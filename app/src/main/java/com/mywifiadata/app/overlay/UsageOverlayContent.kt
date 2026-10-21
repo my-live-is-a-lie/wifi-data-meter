@@ -308,17 +308,23 @@ private fun OverlayTopBar(state: OverlayUiState, actions: OverlayActions) {
             // العرض المتاح يتفاوت (شاشة ضيقة أو وضع أفقي): على الشاشات الضيقة يُخفى
             // المعدّل ثم الوقت كي لا تُقتطع أزرار الإيقاف والإغلاق من طرف الشريط.
             BoxWithConstraints {
-                // المعدّل ظاهر دائمًا كما في التصميم المرجعي؛ على الشاشات الضيقة
-                // يُخفى الوقت أولًا ثم يُختصر المعدّل بعرضه المتاح (بنقاط) بدل أن
-                // يختفي أو يدفع أزرار الطرف خارج الشريط.
-                val showElapsed = maxWidth >= 400.dp
-                val reserved = 22.dp + 130.dp + 46.dp + 56.dp + 48.dp + 16.dp +
-                    (if (showElapsed) 36.dp else 0.dp)
-                val speedMax = (maxWidth - reserved).coerceIn(30.dp, 140.dp)
+                // كل عناصر المرجع ظاهرة دائمًا (الأيقونة، الوقت، تنزيل، رفع،
+                // الإجمالي، المعدّل، إيقاف، إغلاق): على الشاشات الضيقة تُضغط
+                // الوحدات (‎856K بدل ‎856.4 KB) وتصغر الخطوط والمسافات بدل أن
+                // يُحذف عنصر، والمعدّل يُختصر بنقاط داخل عرضه المتاح فقط.
+                val compact = maxWidth < 420.dp
+                val reserved = 22.dp + 30.dp + 80.dp + 56.dp +
+                    (if (compact) 56.dp else 72.dp) +
+                    (if (compact) 42.dp else 70.dp) +
+                    (if (compact) 12.dp else 20.dp)
+                val speedMax = (maxWidth - reserved).coerceIn(28.dp, 150.dp)
                 Row(
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                    modifier = Modifier.padding(
+                        horizontal = if (compact) 6.dp else 10.dp,
+                        vertical = 6.dp,
+                    ),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 10.dp),
                 ) {
                     Box(
                         modifier = Modifier
@@ -331,24 +337,22 @@ private fun OverlayTopBar(state: OverlayUiState, actions: OverlayActions) {
                     ) {
                         TargetIcon(target = state.target, size = 22.dp, tint = Color.White)
                     }
-                    if (showElapsed) {
-                        Text(
-                            text = Format.elapsed(state.elapsedMillis),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.White,
-                            maxLines = 1,
-                            softWrap = false,
-                        )
-                    }
+                    Text(
+                        text = Format.elapsed(state.elapsedMillis),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White,
+                        maxLines = 1,
+                        softWrap = false,
+                    )
                     BarStat(
                         icon = Icons.Rounded.ArrowDownward,
                         tint = LocalDownloadColor.current,
-                        value = Format.bytes(state.totals.rxBytes),
+                        value = Format.bytesShort(state.totals.rxBytes),
                     )
                     BarStat(
                         icon = Icons.Rounded.ArrowUpward,
                         tint = LocalUploadColor.current,
-                        value = Format.bytes(state.totals.txBytes),
+                        value = Format.bytesShort(state.totals.txBytes),
                     )
                     Spacer(modifier = Modifier.weight(1f))
                     Text(
@@ -357,7 +361,11 @@ private fun OverlayTopBar(state: OverlayUiState, actions: OverlayActions) {
                         } else {
                             Format.bytes(state.totals.totalBytes)
                         },
-                        style = MaterialTheme.typography.titleMedium,
+                        style = if (compact) {
+                            MaterialTheme.typography.titleSmall
+                        } else {
+                            MaterialTheme.typography.titleMedium
+                        },
                         color = Color.White,
                         maxLines = 1,
                         softWrap = false,
@@ -442,8 +450,8 @@ private fun OverlayTopBar(state: OverlayUiState, actions: OverlayActions) {
     }
 }
 
-/** خلفية الشريط: سوداء شفّافة فيندمج مع شريط الحالة بدل أن يبدو بطاقة عائمة. */
-private val OverlayTopBarScrim = Color.Black.copy(alpha = 0.6f)
+/** خلفية الشريط: سوداء شبه معتمة فيندمج مع شريط الحالة بدل أن يبدو بطاقة عائمة. */
+private val OverlayTopBarScrim = Color.Black.copy(alpha = 0.85f)
 
 /** قيمة صغيرة بسهم ملوّن في الشريط العلوي (تنزيل/رفع). */
 @Composable
