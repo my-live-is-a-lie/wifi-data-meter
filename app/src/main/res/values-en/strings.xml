@@ -304,7 +304,7 @@
     <string name="apps_usage_filter_percent_value">%1$d%%</string>
     <string name="apps_usage_filter_decrease">Decrease percentage</string>
     <string name="apps_usage_filter_increase">Increase percentage</string>
-    <string name="apps_usage_filter_slider_description">Drag right to increase the percentage, or left to decrease it.</string>
+    <string name="apps_usage_filter_slider_description">Drag left to increase and right to decrease. Moving farther from center speeds up changes; return to center to stop.</string>
     <string name="settings_quick_settings_tile">Network monitoring Quick Settings tile</string>
     <string name="settings_quick_settings_tile_desc">Add a tile to toggle monitoring from Quick Settings. The system may ask for confirmation, or require manual adding. Turning this option off disables the tile in the app but does not remove it; remove it manually from Quick Settings.</string>
     <string name="settings_hide_status_bar_icon">Hide monitoring icon from status bar</string>

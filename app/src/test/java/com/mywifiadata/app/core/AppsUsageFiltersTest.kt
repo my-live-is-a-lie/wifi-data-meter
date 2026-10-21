@@ -148,10 +148,27 @@ class AppsUsageFiltersTest {
     }
 
     @Test
-    fun `percentage control wraps continuously from thirty to one and from one to thirty`() {
+    fun `percentage control steps in both directions and wraps continuously`() {
+        assertEquals(6, stepAppsUsageFilterPercent(5, increase = true))
+        assertEquals(4, stepAppsUsageFilterPercent(5, increase = false))
+        assertEquals(1, stepAppsUsageFilterPercent(30, increase = true))
+        assertEquals(30, stepAppsUsageFilterPercent(1, increase = false))
         assertEquals(1, wrapAppsUsageFilterPercent(31))
         assertEquals(30, wrapAppsUsageFilterPercent(0))
         assertEquals(15, wrapAppsUsageFilterPercent(45))
+    }
+
+    @Test
+    fun `percentage slider speeds up gently with distance and stays within a precise rate range`() {
+        val centerInterval = appsUsageFilterRepeatIntervalMillis(0f)
+        val nearCenterInterval = appsUsageFilterRepeatIntervalMillis(0.2f)
+        val farInterval = appsUsageFilterRepeatIntervalMillis(0.8f)
+
+        assertEquals(900L, centerInterval)
+        assertTrue(centerInterval > nearCenterInterval)
+        assertTrue(nearCenterInterval > farInterval)
+        assertEquals(450L, appsUsageFilterRepeatIntervalMillis(1f))
+        assertEquals(450L, appsUsageFilterRepeatIntervalMillis(2f))
     }
 
     @Test

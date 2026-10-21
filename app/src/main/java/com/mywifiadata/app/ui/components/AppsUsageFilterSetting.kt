@@ -47,6 +47,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -74,7 +75,8 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.mywifiadata.app.R
-import com.mywifiadata.app.core.wrapAppsUsageFilterPercent
+import com.mywifiadata.app.core.appsUsageFilterRepeatIntervalMillis
+import com.mywifiadata.app.core.stepAppsUsageFilterPercent
 import com.mywifiadata.app.data.model.AppsUsageFilterMode
 import com.mywifiadata.app.data.model.PlanCapacityUnit
 import kotlin.math.abs
@@ -316,7 +318,7 @@ private fun PercentageFilterControls(
                     )
                 }
                 Spacer(modifier = Modifier.height(10.dp))
-                AcceleratingPercentSlider(
+                AutoRepeatPercentSlider(
                     value = percentage,
                     onValueChange = onPercentageChange,
                     decreaseLabel = decreaseLabel,
@@ -331,12 +333,12 @@ private fun PercentageFilterControls(
                 PercentStepButton(
                     icon = Icons.Rounded.Add,
                     label = increaseLabel,
-                    onClick = { onPercentageChange(wrapAppsUsageFilterPercent(percentage + 1)) },
+                    onClick = { onPercentageChange(stepAppsUsageFilterPercent(percentage, increase = true)) },
                 )
                 PercentStepButton(
                     icon = Icons.Rounded.Remove,
                     label = decreaseLabel,
-                    onClick = { onPercentageChange(wrapAppsUsageFilterPercent(percentage - 1)) },
+                    onClick = { onPercentageChange(stepAppsUsageFilterPercent(percentage, increase = false)) },
                 )
             }
         }
@@ -371,7 +373,7 @@ private fun PercentStepButton(
 }
 
 @Composable
-private fun AcceleratingPercentSlider(
+private fun AutoRepeatPercentSlider(
     value: Int,
     onValueChange: (Int) -> Unit,
     decreaseLabel: String,
@@ -379,14 +381,57 @@ private fun AcceleratingPercentSlider(
 ) {
     var widthPx by remember { mutableIntStateOf(0) }
     var dragOffsetPx by remember { mutableFloatStateOf(0f) }
-    var dragStartValue by remember { mutableIntStateOf(value) }
     val density = LocalDensity.current
     val thumbRadiusPx = with(density) { 12.dp.toPx() }
     val trackInsetPx = with(density) { 3.dp.toPx() }
+    val centerDeadZonePx = with(density) { 3.dp.toPx() }
     val currentValue by rememberUpdatedState(value)
     val latestOnValueChange by rememberUpdatedState(onValueChange)
     val description = stringResource(R.string.apps_usage_filter_slider_description)
     val valueDescription = stringResource(R.string.apps_usage_filter_percent_value, value)
+
+    // Holding the handle away from center repeats one step at a controlled, distance-based pace.
+    // The center dead zone pauses immediately; the modest 450–900 ms interval keeps adjustment precise.
+    LaunchedEffect(widthPx, thumbRadiusPx, trackInsetPx, centerDeadZonePx) {
+        val maxOffset = (widthPx / 2f - trackInsetPx - thumbRadiusPx).coerceAtLeast(0f)
+        val activeRange = (maxOffset - centerDeadZonePx).coerceAtLeast(0f)
+        val tickMillis = 50L
+        var elapsedMillis = 0L
+        var previousIncrease: Boolean? = null
+
+        while (true) {
+            val offset = dragOffsetPx
+            val offsetDistance = abs(offset)
+            if (activeRange <= 0f || offsetDistance <= centerDeadZonePx) {
+                elapsedMillis = 0L
+                previousIncrease = null
+                delay(tickMillis)
+                continue
+            }
+
+            val increase = offset < 0f
+            if (previousIncrease != increase) {
+                elapsedMillis = 0L
+                previousIncrease = increase
+            }
+            val distanceFraction = ((offsetDistance - centerDeadZonePx) / activeRange).coerceIn(0f, 1f)
+            val intervalMillis = appsUsageFilterRepeatIntervalMillis(distanceFraction)
+
+            elapsedMillis += tickMillis
+            if (elapsedMillis >= intervalMillis) {
+                val currentOffset = dragOffsetPx
+                val currentIncrease = currentOffset < 0f
+                if (abs(currentOffset) <= centerDeadZonePx || currentIncrease != previousIncrease) {
+                    elapsedMillis = 0L
+                    previousIncrease = if (abs(currentOffset) <= centerDeadZonePx) null else currentIncrease
+                } else {
+                    elapsedMillis -= intervalMillis
+                    latestOnValueChange(stepAppsUsageFilterPercent(currentValue, increase = currentIncrease))
+                }
+            }
+            delay(tickMillis)
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -396,19 +441,13 @@ private fun AcceleratingPercentSlider(
             .pointerInput(widthPx, thumbRadiusPx, trackInsetPx) {
                 detectDragGestures(
                     onDragStart = { touch ->
-                        dragStartValue = currentValue
                         val maxOffset = (size.width / 2f - trackInsetPx - thumbRadiusPx).coerceAtLeast(0f)
                         dragOffsetPx = (touch.x - size.width / 2f).coerceIn(-maxOffset, maxOffset)
                     },
                     onDrag = { change, _ ->
                         change.consume()
                         val maxOffset = (size.width / 2f - trackInsetPx - thumbRadiusPx).coerceAtLeast(0f)
-                        val offset = (change.position.x - size.width / 2f).coerceIn(-maxOffset, maxOffset)
-                        dragOffsetPx = offset
-                        val fraction = if (maxOffset > 0f) (abs(offset) / maxOffset).coerceIn(0f, 1f) else 0f
-                        val steps = (29f * fraction * fraction).roundToInt()
-                        val delta = if (offset >= 0f) steps else -steps
-                        latestOnValueChange(wrapAppsUsageFilterPercent(dragStartValue + delta))
+                        dragOffsetPx = (change.position.x - size.width / 2f).coerceIn(-maxOffset, maxOffset)
                     },
                     onDragEnd = { dragOffsetPx = 0f },
                     onDragCancel = { dragOffsetPx = 0f },
@@ -420,11 +459,11 @@ private fun AcceleratingPercentSlider(
                 progressBarRangeInfo = ProgressBarRangeInfo(value.toFloat(), 1f..30f, 0)
                 customActions = listOf(
                     CustomAccessibilityAction(decreaseLabel) {
-                        latestOnValueChange(wrapAppsUsageFilterPercent(currentValue - 1))
+                        latestOnValueChange(stepAppsUsageFilterPercent(currentValue, increase = false))
                         true
                     },
                     CustomAccessibilityAction(increaseLabel) {
-                        latestOnValueChange(wrapAppsUsageFilterPercent(currentValue + 1))
+                        latestOnValueChange(stepAppsUsageFilterPercent(currentValue, increase = true))
                         true
                     },
                 )

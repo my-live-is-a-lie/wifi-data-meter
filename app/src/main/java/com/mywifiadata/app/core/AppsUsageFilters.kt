@@ -4,6 +4,7 @@ import com.mywifiadata.app.data.model.AppUsage
 import com.mywifiadata.app.data.model.AppsFilter
 import com.mywifiadata.app.data.model.PlanCapacityUnit
 import kotlin.math.abs
+import kotlin.math.roundToLong
 
 /** Kept independent of the dashboard's Wi-Fi-only measurements. */
 enum class UsageNetwork { WIFI, MOBILE }
@@ -21,6 +22,16 @@ val appsCountOptions: List<Int?> = listOf(null, 5, 10, 15, 20, 25)
 
 /** Cycle through 1–30 inclusively instead of clamping at either end. */
 fun wrapAppsUsageFilterPercent(value: Int): Int = Math.floorMod(value - 1, 30) + 1
+
+/** Move one percentage point in the requested direction, wrapping at either endpoint. */
+fun stepAppsUsageFilterPercent(value: Int, increase: Boolean): Int =
+    wrapAppsUsageFilterPercent(value + if (increase) 1 else -1)
+
+/** A gentle quadratic ramp: one step every 900 ms near center, down to 450 ms at full travel. */
+fun appsUsageFilterRepeatIntervalMillis(distanceFraction: Float): Long {
+    val distance = distanceFraction.coerceIn(0f, 1f)
+    return (900f - 450f * distance * distance).roundToLong()
+}
 
 fun appsUsageRange(
     network: UsageNetwork,
