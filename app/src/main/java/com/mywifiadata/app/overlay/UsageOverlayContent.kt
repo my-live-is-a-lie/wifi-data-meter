@@ -308,12 +308,17 @@ private fun OverlayTopBar(state: OverlayUiState, actions: OverlayActions) {
             // العرض المتاح يتفاوت (شاشة ضيقة أو وضع أفقي): على الشاشات الضيقة يُخفى
             // المعدّل ثم الوقت كي لا تُقتطع أزرار الإيقاف والإغلاق من طرف الشريط.
             BoxWithConstraints {
-                val showSpeed = maxWidth >= 400.dp
-                val showElapsed = maxWidth >= 340.dp
+                // المعدّل ظاهر دائمًا كما في التصميم المرجعي؛ على الشاشات الضيقة
+                // يُخفى الوقت أولًا ثم يُختصر المعدّل بعرضه المتاح (بنقاط) بدل أن
+                // يختفي أو يدفع أزرار الطرف خارج الشريط.
+                val showElapsed = maxWidth >= 400.dp
+                val reserved = 22.dp + 130.dp + 46.dp + 56.dp + 48.dp + 16.dp +
+                    (if (showElapsed) 36.dp else 0.dp)
+                val speedMax = (maxWidth - reserved).coerceIn(30.dp, 140.dp)
                 Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Box(
                         modifier = Modifier
@@ -324,12 +329,12 @@ private fun OverlayTopBar(state: OverlayUiState, actions: OverlayActions) {
                             .padding(2.dp),
                         contentAlignment = Alignment.Center,
                     ) {
-                        TargetIcon(target = state.target, size = 24.dp, tint = Color.White)
+                        TargetIcon(target = state.target, size = 22.dp, tint = Color.White)
                     }
                     if (showElapsed) {
                         Text(
                             text = Format.elapsed(state.elapsedMillis),
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = MaterialTheme.typography.bodySmall,
                             color = Color.White,
                             maxLines = 1,
                             softWrap = false,
@@ -357,23 +362,23 @@ private fun OverlayTopBar(state: OverlayUiState, actions: OverlayActions) {
                         maxLines = 1,
                         softWrap = false,
                     )
-                    if (showSpeed) {
-                        Text(
-                            text = when {
-                                state.usageAccessMissing -> stringResource(R.string.overlay_no_usage_access_short)
-                                state.readFailed -> stringResource(R.string.overlay_read_failed_short)
-                                !state.wifiConnected -> stringResource(R.string.overlay_no_wifi_short)
-                                state.collecting -> stringResource(R.string.overlay_collecting)
-                                state.totals.totalBytes == 0L && state.elapsedMillis >= NO_TRAFFIC_HINT_MILLIS ->
-                                    stringResource(R.string.overlay_no_traffic_yet)
-                                else -> Format.speed(state.rxSpeed + state.txSpeed)
-                            },
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color.White,
-                            maxLines = 1,
-                            softWrap = false,
-                        )
-                    }
+                    Text(
+                        text = when {
+                            state.usageAccessMissing -> stringResource(R.string.overlay_no_usage_access_short)
+                            state.readFailed -> stringResource(R.string.overlay_read_failed_short)
+                            !state.wifiConnected -> stringResource(R.string.overlay_no_wifi_short)
+                            state.collecting -> stringResource(R.string.overlay_collecting)
+                            state.totals.totalBytes == 0L && state.elapsedMillis >= NO_TRAFFIC_HINT_MILLIS ->
+                                stringResource(R.string.overlay_no_traffic_yet)
+                            else -> Format.speed(state.rxSpeed + state.txSpeed)
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.widthIn(max = speedMax),
+                    )
                     Icon(
                         imageVector = if (state.paused) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
                         contentDescription = stringResource(
@@ -383,8 +388,8 @@ private fun OverlayTopBar(state: OverlayUiState, actions: OverlayActions) {
                         modifier = Modifier
                             .clip(CircleShape)
                             .clickable(onClick = actions.togglePause)
-                            .padding(6.dp)
-                            .size(20.dp),
+                            .padding(5.dp)
+                            .size(18.dp),
                     )
                     Icon(
                         imageVector = Icons.Rounded.Close,
@@ -393,8 +398,8 @@ private fun OverlayTopBar(state: OverlayUiState, actions: OverlayActions) {
                         modifier = Modifier
                             .clip(CircleShape)
                             .clickable(onClick = actions.close)
-                            .padding(6.dp)
-                            .size(20.dp),
+                            .padding(5.dp)
+                            .size(18.dp),
                     )
                 }
             }
@@ -451,11 +456,11 @@ private fun BarStat(icon: androidx.compose.ui.graphics.vector.ImageVector, tint:
             imageVector = icon,
             contentDescription = null,
             tint = tint,
-            modifier = Modifier.size(16.dp),
+            modifier = Modifier.size(14.dp),
         )
         Text(
             text = value,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodySmall,
             color = Color.White,
             maxLines = 1,
             softWrap = false,
