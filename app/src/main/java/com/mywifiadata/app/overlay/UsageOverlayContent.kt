@@ -1,7 +1,10 @@
 package com.mywifiadata.app.overlay
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -19,6 +22,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -110,6 +114,7 @@ fun UsageOverlayContent(state: OverlayUiState, actions: OverlayActions) {
         when (mode) {
             OverlayMode.EDGE -> OverlayEdgeTab(state = state, actions = actions)
             OverlayMode.PILL -> OverlayPill(state = state, actions = actions)
+            OverlayMode.TOP_BAR -> OverlayTopBar(state = state, actions = actions)
             OverlayMode.EXPANDED -> OverlayExpanded(state = state, actions = actions)
         }
     }
@@ -133,12 +138,23 @@ private fun OverlayPill(state: OverlayUiState, actions: OverlayActions) {
         animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMedium),
         label = "overlay-pill-edge",
     )
+    // تلميح منطقة الشريط العلوي أثناء السحب نحو أعلى الشاشة.
+    val topHintScale by animateFloatAsState(
+        targetValue = if (state.topBarArmed) 0.9f else 1f,
+        animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMedium),
+        label = "overlay-pill-top-scale",
+    )
+    val topHintAlpha by animateFloatAsState(
+        targetValue = if (state.topBarArmed) 0.78f else 1f,
+        animationSpec = tween(durationMillis = 160),
+        label = "overlay-pill-top-alpha",
+    )
     Surface(
         modifier = Modifier
             .graphicsLayer {
-                this.alpha = pillAlpha
-                scaleX = pillScale * edgeSnap
-                scaleY = pillScale * edgeSnap
+                this.alpha = pillAlpha * topHintAlpha
+                scaleX = pillScale * edgeSnap * topHintScale
+                scaleY = pillScale * edgeSnap * topHintScale
             }
             .pointerInput(Unit) {
                 detectTapGestures(onTap = { actions.expand() })
@@ -156,7 +172,14 @@ private fun OverlayPill(state: OverlayUiState, actions: OverlayActions) {
         shape = RoundedCornerShape(26.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        border = BorderStroke(
+            1.dp,
+            if (state.topBarArmed) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.outlineVariant
+            },
+        ),
         shadowElevation = 10.dp,
     ) {
         Row(
@@ -243,11 +266,238 @@ private fun OverlayEdgeTab(state: OverlayUiState, actions: OverlayActions) {
     }
 }
 
+/**
+ * الشريط العلوي: الشكل الذي تتقلّص إليه النافذة عند إفلاتها أعلى الشاشة، فيلتصق
+ * تحت شريط الحالة مباشرة بعرض الشاشة كله كما في التصميم المرجعي.
+ *
+ * الشكل مسطّح عمدًا: بلا استدارة ولا إطار ولا ظل ولا خلفيات دائرية حول الأزرار،
+ * وخلفيته سوداء شفّافة تمتد من حرف إلى حرف فيندمج مع شريط الحالة بدل أن يبدو
+ * بطاقة عائمة أخرى.
+ *
+ * - الضغط مرة واحدة على الشريط يعيد النافذة المنبثقة، وكذلك سحبه لأسفل مسافة قصيرة
+ *   (والإفلات قبلها يرتدّ بالشريط إلى مكانه بانميشن لا بقفزة).
+ * - الضغط على أيقونة الهدف يفتح قائمة اختيار التطبيقات منزلقَة تحت الشريط نفسه،
+ *   فيبقى الشريط ظاهرًا والقيم تتحدّث أثناء الاختيار.
+ * - زرّا الإيقاف المؤقت والإغلاق باقيان في طرف الشريط كما في البطاقة الكاملة.
+ */
+@Composable
+private fun OverlayTopBar(state: OverlayUiState, actions: OverlayActions) {
+    Column {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .pointerInput(Unit) {
+                    detectTapGestures(onTap = { actions.expand() })
+                }
+                .pointerInput(Unit) {
+                    detectDragGestures(
+                        onDragStart = { actions.dragStart() },
+                        onDragEnd = { actions.dragEnd() },
+                        onDragCancel = { actions.dragEnd() },
+                    ) { change, dragAmount ->
+                        change.consume()
+                        actions.drag(dragAmount.x, dragAmount.y)
+                    }
+                },
+            // بلا استدارة ولا ظل: شريط مسطّح ملتصق بحرفي الشاشة كامتداد لشريط الحالة.
+            // (استدارة صفر = مستطيل؛ فالاسم RectangleShape أُزيل من كومبوز الحديث.)
+            shape = RoundedCornerShape(0.dp),
+            color = OverlayTopBarScrim,
+            contentColor = Color.White,
+        ) {
+            // العرض المتاح يتفاوت (شاشة ضيقة أو وضع أفقي): على الشاشات الضيقة يُخفى
+            // المعدّل ثم الوقت كي لا تُقتطع أزرار الإيقاف والإغلاق من طرف الشريط.
+            BoxWithConstraints {
+                // كل عناصر المرجع ظاهرة دائمًا (الأيقونة، الوقت، تنزيل، رفع،
+                // الإجمالي، المعدّل، إيقاف، إغلاق): على الشاشات الضيقة تُضغط
+                // الوحدات (‎856K بدل ‎856.4 KB) وتصغر الخطوط والمسافات بدل أن
+                // يُحذف عنصر، والمعدّل يُختصر بنقاط داخل عرضه المتاح فقط.
+                val compact = maxWidth < 420.dp
+                val reserved = 22.dp + 30.dp + 80.dp + 56.dp +
+                    (if (compact) 56.dp else 72.dp) +
+                    (if (compact) 42.dp else 70.dp) +
+                    (if (compact) 12.dp else 20.dp)
+                val speedMax = (maxWidth - reserved).coerceIn(28.dp, 150.dp)
+                Row(
+                    modifier = Modifier.padding(
+                        horizontal = if (compact) 6.dp else 10.dp,
+                        vertical = 6.dp,
+                    ),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 10.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .clickable(onClick = {
+                                if (state.pickerVisible) actions.closePicker() else actions.openPicker()
+                            })
+                            .padding(2.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        TargetIcon(target = state.target, size = 22.dp, tint = Color.White)
+                    }
+                    Text(
+                        text = Format.elapsed(state.elapsedMillis),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White,
+                        maxLines = 1,
+                        softWrap = false,
+                    )
+                    BarStat(
+                        icon = Icons.Rounded.ArrowDownward,
+                        tint = LocalDownloadColor.current,
+                        value = Format.bytesShort(state.totals.rxBytes),
+                    )
+                    BarStat(
+                        icon = Icons.Rounded.ArrowUpward,
+                        tint = LocalUploadColor.current,
+                        value = Format.bytesShort(state.totals.txBytes),
+                    )
+                    Spacer(modifier = Modifier.weight(1f))
+                    Text(
+                        text = if (state.usageAccessMissing || state.collecting) {
+                            "—"
+                        } else {
+                            Format.bytes(state.totals.totalBytes)
+                        },
+                        style = if (compact) {
+                            MaterialTheme.typography.titleSmall
+                        } else {
+                            MaterialTheme.typography.titleMedium
+                        },
+                        color = Color.White,
+                        maxLines = 1,
+                        softWrap = false,
+                    )
+                    Text(
+                        text = when {
+                            state.usageAccessMissing -> stringResource(R.string.overlay_no_usage_access_short)
+                            state.readFailed -> stringResource(R.string.overlay_read_failed_short)
+                            !state.wifiConnected -> stringResource(R.string.overlay_no_wifi_short)
+                            state.collecting -> stringResource(R.string.overlay_collecting)
+                            state.totals.totalBytes == 0L && state.elapsedMillis >= NO_TRAFFIC_HINT_MILLIS ->
+                                stringResource(R.string.overlay_no_traffic_yet)
+                            else -> Format.speed(state.rxSpeed + state.txSpeed)
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.widthIn(max = speedMax),
+                    )
+                    Icon(
+                        imageVector = if (state.paused) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
+                        contentDescription = stringResource(
+                            if (state.paused) R.string.overlay_resume else R.string.overlay_pause,
+                        ),
+                        tint = Color.White,
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .clickable(onClick = actions.togglePause)
+                            .padding(5.dp)
+                            .size(18.dp),
+                    )
+                    Icon(
+                        imageVector = Icons.Rounded.Close,
+                        contentDescription = stringResource(R.string.overlay_close),
+                        tint = Color.White,
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .clickable(onClick = actions.close)
+                            .padding(5.dp)
+                            .size(18.dp),
+                    )
+                }
+            }
+        }
+        // قائمة اختيار التطبيقات تنزلق تحت الشريط وتطوى إليه عند الإغلاق.
+        AnimatedVisibility(
+            visible = state.pickerVisible,
+            enter = fadeIn(animationSpec = tween(durationMillis = 180)) +
+                expandVertically(expandFrom = Alignment.Top),
+            exit = fadeOut(animationSpec = tween(durationMillis = 140)) +
+                shrinkVertically(shrinkTowards = Alignment.Top),
+        ) {
+            // لوحة الاختيار تبقى بسطح المادة المعتاد (لا الخلفية السوداء) كي تبقى
+            // نصوصها مقروءة في السمة الفاتحة والداكنة معًا.
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = AbsoluteRoundedCornerShape(
+                    topLeft = 0.dp,
+                    topRight = 0.dp,
+                    bottomLeft = 16.dp,
+                    bottomRight = 16.dp,
+                ),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                shadowElevation = 8.dp,
+            ) {
+                MonitorPickerContent(
+                    apps = state.pickerApps,
+                    isLoading = state.pickerLoading,
+                    selected = state.target,
+                    history = state.history,
+                    onSelect = actions.selectTarget,
+                    onDismiss = actions.closePicker,
+                    contentPadding = 12.dp,
+                    listMaxHeight = 260.dp,
+                )
+            }
+        }
+    }
+}
+
+/** خلفية الشريط: سوداء شبه معتمة فيندمج مع شريط الحالة بدل أن يبدو بطاقة عائمة. */
+private val OverlayTopBarScrim = Color.Black.copy(alpha = 0.85f)
+
+/** قيمة صغيرة بسهم ملوّن في الشريط العلوي (تنزيل/رفع). */
+@Composable
+private fun BarStat(icon: androidx.compose.ui.graphics.vector.ImageVector, tint: Color, value: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = tint,
+            modifier = Modifier.size(14.dp),
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodySmall,
+            color = Color.White,
+            maxLines = 1,
+            softWrap = false,
+        )
+    }
+}
+
 @Composable
 private fun OverlayExpanded(state: OverlayUiState, actions: OverlayActions) {
+    // تلميح منطقة الشريط العلوي: تنضغط البطاقة وتخفت قليلًا وهي فوق المنطقة،
+    // فيفهم المستخدم قبل الإفلات أن النافذة ستُصغّر إلى شريط تحت شريط الحالة.
+    val topHintScale by animateFloatAsState(
+        targetValue = if (state.topBarArmed) 0.94f else 1f,
+        animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMedium),
+        label = "overlay-expanded-top-scale",
+    )
+    val topHintAlpha by animateFloatAsState(
+        targetValue = if (state.topBarArmed) 0.78f else 1f,
+        animationSpec = tween(durationMillis = 160),
+        label = "overlay-expanded-top-alpha",
+    )
     Surface(
         modifier = Modifier
             .width(312.dp)
+            .graphicsLayer {
+                scaleX = topHintScale
+                scaleY = topHintScale
+                alpha = topHintAlpha
+            }
             .pointerInput(Unit) {
                 detectDragGestures(
                     onDragStart = { actions.dragStart() },
@@ -261,7 +511,14 @@ private fun OverlayExpanded(state: OverlayUiState, actions: OverlayActions) {
         shape = RoundedCornerShape(26.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        border = BorderStroke(
+            1.dp,
+            if (state.topBarArmed) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.outlineVariant
+            },
+        ),
         shadowElevation = 14.dp,
     ) {
         Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp)) {
@@ -515,12 +772,16 @@ private fun OverlayMetric(
 }
 
 @Composable
-private fun TargetIcon(target: MonitorTarget, size: Dp) {
+private fun TargetIcon(
+    target: MonitorTarget,
+    size: Dp,
+    tint: Color = MaterialTheme.colorScheme.onSurface,
+) {
     if (target.isAllApps) {
         Icon(
             imageVector = Icons.Rounded.Apps,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurface,
+            tint = tint,
             modifier = Modifier.size(size),
         )
     } else {
