@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
@@ -34,6 +33,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -44,7 +44,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -52,7 +52,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
@@ -250,44 +249,22 @@ private fun AmountFilterControls(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        val amountFieldShape = RoundedCornerShape(8.dp)
-        Box(
+        OutlinedTextField(
+            value = amountText,
+            onValueChange = { entered: String ->
+                val digits = entered.filter(Char::isDigit).take(10)
+                amountText = digits
+                digits.toIntOrNull()?.let(onAmountChange)
+            },
             modifier = Modifier
-                .width(58.dp)
-                .height(40.dp)
-                .clip(amountFieldShape)
-                .background(MaterialTheme.colorScheme.surfaceContainer)
-                .border(1.dp, MaterialTheme.colorScheme.outline, amountFieldShape)
+                .width(62.dp)
+                .heightIn(min = 44.dp)
                 .semantics { contentDescription = amountAccessibilityLabel },
-            contentAlignment = Alignment.Center,
-        ) {
-            BasicTextField(
-                value = amountText,
-                onValueChange = { entered ->
-                    val digits = entered.filter(Char::isDigit).take(10)
-                    amountText = digits
-                    digits.toIntOrNull()?.let(onAmountChange)
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 4.dp),
-                textStyle = MaterialTheme.typography.titleMediumEmphasized.copy(
-                    color = MaterialTheme.colorScheme.onSurface,
-                    textAlign = TextAlign.Center,
-                ),
-                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                decorationBox = { innerTextField ->
-                    Box(
-                        modifier = Modifier.fillMaxWidth(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        innerTextField()
-                    }
-                },
-            )
-        }
+            textStyle = MaterialTheme.typography.titleMedium.copy(textAlign = TextAlign.Center),
+            singleLine = true,
+            shape = RoundedCornerShape(8.dp),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        )
         FilterOptionPill(
             selectedLabel = stringResource(unit.labelResource()),
             options = PlanCapacityUnit.entries.map { it to stringResource(it.labelResource()) },
