@@ -2,6 +2,8 @@ package com.mywifiadata.app.core
 
 import com.mywifiadata.app.data.model.AppUsage
 import com.mywifiadata.app.data.model.AppsFilter
+import com.mywifiadata.app.data.model.PlanCapacityUnit
+import kotlin.math.abs
 
 /** Kept independent of the dashboard's Wi-Fi-only measurements. */
 enum class UsageNetwork { WIFI, MOBILE }
@@ -54,4 +56,56 @@ fun filterApps(
         AppsSortOrder.LOWEST_USAGE -> filtered.sortedBy { it.totals.totalBytes }
     }
     return if (limit == null) sorted else sorted.take(limit.coerceAtLeast(0))
+}
+
+/** Convert a whole-number MB/GB/TB setting to bytes without overflowing. */
+fun appUsageThresholdBytes(amount: Int, unit: PlanCapacityUnit): Long {
+    val safeAmount = amount.coerceAtLeast(0).toLong()
+    return if (safeAmount > Long.MAX_VALUE / unit.bytesFactor) {
+        Long.MAX_VALUE
+    } else {
+        safeAmount * unit.bytesFactor
+    }
+}
+
+/** Hide apps that use at most the selected amount; summaries are intentionally unaffected. */
+fun filterAppsAtOrBelowUsage(apps: List<AppUsage>, thresholdBytes: Long): List<AppUsage> =
+    apps.filter { it.totals.totalBytes > thresholdBytes.coerceAtLeast(0L) }
+
+/**
+ * Hide the least-used tail whose combined usage is closest to the selected share of total usage.
+ * Whole apps cannot always add up to the exact percentage, so this picks the nearest whole-app
+ * boundary and never hides the last remaining app.
+ */
+fun filterAppsByCumulativeUsagePercent(apps: List<AppUsage>, percentage: Int): List<AppUsage> {
+    if (apps.size <= 1) return apps
+
+    val usageBytes = apps.map { it.totals.totalBytes.coerceAtLeast(0L).toDouble() }
+    val totalBytes = usageBytes.sum()
+    if (totalBytes <= 0.0) return apps
+
+    val targetBytes = totalBytes * percentage.coerceIn(1, 30) / 100.0
+    val ascendingIndices = apps.indices.sortedBy { usageBytes[it] }
+    var hiddenCount = 0
+    var hiddenBytes = 0.0
+
+    // Keep at least the largest app visible. The comparison makes the chosen whole-app sum
+    // as close as possible to the target without unexpectedly removing a dominant app.
+    for (index in ascendingIndices.dropLast(1)) {
+        val appBytes = usageBytes[index]
+        if (appBytes == 0.0) {
+            hiddenCount++
+            continue
+        }
+        val candidateBytes = hiddenBytes + appBytes
+        if (abs(targetBytes - candidateBytes) < abs(targetBytes - hiddenBytes)) {
+            hiddenBytes = candidateBytes
+            hiddenCount++
+        } else {
+            break
+        }
+    }
+
+    val hiddenIndices = ascendingIndices.take(hiddenCount).toHashSet()
+    return apps.filterIndexed { index, _ -> index !in hiddenIndices }
 }

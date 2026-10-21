@@ -186,6 +186,7 @@ import com.mywifiadata.app.data.model.AdditionalPlan
 import com.mywifiadata.app.data.model.AdditionalPlanDraft
 import com.mywifiadata.app.data.model.AppLayoutDirection
 import com.mywifiadata.app.data.model.AppSettings
+import com.mywifiadata.app.data.model.AppsUsageFilterMode
 import com.mywifiadata.app.data.model.DataPlan
 import com.mywifiadata.app.data.model.MAX_ADDITIONAL_PLANS
 import com.mywifiadata.app.data.model.PlanCapacityUnit
@@ -194,6 +195,7 @@ import com.mywifiadata.app.data.model.PlanDurationUnit
 import com.mywifiadata.app.data.model.PlanNetworkType
 import com.mywifiadata.app.data.model.ThemeMode
 import com.mywifiadata.app.ui.UiState
+import com.mywifiadata.app.ui.components.AppsUsageFilterSetting
 import com.mywifiadata.app.ui.components.ExpressiveCard
 import com.mywifiadata.app.ui.components.InfoRow
 import com.mywifiadata.app.ui.components.SectionHeader
@@ -249,6 +251,11 @@ fun SettingsScreen(
     onClearData: () -> Unit,
     onLayoutDirectionChange: (AppLayoutDirection) -> Unit = {},
     onHistoryRetentionChange: (Int) -> Unit = {},
+    onAppsUsageFilterEnabledChange: (Boolean) -> Unit = {},
+    onAppsUsageFilterModeChange: (AppsUsageFilterMode) -> Unit = {},
+    onAppsUsageFilterAmountChange: (Int) -> Unit = {},
+    onAppsUsageFilterUnitChange: (PlanCapacityUnit) -> Unit = {},
+    onAppsUsageFilterPercentChange: (Int) -> Unit = {},
     onSavePlan: (PlanDraft) -> Unit = { draft -> onQuotaChange(draft.quotaBytes) },
     onActivatePlan: (UsageNetwork) -> Unit = {},
     onAddPlanToSavedList: (PlanDraft) -> Unit = {},
@@ -800,6 +807,18 @@ fun SettingsScreen(
                                         onAppIconHiddenChange(false)
                                     }
                                 },
+                            )
+                            AppsUsageFilterSetting(
+                                enabled = settings.appsUsageFilterEnabled,
+                                mode = settings.appsUsageFilterMode,
+                                amount = settings.appsUsageFilterAmount,
+                                unit = settings.appsUsageFilterUnit,
+                                percentage = settings.appsUsageFilterPercent,
+                                onEnabledChange = onAppsUsageFilterEnabledChange,
+                                onModeChange = onAppsUsageFilterModeChange,
+                                onAmountChange = onAppsUsageFilterAmountChange,
+                                onUnitChange = onAppsUsageFilterUnitChange,
+                                onPercentageChange = onAppsUsageFilterPercentChange,
                             )
                         }
                     }

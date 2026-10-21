@@ -9,6 +9,8 @@ import com.mywifiadata.app.core.AppsSortOrder
 import com.mywifiadata.app.data.model.AppSearchSelection
 import com.mywifiadata.app.data.model.AppsFilter
 import com.mywifiadata.app.data.model.AppUsage
+import com.mywifiadata.app.data.model.AppsUsageFilterMode
+import com.mywifiadata.app.data.model.PlanCapacityUnit
 import com.mywifiadata.app.data.model.TrafficTotals
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -24,6 +26,66 @@ class AppsUiStateTest {
         assertEquals(10, state.visiblePeriodApps.size)
         assertEquals(55L, state.visiblePeriodApps.sumOf { it.totals.totalBytes })
         assertEquals(55L, state.filteredApps.sumOf { it.totals.totalBytes })
+    }
+
+    @Test
+    fun `absolute app usage filter affects list rows but not summaries`() {
+        val apps = listOf(
+            AppUsage(1, "app.1", "App 1", false, TrafficTotals(5_000_000, 0)),
+            AppUsage(2, "app.2", "App 2", false, TrafficTotals(5_000_001, 0)),
+            AppUsage(3, "app.3", "App 3", false, TrafficTotals(20_000_000, 0)),
+        )
+        val state = UiState(
+            apps = apps,
+            periodApps = apps,
+            settings = UiState().settings.copy(
+                appsUsageFilterEnabled = true,
+                appsUsageFilterMode = AppsUsageFilterMode.AMOUNT,
+                appsUsageFilterAmount = 5,
+                appsUsageFilterUnit = PlanCapacityUnit.MB,
+            ),
+        )
+
+        assertEquals(listOf(3, 2), state.visibleApps.map { it.uid })
+        assertEquals(3, state.filteredApps.size)
+        assertEquals(3, state.visiblePeriodApps.size)
+    }
+
+    @Test
+    fun `percentage app filter hides the low usage tail while preserving the full-period summary`() {
+        val apps = listOf(
+            AppUsage(1, "app.1", "App 1", false, TrafficTotals(70, 0)),
+            AppUsage(2, "app.2", "App 2", false, TrafficTotals(10, 0)),
+            AppUsage(3, "app.3", "App 3", false, TrafficTotals(20, 0)),
+        )
+        val state = UiState(
+            apps = apps,
+            periodApps = apps,
+            settings = UiState().settings.copy(
+                appsUsageFilterEnabled = true,
+                appsUsageFilterMode = AppsUsageFilterMode.PERCENTAGE,
+                appsUsageFilterPercent = 30,
+            ),
+        )
+
+        assertEquals(listOf(1), state.visibleApps.map { it.uid })
+        assertEquals(100L, state.filteredApps.sumOf { it.totals.totalBytes })
+        assertEquals(100L, state.visiblePeriodApps.sumOf { it.totals.totalBytes })
+    }
+
+    @Test
+    fun `disabled app usage filter leaves every app in the list`() {
+        val apps = (1..4).map { AppUsage(it, "app.$it", "App $it", false, TrafficTotals(it.toLong(), 0)) }
+        val state = UiState(
+            apps = apps,
+            settings = UiState().settings.copy(
+                appsUsageFilterEnabled = false,
+                appsUsageFilterMode = AppsUsageFilterMode.AMOUNT,
+                appsUsageFilterAmount = 100,
+            ),
+        )
+
+        assertEquals(listOf(4, 3, 2, 1), state.visibleApps.map { it.uid })
     }
 
     @Test
