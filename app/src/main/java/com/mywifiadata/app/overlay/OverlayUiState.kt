@@ -6,16 +6,18 @@ import com.mywifiadata.app.data.model.MonitorTarget
 import com.mywifiadata.app.data.model.OverlayEdge
 import com.mywifiadata.app.data.model.TrafficTotals
 
-/** أشكال النافذة العائمة الثلاثة. */
-enum class OverlayMode { EXPANDED, PILL, EDGE }
+/** أشكال النافذة العائمة الأربعة. */
+enum class OverlayMode { EXPANDED, PILL, EDGE, TOP_BAR }
 
 /**
  * هل الانتقال من شكل إلى آخر «تكبير»؟ يحدّد مدة الحركة: التكبير أبطأ من الطيّ.
- * الانتقال إلى اللسان تصغير دائمًا، والخروج منه تكبير دائمًا.
+ * الانتقال إلى اللسان أو إلى الشريط العلوي تصغير دائمًا، والخروج منهما تكبير دائمًا.
  */
 fun OverlayMode.expandsTo(target: OverlayMode): Boolean = when {
     target == OverlayMode.EDGE -> false
     this == OverlayMode.EDGE -> true
+    target == OverlayMode.TOP_BAR -> false
+    this == OverlayMode.TOP_BAR -> true
     target == OverlayMode.EXPANDED -> true
     else -> false
 }
@@ -46,6 +48,11 @@ data class OverlayUiState(
     val dismissArmed: Boolean = false,
     /** الحافة التي ستلتصق بها الكبسولة إن أُفلتت الآن؛ تلميح بصري أثناء السحب. */
     val edgeArmed: OverlayEdge? = null,
+    /**
+     * النافذة فوق منطقة الشريط العلوي الآن: إن أُفلتت هناك تصغّر إلى شريط تحت
+     * شريط الحالة. تلميح بصري (انضغاط وخفوت) أثناء السحب نحو الأعلى.
+     */
+    val topBarArmed: Boolean = false,
     val pickerVisible: Boolean = false,
     val pickerApps: List<AppUsage> = emptyList(),
     val pickerLoading: Boolean = false,

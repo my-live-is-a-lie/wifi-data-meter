@@ -59,7 +59,7 @@
 - **الهدف**: كل التطبيقات أو تطبيق واحد يُختار من قائمة تبدأ دائمًا بـ«جميع
   التطبيقات»، ثم التطبيقات مرتّبة بحسب عدد مرات اختيارها (الأكثر اختيارًا أولًا)
   مع بحث فوري. تتغيّر أيقونة البطاقة والنافذة إلى شعار التطبيق المختار.
-- **ثلاثة أشكال**:
+- **أربعة أشكال**:
   - **بطاقة كاملة**: شعار الهدف واسمه مع سهم لتغييره، وأزرار الإيقاف المؤقت
     والتصغير والإغلاق، والوقت المنقضي وإجمالي التنزيل والرفع والإجمالي.
   - **كبسولة صغيرة**: الشعار والإجمالي فقط؛ الضغط يوسّعها، وسحبها يحرّكها في أي
@@ -67,13 +67,23 @@
   - **لسان على الحافة**: الإجمالي عموديًا ملتصقًا بحافة الشاشة؛ الضغط عليه أو سحبه
     إلى الداخل يعيد الكبسولة، والسحب رأسيًا يغيّر موضعه على الحافة. موضعه محسوب من
     مقاس الشاشة في كل مرة لا من إحداثي محفوظ، فيبقى على الحافة بعد تدوير الهاتف.
-- **حركة التحوّل**: الانتقال بين الأشكال الثلاثة ليس تبديلًا مفاجئًا: الحجم يتدرّج من
+  - **شريط تحت شريط الحالة**: سحب النافذة (بطاقة أو كبسولة) إلى أعلى الشاشة وإفلاتها
+    هناك يصغّرها إلى شريط رفيع يلتصق تحت شريط الحالة مباشرة بعرض الشاشة كله: أيقونة
+    الهدف، والوقت المنقضي، والتنزيل والرفع بسهمين ملونين، والإجمالي والمعدّل، وزرّا
+    الإيقاف المؤقت والإغلاق في الطرف. الضغط على أيقونة الهدف يزلق قائمة اختيار
+    التطبيقات تحت الشريط نفسه فيبقى ظاهرًا والقيم تتحدّث أثناء الاختيار، والضغط
+    عليها ثانية يطويها. الضغط مرة واحدة على الشريط، أو سحبه لأسفل مسافة قصيرة،
+    يعيد النافذة المنبثقة إلى موضعها المحفوظ قبل التصغير، والإفلات قبل العتبة يرتدّ
+    بالشريط إلى مكانه بانميشن لا بقفزة. وأثناء السحب نحو الأعلى تُبرز المنطقة نفسها:
+    تنضغط النافذة وتخفت ويتلوّن إطارها بلون التمييز فيُعرف المصير قبل الإفلات.
+- **حركة التحوّل**: الانتقال بين الأشكال الأربعة ليس تبديلًا مفاجئًا: الحجم يتدرّج من
   حجم الشكل القديم إلى الجديد، والمحتوى القديم يخفت متقلّصًا بينما يظهر الجديد متوسّعًا
   (`AnimatedContent` + `SizeTransform`). وفي الوقت نفسه تنزلق النافذة نفسها إلى موضعها
   الجديد بمحرّك موضع (`ValueAnimator` بتدرّج تباطؤ) يحسب الهدف في كل إطار من الحجم
   المقيس حينها، فيبقى المركز ملتصقًا بنقطة الارتساء. التكبير أبطأ من الطيّ (300 مقابل
   220 مللي ثانية) لأن العين تتابع النمو، واللسان يُسحب من الحافة ويلتصق بها بانزلاق
-  حقيقي بدل قفزة، وسحب الكبسولة يوقف أي حركة جارية ويسلّم القيادة للإصبع فورًا.
+  حقيقي بدل قفزة، والشريط العلوي ينزلق تحت شريط الحالة وينمو منه بالآلية نفسها،
+  وسحب الكبسولة أو الشريط يوقف أي حركة جارية ويسلّم القيادة للإصبع فورًا.
 - **القياس حقيقي لا عدّاد**: تُقرأ إحصاءات النظام (`NetworkStatsManager` على شبكة
   الواي فاي) بنافذة تراكمية من منتصف الليل، ويُعرض الفرق عن قراءة بداية المقطع — أي
   كل بايت سجّله النظام فعلًا للهدف المختار؛ و«جميع التطبيقات» مجموع التطبيقات الظاهرة.
@@ -318,9 +328,12 @@ built with **Kotlin + Jetpack Compose + Material 3 Expressive**.
 - Settings: quota + cycle start day, alert threshold, sampling interval, background tracking, dynamic color.
 - Background monitoring through a `dataSync` foreground service with an ongoing notification and threshold alerts.
 - Floating live-usage window: a dashboard card below the quick actions opens a resizable overlay for all apps or
-  one chosen app. It comes in three shapes (full card, draggable pill, edge tab), resets its counters and clock
-  whenever the target changes, and pauses, minimises or closes from its own controls. The target picker always
-  lists “All apps” first and moves frequently chosen apps to the top with instant search.
+  one chosen app. It comes in four shapes (full card, draggable pill, edge tab, and a slim strip pinned under the
+  status bar that the window collapses into when dropped at the top of the screen; a single tap on the strip or
+  pulling it down restores the window, and tapping its target icon slides the picker open beneath the strip),
+  resets its counters and clock whenever the target changes, and pauses, minimises or closes from its own
+  controls. The target picker always lists “All apps” first and moves frequently chosen apps to the top with
+  instant search.
 - A reference-matching “Today” card (blue download / purple upload tiles, total row, fast.com speed-test panel) with
   a collapsible history of the nine preceding tests; the latest ten results are saved on-device. The speed test
   also aborts its transfer with a clear message when the connection drops or no data arrives for too long (12 s
