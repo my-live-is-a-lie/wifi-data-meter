@@ -113,6 +113,9 @@ data class UsageSlice(
 /** فلتر عرض التطبيقات: الكل (عند عدم اختيار أي فلتر) أو المثبتة فقط أو النظام فقط. */
 enum class AppsFilter { ALL, INSTALLED, SYSTEM }
 
+/** طريقة استبعاد التطبيقات قليلة الاستهلاك من قائمة التطبيقات. */
+enum class AppsUsageFilterMode { AMOUNT, PERCENTAGE }
+
 /**
  * آخر نتيجة اختبار سرعة محفوظة على الجهاز لتظهر في لوحة اليوم حتى بعد
  * إغلاق التطبيق وتشغيله من جديد.
@@ -357,6 +360,12 @@ data class AppSettings(
     val historyLineChartEnabled: Boolean = false,
     /** نمط مخططات التطبيقات محفوظ ليستمر بعد إعادة تشغيل التطبيق. */
     val appsLineChartEnabled: Boolean = false,
+    /** إخفاء التطبيقات الأقل استهلاكًا من قائمة التطبيقات فقط. */
+    val appsUsageFilterEnabled: Boolean = false,
+    val appsUsageFilterMode: AppsUsageFilterMode = AppsUsageFilterMode.AMOUNT,
+    val appsUsageFilterAmount: Int = 5,
+    val appsUsageFilterUnit: PlanCapacityUnit = PlanCapacityUnit.MB,
+    val appsUsageFilterPercent: Int = 3,
     val appSearchHistory: List<AppSearchSelection> = emptyList(),
     /** هدف النافذة العائمة للاستهلاك المباشر؛ الافتراضي «جميع التطبيقات». */
     val monitorTarget: MonitorTarget = MonitorTarget.AllApps,

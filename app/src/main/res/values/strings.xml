@@ -197,6 +197,8 @@
     <string name="apps_screen_title">استهلاك التطبيقات</string>
     <string name="apps_empty_title">لا يوجد استهلاك مسجّل</string>
     <string name="apps_empty_body">لم تُسجّل أي بيانات لهذه الفترة حتى الآن. جرّب تصفح الإنترنت أو تحديث القائمة.</string>
+    <string name="apps_usage_filter_empty_title">لا توجد تطبيقات تطابق الفلترة</string>
+    <string name="apps_usage_filter_empty_body">خفّض حد الاستهلاك أو اختر نسبة أخرى، أو أوقف الفلترة لإظهار التطبيقات.</string>
     <string name="dashboard_today_top_apps_title">أكثر 5 تطبيقات استهلاكًا لـ%1$s</string>
     <string name="dashboard_today_apps_loading">جارٍ تحميل بيانات التطبيقات…</string>
     <string name="dashboard_today_apps_empty">لا يوجد استهلاك مسجّل لهذه الفئة اليوم.</string>
@@ -310,6 +312,18 @@
     <string name="settings_usage_access_granted">ممنوحة</string>
     <string name="settings_usage_access_missing">غير ممنوحة — اضغط للمنح</string>
     <string name="settings_section_more">المزيد</string>
+    <string name="apps_usage_filter_title">فلترة التطبيقات</string>
+    <string name="apps_usage_filter_description">فلترة ما يتم عرضه من تطبيقات حسب نسبة أو كمية الاستهلاك</string>
+    <string name="apps_usage_filter_expand">فتح خيارات فلترة التطبيقات</string>
+    <string name="apps_usage_filter_collapse">إغلاق خيارات فلترة التطبيقات</string>
+    <string name="apps_usage_filter_mode_title">نوع الفلترة</string>
+    <string name="apps_usage_filter_mode_amount">استهلاك</string>
+    <string name="apps_usage_filter_mode_percentage">نسبة مئوية</string>
+    <string name="apps_usage_filter_amount_accessibility">حدّ الاستهلاك بالوحدة المحددة</string>
+    <string name="apps_usage_filter_percent_value">٪%1$d</string>
+    <string name="apps_usage_filter_decrease">تقليل النسبة المئوية</string>
+    <string name="apps_usage_filter_increase">زيادة النسبة المئوية</string>
+    <string name="apps_usage_filter_slider_description">اسحب من المنتصف إلى اليمين لزيادة النسبة، أو إلى اليسار لتقليلها</string>
     <string name="settings_quick_settings_tile">زر مراقبة الشبكة في الإعدادات السريعة</string>
     <string name="settings_quick_settings_tile_desc">إضافة زر لتشغيل المراقبة من لوحة الإعدادات السريعة. قد يطلب النظام موافقتك أو يتطلب إضافته يدويًا. إيقاف هذا الخيار يعطّل الزر داخل التطبيق ولا يحذفه؛ أزِله يدويًا من اللوحة.</string>
     <string name="settings_hide_status_bar_icon">إخفاء أيقونة المراقبة من شريط الحالة</string>
