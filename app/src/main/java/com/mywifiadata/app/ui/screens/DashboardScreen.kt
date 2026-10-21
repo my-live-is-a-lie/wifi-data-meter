@@ -2533,7 +2533,7 @@ private fun SessionCard(state: UiState, onResetSession: () -> Unit, isEditing: B
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 4.dp, vertical = 4.dp),
+                    .padding(start = 4.dp, top = 4.dp, bottom = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 FlowRow(
@@ -2565,7 +2565,8 @@ private fun SessionCard(state: UiState, onResetSession: () -> Unit, isEditing: B
                     onClick = onResetSession,
                     enabled = !isEditing,
                     shape = AppButtonShape,
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                    // محاذاة النص مع القيم أسفله: لا حشو من جهة النهاية (اليسار في RTL).
+                    contentPadding = PaddingValues(start = 8.dp, top = 4.dp, bottom = 4.dp),
                 ) {
                     Text(
                         text = stringResource(R.string.action_reset_session),
