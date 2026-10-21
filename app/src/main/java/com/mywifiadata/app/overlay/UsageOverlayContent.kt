@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.AbsoluteRoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RectangleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Apps
@@ -270,6 +271,10 @@ private fun OverlayEdgeTab(state: OverlayUiState, actions: OverlayActions) {
  * الشريط العلوي: الشكل الذي تتقلّص إليه النافذة عند إفلاتها أعلى الشاشة، فيلتصق
  * تحت شريط الحالة مباشرة بعرض الشاشة كله كما في التصميم المرجعي.
  *
+ * الشكل مسطّح عمدًا: بلا استدارة ولا إطار ولا ظل ولا خلفيات دائرية حول الأزرار،
+ * وخلفيته سوداء شفّافة تمتد من حرف إلى حرف فيندمج مع شريط الحالة بدل أن يبدو
+ * بطاقة عائمة أخرى.
+ *
  * - الضغط مرة واحدة على الشريط يعيد النافذة المنبثقة، وكذلك سحبه لأسفل مسافة قصيرة
  *   (والإفلات قبلها يرتدّ بالشريط إلى مكانه بانميشن لا بقفزة).
  * - الضغط على أيقونة الهدف يفتح قائمة اختيار التطبيقات منزلقَة تحت الشريط نفسه،
@@ -295,45 +300,37 @@ private fun OverlayTopBar(state: OverlayUiState, actions: OverlayActions) {
                         actions.drag(dragAmount.x, dragAmount.y)
                     }
                 },
-            // استدارة في الأسفل فقط: أعلى الشريط ملاصق لشريط الحالة بلا فراغ.
-            shape = AbsoluteRoundedCornerShape(
-                topLeft = 0.dp,
-                topRight = 0.dp,
-                bottomLeft = 16.dp,
-                bottomRight = 16.dp,
-            ),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-            shadowElevation = 8.dp,
+            // بلا استدارة ولا ظل: شريط مسطّح ملتصق بحرفي الشاشة كامتداد لشريط الحالة.
+            shape = RectangleShape,
+            color = OverlayTopBarScrim,
+            contentColor = Color.White,
         ) {
-            // العرض المتاح يتفاوت (شاشة ضيقة أو وضع أفقي): المعدّل يأخذ الفراغ
-            // المتبقي ويُختصر بنقاط إن ضاق، والوقت يُخفى على الشاشات الضيقة كي
-            // لا تُقتطع أزرار الإيقاف والإغلاق من طرف الشريط.
+            // العرض المتاح يتفاوت (شاشة ضيقة أو وضع أفقي): على الشاشات الضيقة يُخفى
+            // المعدّل ثم الوقت كي لا تُقتطع أزرار الإيقاف والإغلاق من طرف الشريط.
             BoxWithConstraints {
-                val showElapsed = maxWidth >= 380.dp
+                val showSpeed = maxWidth >= 400.dp
+                val showElapsed = maxWidth >= 340.dp
                 Row(
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 7.dp),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(26.dp)
                             .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
                             .clickable(onClick = {
                                 if (state.pickerVisible) actions.closePicker() else actions.openPicker()
-                            }),
+                            })
+                            .padding(2.dp),
                         contentAlignment = Alignment.Center,
                     ) {
-                        TargetIcon(target = state.target, size = 18.dp)
+                        TargetIcon(target = state.target, size = 24.dp, tint = Color.White)
                     }
                     if (showElapsed) {
                         Text(
                             text = Format.elapsed(state.elapsedMillis),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.White,
                             maxLines = 1,
                             softWrap = false,
                         )
@@ -348,63 +345,57 @@ private fun OverlayTopBar(state: OverlayUiState, actions: OverlayActions) {
                         tint = LocalUploadColor.current,
                         value = Format.bytes(state.totals.txBytes),
                     )
+                    Spacer(modifier = Modifier.weight(1f))
                     Text(
                         text = if (state.usageAccessMissing || state.collecting) {
                             "—"
                         } else {
                             Format.bytes(state.totals.totalBytes)
                         },
-                        style = MaterialTheme.typography.titleSmall,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color.White,
                         maxLines = 1,
                         softWrap = false,
                     )
-                    Text(
-                        text = when {
-                            state.usageAccessMissing -> stringResource(R.string.overlay_no_usage_access_short)
-                            state.readFailed -> stringResource(R.string.overlay_read_failed_short)
-                            !state.wifiConnected -> stringResource(R.string.overlay_no_wifi_short)
-                            state.collecting -> stringResource(R.string.overlay_collecting)
-                            state.totals.totalBytes == 0L && state.elapsedMillis >= NO_TRAFFIC_HINT_MILLIS ->
-                                stringResource(R.string.overlay_no_traffic_yet)
-                            else -> Format.speed(state.rxSpeed + state.txSpeed)
-                        },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        softWrap = false,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false),
+                    if (showSpeed) {
+                        Text(
+                            text = when {
+                                state.usageAccessMissing -> stringResource(R.string.overlay_no_usage_access_short)
+                                state.readFailed -> stringResource(R.string.overlay_read_failed_short)
+                                !state.wifiConnected -> stringResource(R.string.overlay_no_wifi_short)
+                                state.collecting -> stringResource(R.string.overlay_collecting)
+                                state.totals.totalBytes == 0L && state.elapsedMillis >= NO_TRAFFIC_HINT_MILLIS ->
+                                    stringResource(R.string.overlay_no_traffic_yet)
+                                else -> Format.speed(state.rxSpeed + state.txSpeed)
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.White,
+                            maxLines = 1,
+                            softWrap = false,
+                        )
+                    }
+                    Icon(
+                        imageVector = if (state.paused) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
+                        contentDescription = stringResource(
+                            if (state.paused) R.string.overlay_resume else R.string.overlay_pause,
+                        ),
+                        tint = Color.White,
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .clickable(onClick = actions.togglePause)
+                            .padding(6.dp)
+                            .size(20.dp),
                     )
-                    Box(
+                    Icon(
+                        imageVector = Icons.Rounded.Close,
+                        contentDescription = stringResource(R.string.overlay_close),
+                        tint = Color.White,
                         modifier = Modifier
-                            .size(26.dp)
                             .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-                            .clickable(onClick = actions.togglePause),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            imageVector = if (state.paused) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
-                            contentDescription = stringResource(
-                                if (state.paused) R.string.overlay_resume else R.string.overlay_pause,
-                            ),
-                            modifier = Modifier.size(14.dp),
-                        )
-                    }
-                    Box(
-                        modifier = Modifier
-                            .size(26.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-                            .clickable(onClick = actions.close),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Close,
-                            contentDescription = stringResource(R.string.overlay_close),
-                            modifier = Modifier.size(14.dp),
-                        )
-                    }
+                            .clickable(onClick = actions.close)
+                            .padding(6.dp)
+                            .size(20.dp),
+                    )
                 }
             }
         }
@@ -416,6 +407,8 @@ private fun OverlayTopBar(state: OverlayUiState, actions: OverlayActions) {
             exit = fadeOut(animationSpec = tween(durationMillis = 140)) +
                 shrinkVertically(shrinkTowards = Alignment.Top),
         ) {
+            // لوحة الاختيار تبقى بسطح المادة المعتاد (لا الخلفية السوداء) كي تبقى
+            // نصوصها مقروءة في السمة الفاتحة والداكنة معًا.
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = AbsoluteRoundedCornerShape(
@@ -441,6 +434,32 @@ private fun OverlayTopBar(state: OverlayUiState, actions: OverlayActions) {
                 )
             }
         }
+    }
+}
+
+/** خلفية الشريط: سوداء شفّافة فيندمج مع شريط الحالة بدل أن يبدو بطاقة عائمة. */
+private val OverlayTopBarScrim = Color.Black.copy(alpha = 0.6f)
+
+/** قيمة صغيرة بسهم ملوّن في الشريط العلوي (تنزيل/رفع). */
+@Composable
+private fun BarStat(icon: androidx.compose.ui.graphics.vector.ImageVector, tint: Color, value: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = tint,
+            modifier = Modifier.size(16.dp),
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color.White,
+            maxLines = 1,
+            softWrap = false,
+        )
     }
 }
 
@@ -763,12 +782,16 @@ private fun OverlayMetric(
 }
 
 @Composable
-private fun TargetIcon(target: MonitorTarget, size: Dp) {
+private fun TargetIcon(
+    target: MonitorTarget,
+    size: Dp,
+    tint: Color = MaterialTheme.colorScheme.onSurface,
+) {
     if (target.isAllApps) {
         Icon(
             imageVector = Icons.Rounded.Apps,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurface,
+            tint = tint,
             modifier = Modifier.size(size),
         )
     } else {

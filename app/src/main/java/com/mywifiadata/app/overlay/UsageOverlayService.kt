@@ -19,11 +19,15 @@ import android.view.WindowInsets
 import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -325,7 +329,15 @@ class UsageOverlayService :
             setContent {
                 val settings by repository.settingsStore.settings.collectAsState()
                 OverlayTheme(settings) {
-                    UsageOverlayContent(state = ui.value, actions = overlayActions)
+                    // ارتساء مطلق بأعلى يسار النافذة (لا TopStart فيتقلب مع الاتجاه):
+                    // نافذة الشريط بعرض الشاشة كله، والمحتوى المتحوّل يلتصق بحرف
+                    // النافذة فينمو من موضعها بدل أن يقفز إلى وسطها.
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.TopLeft,
+                    ) {
+                        UsageOverlayContent(state = ui.value, actions = overlayActions)
+                    }
                 }
             }
         }
@@ -373,7 +385,7 @@ class UsageOverlayService :
         if (screenWidth <= 0 || screenHeight <= 0) return
         val settings = repository.settingsStore.current
         val (targetX, targetY) = when (ui.value.mode) {
-            OverlayMode.TOP_BAR -> topBarTarget(view.width)
+            OverlayMode.TOP_BAR -> topBarTarget()
             OverlayMode.EDGE -> {
                 val edgeX = OverlayGeometry.edgeX(
                     atLeftEdge = ui.value.edge == OverlayEdge.LEFT,
@@ -402,9 +414,24 @@ class UsageOverlayService :
      * موضع الشريط العلوي: ملتصقًا تحت شريط الحالة مباشرة، ومتوسطًا أفقيًا كي ينمو
      * متماثلًا من الجهتين أثناء تحوّل القياس (عرضه النهائي كامل عرض الشاشة).
      */
-    private fun topBarTarget(width: Int): Pair<Int, Int> {
-        val (screenWidth, _) = screenSize()
-        return ((screenWidth - width) / 2).coerceAtLeast(0) to statusBarHeight()
+    private fun topBarTarget(): Pair<Int, Int> = 0 to statusBarHeight()
+
+    /**
+     * الشريط يمتد من حرف إلى حرف: عرض النافذة يُجعل مطابقًا لعرض الشاشة في وضع
+     * الشريط (لا `WRAP_CONTENT` كي لا تُقصّ النافذة بعرض المحتوى فتظهر بهوامش)،
+     * ويُعاد لفاف المحتوى عند الخروج منه ليتتبّع حجم الشكل المتحوّل إطارًا بإطار.
+     */
+    private fun applyWindowWidthForMode(mode: OverlayMode) {
+        val view = rootView ?: return
+        val params = layoutParams ?: return
+        val wanted = if (mode == OverlayMode.TOP_BAR) {
+            WindowManager.LayoutParams.MATCH_PARENT
+        } else {
+            WindowManager.LayoutParams.WRAP_CONTENT
+        }
+        if (params.width == wanted) return
+        params.width = wanted
+        runCatching { windowManager.updateViewLayout(view, params) }
     }
 
     /**
@@ -465,7 +492,7 @@ class UsageOverlayService :
         val edge = ui.value.edge
         animateTo(expanding) { width, height, screenWidth, screenHeight ->
             when (mode) {
-                OverlayMode.TOP_BAR -> topBarTarget(width)
+                OverlayMode.TOP_BAR -> topBarTarget()
                 OverlayMode.EDGE -> {
                     val x = OverlayGeometry.edgeX(
                         atLeftEdge = edge == OverlayEdge.LEFT,
@@ -578,6 +605,7 @@ class UsageOverlayService :
             OverlayMode.TOP_BAR -> {
                 // الشريط بعرض الشاشة كاملًا: يتبع الإصبع رأسيًا فقط، والمسافة المتراكمة
                 // هي التي تقرّر عند الإفلات إن عاد نافذة منبثقة أم ارتدّ إلى موضعه.
+                params.x = 0
                 params.y = OverlayGeometry.clampY(
                     (params.y + dy).roundToInt(),
                     view.height,
@@ -759,6 +787,9 @@ class UsageOverlayService :
             topBarArmed = false,
         )
         setWindowFocusable(false)
+        // عرض النافذة أولًا: الشريط يحتاج عرض الشاشة كله، والخروج منه يعيد التتبع
+        // لحجم المحتوى، وقبل الانميشن كي لا يقفز المحتوى وسط نافذة أعرض منه.
+        applyWindowWidthForMode(mode)
         // المحتوى يتدرّج في الحجم، والنافذة تنزلق إلى موضعها الجديد في الوقت نفسه.
         animateToMode(mode, expanding = previousMode.expandsTo(mode))
     }
