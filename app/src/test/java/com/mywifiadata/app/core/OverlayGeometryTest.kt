@@ -96,6 +96,25 @@ class OverlayGeometryTest {
     }
 
     @Test
+    fun `the edge tab sticks to its screen side in portrait and in landscape`() {
+        // موضع اللسان يُحسب من عرض الشاشة الحالي لا من إحداثي محفوظ، فيبقى على
+        // الحافة بعد الدوران بدل أن يبقى عند إحداثي الوضع الرأسي (منتصف الأفقي).
+        val tabWidth = 140
+        assertEquals(0, OverlayGeometry.edgeX(atLeftEdge = true, tabWidth, screenWidth))
+        assertEquals(screenWidth - tabWidth, OverlayGeometry.edgeX(atLeftEdge = false, tabWidth, screenWidth))
+
+        val landscapeWidth = screenHeight // بعد الدوران يتبدّل العرض بالارتفاع
+        assertEquals(0, OverlayGeometry.edgeX(atLeftEdge = true, tabWidth, landscapeWidth))
+        assertEquals(landscapeWidth - tabWidth, OverlayGeometry.edgeX(atLeftEdge = false, tabWidth, landscapeWidth))
+    }
+
+    @Test
+    fun `the edge tab never leaves the screen`() {
+        assertEquals(0, OverlayGeometry.edgeX(atLeftEdge = false, screenWidth + 400, screenWidth))
+        assertEquals(0, OverlayGeometry.edgeX(atLeftEdge = true, screenWidth + 400, screenWidth))
+    }
+
+    @Test
     fun `top left placement is clamped near the borders`() {
         val (x, y) = OverlayGeometry.topLeftFor(1f, 1f, pillWidth, pillHeight, screenWidth, screenHeight)
         assertEquals(screenWidth - pillWidth, x)

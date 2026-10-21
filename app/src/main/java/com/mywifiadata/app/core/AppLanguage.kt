@@ -19,7 +19,19 @@ object AppLanguage {
         else -> SYSTEM
     }
 
-    /** Reads the persisted choice early enough for Context resources to use the selected strings. */
+    /**
+     * Reads the persisted choice early enough for Context resources to use the selected strings.
+     *
+     * التهيئة المُجاوَزة تُبنى **فارغة** ثم تُضبط اللغة واتجاهها فيها فقط — لا تُنسخ
+     * تهيئة الجهاز كاملةً. السبب: عند كل تغيّر تهيئة يبني `ResourcesManager` التهيئة
+     * الجديدة هكذا: `tmpConfig.setTo(globalConfig)` ثم
+     * `tmpConfig.updateFrom(mOverrideConfiguration)` — أي أن التهيئة المُجاوَزة تعلو
+     * على التهيئة الحيّة. نسخ التهيئة كاملةً يُثبّت معها `windowConfiguration`
+     * (حدود النافذة والدوران) على قيمتها لحظة إنشاء المكوّن، فتصير الخدمة عمياء عن
+     * تدوير الشاشة: تبقى النافذة العائمة عند إحداثيات الوضع القديم فتظهر في منتصف
+     * الشاشة الأفقية بدل الحافة. الحقول غير المحدّدة في تهيئة فارغة يتجاهلها
+     * `updateFrom`، فتُترك للتحديث الحيّ.
+     */
     fun localizedContext(base: Context): Context {
         val language = normalize(
             base.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
@@ -32,7 +44,8 @@ object AppLanguage {
 
         val locale = Locale.forLanguageTag(language)
         Locale.setDefault(locale)
-        val configuration = Configuration(base.resources.configuration).apply {
+        // تهيئة فارغة = «تجاوز اللغة فقط»؛ بقية الحقول تأتي من التهيئة الحيّة.
+        val configuration = Configuration().apply {
             setLocale(locale)
             setLayoutDirection(locale)
         }

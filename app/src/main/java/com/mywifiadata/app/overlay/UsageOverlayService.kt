@@ -7,11 +7,13 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.content.res.Configuration
 import android.graphics.PixelFormat
+import android.hardware.display.DisplayManager
 import android.os.Build
 import android.os.IBinder
 import android.os.SystemClock
 import android.provider.Settings
 import android.util.Log
+import android.view.Display
 import android.view.Gravity
 import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
@@ -106,6 +108,14 @@ class UsageOverlayService :
     private lateinit var notifier: Notifier
     private lateinit var windowManager: WindowManager
 
+    /**
+     * مدير نوافذ لقياس الشاشة من **سياق التطبيق** (بلا تهيئة مُجاوَزة)، لأن قياس
+     * الخدمة نفسه يتجمّد على لحظة إنشائها (الشرح في [screenSize]).
+     */
+    private val metricsWindowManager: WindowManager by lazy(LazyThreadSafetyMode.NONE) {
+        applicationContext.getSystemService(WindowManager::class.java) ?: windowManager
+    }
+
     private var rootView: ComposeView? = null
     private var layoutParams: WindowManager.LayoutParams? = null
 
@@ -142,6 +152,31 @@ class UsageOverlayService :
     /** انميشن الموضع الجاري أثناء تحوّل الشكل؛ وجوده يمنع القفز إلى الموضع النهائي. */
     private var positionAnimator: ValueAnimator? = null
 
+    /**
+     * آخر مقاس شاشة قيس عند آخر تموضع للنافذة.
+     *
+     * `null` تعني «لا مقاس مرجعي»، فيُعاد التموضع في أول قياس يليها. هكذا نلتقط
+     * الدوران حتى إن وصل ردّ [onConfigurationChanged] قبل أن تكتمل مقاييس العرض،
+     * أو لم يصل أصلًا (الردّ غير مضمون لخدمة بلا واجهة).
+     */
+    private var lastScreenSize: Pair<Int, Int>? = null
+
+    /**
+     * أصحّ إشارة لتغيّر الشاشة في خدمة بلا واجهة: [onConfigurationChanged] غير مضمون
+     * للخدمات، أمّا هذا المستمع فيصل مع كل تغيّر في العرض (الدوران، الكثافة).
+     */
+    private val displayListener = object : DisplayManager.DisplayListener {
+        override fun onDisplayAdded(displayId: Int) = Unit
+
+        override fun onDisplayRemoved(displayId: Int) = Unit
+
+        override fun onDisplayChanged(displayId: Int) {
+            // بلا force: نتحرّك فقط إن تغيّر المقاس فعلًا، فلا نقطع انميشن جاريًا
+            // لمجرّد تغيّر حالة العرض (إضاءة/إطفاء) بلا تغيّر في أبعاده.
+            if (displayId == Display.DEFAULT_DISPLAY) handleScreenChange(force = false)
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         val app = application as MyWifiApplication
@@ -168,6 +203,11 @@ class UsageOverlayService :
             usageAccessMissing = !repository.hasUsageAccess(),
         )
 
+        runCatching {
+            getSystemService(DisplayManager::class.java)
+                // handler فارغ = الاستدعاء على لوبور الخيط الرئيسي الحالي.
+                ?.registerDisplayListener(displayListener, null)
+        }
         _running.value = true
         observeSettings()
         startTicker()
@@ -198,8 +238,49 @@ class UsageOverlayService :
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
+        // التهيئة تغيّرت يقينًا: نعيد الحساب ولو بدا المقاس كما هو (دوران 180°).
+        handleScreenChange(force = true)
+    }
+
+    /**
+     * يعيد تموضع النافذة بعد تغيّر الشاشة (تدوير، أو تغيّر مقاسها).
+     *
+     * اللسان الملتصق بالحافة أحوج الأشكال إلى هذا: موضعه محسوب من عرض الشاشة لا من
+     * نسبة محفوظة، فبقاء إحداثي الوضع الرأسي بعد الدوران يضعه في منتصف الشاشة
+     * الأفقية. نتحقّق في الإطار الحالي، ثم مرّة أخرى في الذي يليه لأن مقاسات العرض
+     * قد تتأخّر إطارًا بعد الإشارة؛ والاستماع إلى القياس في [showWindow] شبكة أمان
+     * لما بعد اكتمال الدوران.
+     */
+    private fun handleScreenChange(force: Boolean) {
+        val view = rootView ?: return
+        view.post {
+            positionWindowIfScreenChanged(force = force)
+            view.post { positionWindowIfScreenChanged(force = force) }
+        }
+    }
+
+    /**
+     * يعيد تموضع النافذة إن كان مقاس الشاشة قد تغيّر منذ آخر تموضع.
+     *
+     * المقارنة بالمقاس لا بالدوران تجعلها آمنة أثناء السحب: السحب يغيّر موضع
+     * النافذة لا مقاس الشاشة، فلا يُعاد التموضع فوق إصبع المستخدم.
+     *
+     * @param force إعادة التموضع ولو لم يتغيّر المقاس (عند إشارة تغيّر صريحة).
+     * @return `true` إن أُعيد التموضع.
+     */
+    private fun positionWindowIfScreenChanged(force: Boolean): Boolean {
+        val view = rootView ?: return false
+        if (view.width <= 0 || view.height <= 0) return false
+        val size = screenSize()
+        if (size.first <= 0 || size.second <= 0) return false
+        val previous = lastScreenSize
+        lastScreenSize = size
+        val changed = force || previous == null || previous != size
+        if (!changed) return false
+        // أثناء التحوّل يقود الانميشن النافذة إلى هدف محسوب بمقاس قديم؛ إيقافه أولًا.
         cancelPositionAnimation()
-        rootView?.post { positionWindow() }
+        positionWindow()
+        return true
     }
 
     override fun onDestroy() {
@@ -207,6 +288,9 @@ class UsageOverlayService :
         tickerJob?.cancel()
         settingsJob?.cancel()
         cancelPositionAnimation()
+        runCatching {
+            getSystemService(DisplayManager::class.java)?.unregisterDisplayListener(displayListener)
+        }
         rootView?.let { view -> runCatching { windowManager.removeViewImmediate(view) } }
         rootView = null
         layoutParams = null
@@ -247,6 +331,9 @@ class UsageOverlayService :
             y = 0
         }
         view.addOnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
+            // فحص مقاس الشاشة أولًا: الدوران يمرّ من هنا وإن لم يصل ردّ التهيئة،
+            // وحجم المحتوى قد لا يتغيّر أصلًا (اللسان عرضه ثابت) فلا يكفي وحده.
+            if (positionWindowIfScreenChanged(force = false)) return@addOnLayoutChangeListener
             val sizeChanged = (right - left) != (oldRight - oldLeft) ||
                 (bottom - top) != (oldBottom - oldTop)
             if (sizeChanged) positionWindow()
@@ -259,6 +346,8 @@ class UsageOverlayService :
         }
         rootView = view
         layoutParams = params
+        // مرجع المقاس من الآن: أول قياس يليه لا يُعدّ «تغيّر شاشة» فيقطع انميشن جارٍ.
+        lastScreenSize = screenSize()
         view.post { positionWindow() }
     }
 
@@ -272,7 +361,11 @@ class UsageOverlayService :
         if (screenWidth <= 0 || screenHeight <= 0) return
         val settings = repository.settingsStore.current
         val (targetX, targetY) = if (ui.value.mode == OverlayMode.EDGE) {
-            val edgeX = if (ui.value.edge == OverlayEdge.LEFT) 0 else screenWidth - view.width
+            val edgeX = OverlayGeometry.edgeX(
+                atLeftEdge = ui.value.edge == OverlayEdge.LEFT,
+                width = view.width,
+                screenWidth = screenWidth,
+            )
             val centeredY = (settings.overlayAnchorY * screenHeight - view.height / 2f).roundToInt()
             edgeX to OverlayGeometry.clampY(centeredY, view.height, screenHeight)
         } else {
@@ -348,7 +441,11 @@ class UsageOverlayService :
         val edge = ui.value.edge
         animateTo(expanding) { width, height, screenWidth, screenHeight ->
             if (mode == OverlayMode.EDGE) {
-                val x = if (edge == OverlayEdge.LEFT) 0 else screenWidth - width
+                val x = OverlayGeometry.edgeX(
+                    atLeftEdge = edge == OverlayEdge.LEFT,
+                    width = width,
+                    screenWidth = screenWidth,
+                )
                 val y = OverlayGeometry.clampY(
                     (settings.overlayAnchorY * screenHeight - height / 2f).roundToInt(),
                     height,
@@ -368,14 +465,27 @@ class UsageOverlayService :
         }
     }
 
+    /**
+     * مقاس مساحة النافذة بالبكسل في دورانها الحالي.
+     *
+     * يُقرأ من مدير نوافذ مأخوذ من **سياق التطبيق** لا من سياق الخدمة: هذا السياق
+     * (وسياق النشاط) مبني على `createConfigurationContext` في [AppLanguage]، وأندرويد
+     * يطبّق التهيئة المُجاوَزة **فوق** التهيئة الحيّة عند كل تغيّر
+     * (`tmpConfig.updateFrom(mOverrideConfiguration)`)، فتُثبَّت معها
+     * `windowConfiguration` — الحدود والدوران — على قيمتها لحظة إنشاء المكوّن.
+     * عندها لا ترى خدمة النافذة العائمة تدوير الشاشة أبدًا، فتبقى النافذة عند
+     * إحداثيات الوضع القديم: يظهر اللسان في **منتصف** الشاشة الأفقية بدل حافتها.
+     * سياق التطبيق بلا تهيئة مُجاوَزة، فمقاسه يتبدّل مع الدوران فورًا.
+     */
     private fun screenSize(): Pair<Int, Int> {
+        val manager = metricsWindowManager
         val metrics = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val bounds = windowManager.currentWindowMetrics.bounds
+            val bounds = manager.currentWindowMetrics.bounds
             bounds.width() to bounds.height()
         } else {
             val point = android.graphics.Point()
             @Suppress("DEPRECATION")
-            windowManager.defaultDisplay.getRealSize(point)
+            manager.defaultDisplay.getRealSize(point)
             point.x to point.y
         }
         return if (metrics.first > 0 && metrics.second > 0) {

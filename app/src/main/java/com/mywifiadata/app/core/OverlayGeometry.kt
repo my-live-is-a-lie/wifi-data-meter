@@ -32,6 +32,16 @@ object OverlayGeometry {
     fun clampY(y: Int, height: Int, screenHeight: Int): Int =
         y.coerceIn(0, (screenHeight - height).coerceAtLeast(0))
 
+    /**
+     * موضع اللسان أفقيًا: ملتصقًا بحرف الشاشة اليسرى أو اليمنى.
+     *
+     * يُحسب من **عرض الشاشة الحالي** لا من إحداثي محفوظ: بعد تدوير الهاتف يتبدّل
+     * عرض الشاشة (يصبح ارتفاع الوضع السابق)، فلو بقي الإحداثي القديم ظهر اللسان
+     * في منتصف الشاشة بدل حافتها.
+     */
+    fun edgeX(atLeftEdge: Boolean, width: Int, screenWidth: Int): Int =
+        if (atLeftEdge) 0 else (screenWidth - width).coerceAtLeast(0)
+
     /** يحوّل مركز النافذة إلى نسبتَي موضع (0..1) تُحفظ في الإعدادات. */
     fun centerFractions(
         x: Int,
