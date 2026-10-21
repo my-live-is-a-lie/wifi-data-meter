@@ -31,7 +31,6 @@ import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
@@ -74,6 +73,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.mywifiadata.app.R
+import com.mywifiadata.app.core.wrapAppsUsageFilterPercent
 import com.mywifiadata.app.data.model.AppsUsageFilterMode
 import com.mywifiadata.app.data.model.PlanCapacityUnit
 import kotlin.math.abs
@@ -170,7 +170,11 @@ fun AppsUsageFilterSetting(
                     .fillMaxWidth()
                     .padding(top = 8.dp),
                 verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = if (mode == AppsUsageFilterMode.PERCENTAGE) {
+                    Arrangement.SpaceBetween
+                } else {
+                    Arrangement.spacedBy(4.dp)
+                },
             ) {
                 FilterModeDropdown(
                     mode = mode,
@@ -190,7 +194,7 @@ fun AppsUsageFilterSetting(
                     AppsUsageFilterMode.PERCENTAGE -> PercentageFilterControls(
                         percentage = percentage.coerceIn(1, 30),
                         onPercentageChange = onPercentageChange,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.width(106.dp),
                     )
                 }
             }
@@ -286,30 +290,31 @@ private fun PercentageFilterControls(
     val darkSurface = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val percentageBadgeColor = if (darkSurface) Color(0xFF1D202A) else MaterialTheme.colorScheme.surfaceContainerHigh
 
-    // The gesture controls are directional (left lowers, right raises) in both app languages.
+    // Keep the number/track/buttons in the compact proportions of the supplied design.
+    // The inner layout is LTR in Arabic too: right increases and left decreases.
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
         Row(
-            modifier = modifier.fillMaxWidth(),
+            modifier = modifier,
             verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Column(modifier = Modifier.width(68.dp)) {
                 Box(
                     modifier = Modifier
-                        .width(70.dp)
-                        .height(32.dp)
+                        .width(68.dp)
+                        .height(26.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(percentageBadgeColor),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text = stringResource(R.string.apps_usage_filter_percent_value, percentage),
-                        style = MaterialTheme.typography.titleMediumEmphasized,
+                        style = MaterialTheme.typography.bodyLargeEmphasized,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                     )
                 }
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(10.dp))
                 AcceleratingPercentSlider(
                     value = percentage,
                     onValueChange = onPercentageChange,
@@ -318,18 +323,19 @@ private fun PercentageFilterControls(
                 )
             }
             Column(
+                modifier = Modifier.width(22.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 PercentStepButton(
-                    icon = Icons.Rounded.Remove,
-                    label = decreaseLabel,
-                    onClick = { onPercentageChange((percentage - 1).coerceAtLeast(1)) },
-                )
-                PercentStepButton(
                     icon = Icons.Rounded.Add,
                     label = increaseLabel,
-                    onClick = { onPercentageChange((percentage + 1).coerceAtMost(30)) },
+                    onClick = { onPercentageChange(wrapAppsUsageFilterPercent(percentage + 1)) },
+                )
+                PercentStepButton(
+                    icon = Icons.Rounded.Remove,
+                    label = decreaseLabel,
+                    onClick = { onPercentageChange(wrapAppsUsageFilterPercent(percentage - 1)) },
                 )
             }
         }
@@ -342,29 +348,24 @@ private fun PercentStepButton(
     label: String,
     onClick: () -> Unit,
 ) {
-    IconButton(
-        onClick = onClick,
+    Box(
         modifier = Modifier
-            .size(38.dp)
-            .semantics { contentDescription = label },
-    ) {
-        Box(
-            modifier = Modifier
-                .size(24.dp)
-                .clip(CircleShape)
-                .background(
-                    if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFF3F455A)
-                    else MaterialTheme.colorScheme.surfaceContainerHighest,
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(18.dp),
+            .size(22.dp)
+            .clip(CircleShape)
+            .background(
+                if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFF3F455A)
+                else MaterialTheme.colorScheme.surfaceContainerHighest,
             )
-        }
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = label },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(16.dp),
+        )
     }
 }
 
@@ -380,6 +381,7 @@ private fun AcceleratingPercentSlider(
     var dragStartValue by remember { mutableIntStateOf(value) }
     val density = LocalDensity.current
     val thumbRadiusPx = with(density) { 12.dp.toPx() }
+    val trackInsetPx = with(density) { 3.dp.toPx() }
     val currentValue by rememberUpdatedState(value)
     val latestOnValueChange by rememberUpdatedState(onValueChange)
     val description = stringResource(R.string.apps_usage_filter_slider_description)
@@ -388,26 +390,24 @@ private fun AcceleratingPercentSlider(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(40.dp)
+            .height(18.dp)
             .onSizeChanged { widthPx = it.width }
-            .pointerInput(widthPx, thumbRadiusPx) {
+            .pointerInput(widthPx, thumbRadiusPx, trackInsetPx) {
                 detectDragGestures(
                     onDragStart = { touch ->
                         dragStartValue = currentValue
-                        val maxOffset = (size.width / 2f - thumbRadiusPx).coerceAtLeast(0f)
+                        val maxOffset = (size.width / 2f - trackInsetPx - thumbRadiusPx).coerceAtLeast(0f)
                         dragOffsetPx = (touch.x - size.width / 2f).coerceIn(-maxOffset, maxOffset)
                     },
                     onDrag = { change, _ ->
                         change.consume()
-                        val maxOffset = (size.width / 2f - thumbRadiusPx).coerceAtLeast(0f)
+                        val maxOffset = (size.width / 2f - trackInsetPx - thumbRadiusPx).coerceAtLeast(0f)
                         val offset = (change.position.x - size.width / 2f).coerceIn(-maxOffset, maxOffset)
                         dragOffsetPx = offset
                         val fraction = if (maxOffset > 0f) (abs(offset) / maxOffset).coerceIn(0f, 1f) else 0f
-                        val movingRight = offset >= 0f
-                        val availableSteps = if (movingRight) 30 - dragStartValue else dragStartValue - 1
-                        val steps = (availableSteps * fraction * fraction).roundToInt()
-                        val next = if (movingRight) dragStartValue + steps else dragStartValue - steps
-                        latestOnValueChange(next.coerceIn(1, 30))
+                        val steps = (29f * fraction * fraction).roundToInt()
+                        val delta = if (offset >= 0f) steps else -steps
+                        latestOnValueChange(wrapAppsUsageFilterPercent(dragStartValue + delta))
                     },
                     onDragEnd = { dragOffsetPx = 0f },
                     onDragCancel = { dragOffsetPx = 0f },
@@ -419,16 +419,12 @@ private fun AcceleratingPercentSlider(
                 progressBarRangeInfo = ProgressBarRangeInfo(value.toFloat(), 1f..30f, 0)
                 customActions = listOf(
                     CustomAccessibilityAction(decreaseLabel) {
-                        if (currentValue <= 1) false else {
-                            latestOnValueChange(currentValue - 1)
-                            true
-                        }
+                        latestOnValueChange(wrapAppsUsageFilterPercent(currentValue - 1))
+                        true
                     },
                     CustomAccessibilityAction(increaseLabel) {
-                        if (currentValue >= 30) false else {
-                            latestOnValueChange(currentValue + 1)
-                            true
-                        }
+                        latestOnValueChange(wrapAppsUsageFilterPercent(currentValue + 1))
+                        true
                     },
                 )
             },
@@ -437,7 +433,7 @@ private fun AcceleratingPercentSlider(
             modifier = Modifier
                 .align(Alignment.Center)
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp)
+                .padding(horizontal = 3.dp)
                 .height(12.dp)
                 .clip(RoundedCornerShape(50))
                 .background(

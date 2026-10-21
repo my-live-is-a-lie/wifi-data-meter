@@ -148,6 +148,13 @@ class AppsUsageFiltersTest {
     }
 
     @Test
+    fun `percentage control wraps continuously from thirty to one and from one to thirty`() {
+        assertEquals(1, wrapAppsUsageFilterPercent(31))
+        assertEquals(30, wrapAppsUsageFilterPercent(0))
+        assertEquals(15, wrapAppsUsageFilterPercent(45))
+    }
+
+    @Test
     fun `percentage filter leaves zero total lists unchanged and hides zero usage tail when total exists`() {
         assertEquals(
             listOf(1, 2),

@@ -19,6 +19,9 @@ enum class AppsSortOrder {
 
 val appsCountOptions: List<Int?> = listOf(null, 5, 10, 15, 20, 25)
 
+/** Cycle through 1–30 inclusively instead of clamping at either end. */
+fun wrapAppsUsageFilterPercent(value: Int): Int = Math.floorMod(value - 1, 30) + 1
+
 fun appsUsageRange(
     network: UsageNetwork,
     scope: AppsUsageScope,
