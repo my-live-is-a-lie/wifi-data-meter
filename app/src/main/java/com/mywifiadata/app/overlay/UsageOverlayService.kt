@@ -15,14 +15,18 @@ import android.provider.Settings
 import android.util.Log
 import android.view.Display
 import android.view.Gravity
+import android.view.WindowInsets
 import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.AbsoluteAlignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -80,7 +84,8 @@ import kotlin.math.roundToInt
 
 /**
  * خدمة أمامية تعرض نافذة عائمة (Overlay) لاستهلاك الواي فاي المباشر:
- * بطاقة كاملة، أو كبسولة صغيرة قابلة للسحب، أو لسان على حافة الشاشة.
+ * بطاقة كاملة، أو كبسولة صغيرة قابلة للسحب، أو لسان على حافة الشاشة،
+ * أو شريط رفيع تحت شريط الحالة تُصغَّر إليه النافذة عند إفلاتها أعلى الشاشة.
  *
  * العدّادات تبدأ عند فتح النافذة وتُصفَّر عند تغيير هدف المراقبة،
  * وتُجمَّد عند الإيقاف المؤقت. النافذة نافذة Compose تُضاف إلى [WindowManager]،
@@ -148,6 +153,14 @@ class UsageOverlayService :
     private var frozenTotals = TrafficTotals.Empty
     private var frozenElapsedMillis = 0L
     private var edgeInwardPx = 0f
+    /** المسافة الرأسية المتراكمة لسحب الشريط العلوي لأسفل (لإعادته نافذة). */
+    private var topBarDragDy = 0f
+
+    /**
+     * ارتفاع شريط الحالة بالبكسل، مخزّن لأنه يُقرأ في كل إطار من انميشن الموضع.
+     * يُبطَل عند تغيّر الشاشة (الدوران يبدّله في الوضع الأفقي).
+     */
+    private var statusBarHeightPx = -1
 
     /** انميشن الموضع الجاري أثناء تحوّل الشكل؛ وجوده يمنع القفز إلى الموضع النهائي. */
     private var positionAnimator: ValueAnimator? = null
@@ -253,6 +266,8 @@ class UsageOverlayService :
      */
     private fun handleScreenChange(force: Boolean) {
         val view = rootView ?: return
+        // ارتفاع شريط الحالة يتبدّل مع الدوران؛ يُقرأ من جديد عند أول تموضع تالٍ.
+        statusBarHeightPx = -1
         view.post {
             positionWindowIfScreenChanged(force = force)
             view.post { positionWindowIfScreenChanged(force = force) }
@@ -313,7 +328,17 @@ class UsageOverlayService :
             setContent {
                 val settings by repository.settingsStore.settings.collectAsState()
                 OverlayTheme(settings) {
-                    UsageOverlayContent(state = ui.value, actions = overlayActions)
+                    // ارتساء مطلق بأعلى يسار النافذة (لا TopStart فيتقلب مع الاتجاه):
+                    // نافذة الشريط بعرض الشاشة كله، والمحتوى المتحوّل يلتصق بحرف
+                    // النافذة فينمو من موضعها بدل أن يقفز إلى وسطها.
+                    // بلا fillMaxSize قصدًا: حجم الغلاف = حجم المحتوى، فيبقى إطار
+                    // النافذة بحجم الشكل الظاهر فقط؛ لو ملأ الشاشة لابتلع كل لمسة
+                    // خارج الشريط ومنعها عن التطبيقات خلفه.
+                    Box(
+                        contentAlignment = AbsoluteAlignment.TopLeft,
+                    ) {
+                        UsageOverlayContent(state = ui.value, actions = overlayActions)
+                    }
                 }
             }
         }
@@ -360,16 +385,18 @@ class UsageOverlayService :
         val (screenWidth, screenHeight) = screenSize()
         if (screenWidth <= 0 || screenHeight <= 0) return
         val settings = repository.settingsStore.current
-        val (targetX, targetY) = if (ui.value.mode == OverlayMode.EDGE) {
-            val edgeX = OverlayGeometry.edgeX(
-                atLeftEdge = ui.value.edge == OverlayEdge.LEFT,
-                width = view.width,
-                screenWidth = screenWidth,
-            )
-            val centeredY = (settings.overlayAnchorY * screenHeight - view.height / 2f).roundToInt()
-            edgeX to OverlayGeometry.clampY(centeredY, view.height, screenHeight)
-        } else {
-            OverlayGeometry.topLeftFor(
+        val (targetX, targetY) = when (ui.value.mode) {
+            OverlayMode.TOP_BAR -> topBarTarget()
+            OverlayMode.EDGE -> {
+                val edgeX = OverlayGeometry.edgeX(
+                    atLeftEdge = ui.value.edge == OverlayEdge.LEFT,
+                    width = view.width,
+                    screenWidth = screenWidth,
+                )
+                val centeredY = (settings.overlayAnchorY * screenHeight - view.height / 2f).roundToInt()
+                edgeX to OverlayGeometry.clampY(centeredY, view.height, screenHeight)
+            }
+            else -> OverlayGeometry.topLeftFor(
                 fractionX = settings.overlayAnchorX,
                 fractionY = settings.overlayAnchorY,
                 width = view.width,
@@ -381,6 +408,30 @@ class UsageOverlayService :
         if (params.x == targetX && params.y == targetY) return
         params.x = targetX
         params.y = targetY
+        runCatching { windowManager.updateViewLayout(view, params) }
+    }
+
+    /**
+     * موضع الشريط العلوي: ملتصقًا تحت شريط الحالة مباشرة، ومتوسطًا أفقيًا كي ينمو
+     * متماثلًا من الجهتين أثناء تحوّل القياس (عرضه النهائي كامل عرض الشاشة).
+     */
+    private fun topBarTarget(): Pair<Int, Int> = 0 to statusBarHeight()
+
+    /**
+     * الشريط يمتد من حرف إلى حرف: عرض النافذة يُجعل مطابقًا لعرض الشاشة في وضع
+     * الشريط (لا `WRAP_CONTENT` كي لا تُقصّ النافذة بعرض المحتوى فتظهر بهوامش)،
+     * ويُعاد لفاف المحتوى عند الخروج منه ليتتبّع حجم الشكل المتحوّل إطارًا بإطار.
+     */
+    private fun applyWindowWidthForMode(mode: OverlayMode) {
+        val view = rootView ?: return
+        val params = layoutParams ?: return
+        val wanted = if (mode == OverlayMode.TOP_BAR) {
+            WindowManager.LayoutParams.MATCH_PARENT
+        } else {
+            WindowManager.LayoutParams.WRAP_CONTENT
+        }
+        if (params.width == wanted) return
+        params.width = wanted
         runCatching { windowManager.updateViewLayout(view, params) }
     }
 
@@ -434,26 +485,29 @@ class UsageOverlayService :
 
     /**
      * موضع الشكل الجديد: البطاقة والكبسولة حول نقطة الارتساء المحفوظة،
-     * واللسان ملتصقًا بالحافة عند ارتفاع الكبسولة نفسه.
+     * واللسان ملتصقًا بالحافة عند ارتفاع الكبسولة نفسه، والشريط العلوي تحت
+     * شريط الحالة مباشرة.
      */
     private fun animateToMode(mode: OverlayMode, expanding: Boolean) {
         val settings = repository.settingsStore.current
         val edge = ui.value.edge
         animateTo(expanding) { width, height, screenWidth, screenHeight ->
-            if (mode == OverlayMode.EDGE) {
-                val x = OverlayGeometry.edgeX(
-                    atLeftEdge = edge == OverlayEdge.LEFT,
-                    width = width,
-                    screenWidth = screenWidth,
-                )
-                val y = OverlayGeometry.clampY(
-                    (settings.overlayAnchorY * screenHeight - height / 2f).roundToInt(),
-                    height,
-                    screenHeight,
-                )
-                x to y
-            } else {
-                OverlayGeometry.topLeftFor(
+            when (mode) {
+                OverlayMode.TOP_BAR -> topBarTarget()
+                OverlayMode.EDGE -> {
+                    val x = OverlayGeometry.edgeX(
+                        atLeftEdge = edge == OverlayEdge.LEFT,
+                        width = width,
+                        screenWidth = screenWidth,
+                    )
+                    val y = OverlayGeometry.clampY(
+                        (settings.overlayAnchorY * screenHeight - height / 2f).roundToInt(),
+                        height,
+                        screenHeight,
+                    )
+                    x to y
+                }
+                else -> OverlayGeometry.topLeftFor(
                     fractionX = settings.overlayAnchorX,
                     fractionY = settings.overlayAnchorY,
                     width = width,
@@ -495,13 +549,43 @@ class UsageOverlayService :
         }
     }
 
+    /**
+     * ارتفاع شريط الحالة: الشريط العلوي للنافذة يلتصق تحته مباشرة لا فوقه.
+     *
+     * يُقرأ من حدود النافذة الحالية (API 30+) لأن نافذة الخدمة مُضافة براية
+     * `FLAG_LAYOUT_IN_SCREEN` فإحداثيها صفر عند حرف الشاشة الأعلى خلف شريط الحالة؛
+     * وعند تعذّر القراءة نعود إلى مورد النظام المعروف، ثم إلى تقدير بالكثافة.
+     */
+    private fun statusBarHeight(): Int {
+        val cached = statusBarHeightPx
+        if (cached >= 0) return cached
+        val height = readStatusBarHeight()
+        statusBarHeightPx = height
+        return height
+    }
+
+    private fun readStatusBarHeight(): Int {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val insets = runCatching { metricsWindowManager.currentWindowMetrics.windowInsets }.getOrNull()
+            val top = insets?.getInsets(WindowInsets.Type.statusBars())?.top ?: 0
+            if (top > 0) return top
+        }
+        val resourceId = resources.getIdentifier("status_bar_height", "dimen", "android")
+        return if (resourceId > 0) {
+            resources.getDimensionPixelSize(resourceId)
+        } else {
+            (24 * resources.displayMetrics.density).roundToInt()
+        }
+    }
+
     // ————————————————————————— السحب والإفلات —————————————————————————
 
     private fun handleDragStart() {
         // وسط التحوّل: السحب يوقف الانميشن ويأخذ الموضع كما هو بدل انتظاره.
         cancelPositionAnimation()
-        ui.value = ui.value.copy(dismissArmed = false, edgeArmed = null)
+        ui.value = ui.value.copy(dismissArmed = false, edgeArmed = null, topBarArmed = false)
         edgeInwardPx = 0f
+        topBarDragDy = 0f
     }
 
     private fun handleDrag(dx: Float, dy: Float) {
@@ -516,6 +600,19 @@ class UsageOverlayService :
                     screenHeight,
                 )
                 edgeInwardPx += if (ui.value.edge == OverlayEdge.LEFT) dx else -dx
+                runCatching { windowManager.updateViewLayout(view, params) }
+            }
+
+            OverlayMode.TOP_BAR -> {
+                // الشريط بعرض الشاشة كاملًا: يتبع الإصبع رأسيًا فقط، والمسافة المتراكمة
+                // هي التي تقرّر عند الإفلات إن عاد نافذة منبثقة أم ارتدّ إلى موضعه.
+                params.x = 0
+                params.y = OverlayGeometry.clampY(
+                    (params.y + dy).roundToInt(),
+                    view.height,
+                    screenHeight,
+                )
+                topBarDragDy += dy
                 runCatching { windowManager.updateViewLayout(view, params) }
             }
 
@@ -538,6 +635,7 @@ class UsageOverlayService :
                     height = view.height,
                     screenWidth = screenWidth,
                     screenHeight = screenHeight,
+                    statusBarHeight = statusBarHeight(),
                 )
                 val armed = ui.value.mode == OverlayMode.PILL && drop == OverlayDrop.DISMISS
                 val armedEdge = if (ui.value.mode == OverlayMode.PILL) {
@@ -549,8 +647,17 @@ class UsageOverlayService :
                 } else {
                     null
                 }
-                if (ui.value.dismissArmed != armed || ui.value.edgeArmed != armedEdge) {
-                    ui.value = ui.value.copy(dismissArmed = armed, edgeArmed = armedEdge)
+                // منطقة الشريط العلوي متاحة للبطاقة والكبسولة معًا.
+                val armedTop = drop == OverlayDrop.TOP_BAR
+                if (ui.value.dismissArmed != armed ||
+                    ui.value.edgeArmed != armedEdge ||
+                    ui.value.topBarArmed != armedTop
+                ) {
+                    ui.value = ui.value.copy(
+                        dismissArmed = armed,
+                        edgeArmed = armedEdge,
+                        topBarArmed = armedTop,
+                    )
                 }
             }
         }
@@ -582,6 +689,16 @@ class UsageOverlayService :
                 persistAnchorY(centerY)
                 positionWindow()
             }
+        } else if (mode == OverlayMode.TOP_BAR) {
+            val pulled = topBarDragDy
+            topBarDragDy = 0f
+            if (pulled >= OverlayGeometry.TOP_BAR_RETURN_DP * resources.displayMetrics.density) {
+                // السحب لأسفل يعيد النافذة المنبثقة في موضعها المحفوظ قبل التصغير.
+                switchMode(OverlayMode.EXPANDED)
+            } else {
+                // سحبة قصيرة: يرتدّ الشريط إلى مكانه تحت شريط الحالة بانميشن لا بقفزة.
+                animateToMode(OverlayMode.TOP_BAR, expanding = false)
+            }
         } else {
             val drop = OverlayGeometry.dropTarget(
                 x = params.x,
@@ -590,9 +707,13 @@ class UsageOverlayService :
                 height = view.height,
                 screenWidth = screenWidth,
                 screenHeight = screenHeight,
+                statusBarHeight = statusBarHeight(),
             )
-            if (mode == OverlayMode.PILL) {
-                when (drop) {
+            when {
+                // الإفلات أعلى الشاشة يصغّر النافذة شريطًا؛ يبقى الارتساء المحفوظ
+                // كما هو لتعود النافذة إليه عند التكبير لا إلى موضع الإفلات.
+                drop == OverlayDrop.TOP_BAR -> switchMode(OverlayMode.TOP_BAR)
+                mode == OverlayMode.PILL -> when (drop) {
                     OverlayDrop.DISMISS -> {
                         closeOverlay()
                         return
@@ -600,17 +721,18 @@ class UsageOverlayService :
 
                     OverlayDrop.EDGE_LEFT -> switchToEdge(OverlayEdge.LEFT)
                     OverlayDrop.EDGE_RIGHT -> switchToEdge(OverlayEdge.RIGHT)
-                    OverlayDrop.NONE -> {
+                    else -> {
                         persistCurrentCenter()
                         positionWindow()
                     }
                 }
-            } else {
-                persistCurrentCenter()
-                positionWindow()
+                else -> {
+                    persistCurrentCenter()
+                    positionWindow()
+                }
             }
         }
-        ui.value = ui.value.copy(dismissArmed = false, edgeArmed = null)
+        ui.value = ui.value.copy(dismissArmed = false, edgeArmed = null, topBarArmed = false)
     }
 
     private fun persistCurrentCenter() {
@@ -659,8 +781,16 @@ class UsageOverlayService :
             }
             repository.settingsStore.update { it.copy(overlayAnchorX = centerX) }
         }
-        ui.value = ui.value.copy(mode = mode, pickerVisible = false, edgeArmed = null)
+        ui.value = ui.value.copy(
+            mode = mode,
+            pickerVisible = false,
+            edgeArmed = null,
+            topBarArmed = false,
+        )
         setWindowFocusable(false)
+        // عرض النافذة أولًا: الشريط يحتاج عرض الشاشة كله، والخروج منه يعيد التتبع
+        // لحجم المحتوى، وقبل الانميشن كي لا يقفز المحتوى وسط نافذة أعرض منه.
+        applyWindowWidthForMode(mode)
         // المحتوى يتدرّج في الحجم، والنافذة تنزلق إلى موضعها الجديد في الوقت نفسه.
         animateToMode(mode, expanding = previousMode.expandsTo(mode))
     }
@@ -1106,7 +1236,11 @@ class UsageOverlayService :
         const val ACTION_SHOW = "com.mywifiadata.app.overlay.SHOW"
         const val ACTION_CLOSE = "com.mywifiadata.app.overlay.CLOSE"
 
+        // NOT_TOUCH_MODAL صريحةً: كل لمسة خارج إطار النافذة تمرّ إلى التطبيقات
+        // خلفها؛ بلا هذه الراية يصبح إطار النافذة (وبخاصة الشريط بعرض الشاشة)
+        // حاجزًا يبتلع لمسات المستخدم كلها.
         private val BASE_WINDOW_FLAGS = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
             WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
             WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
 
