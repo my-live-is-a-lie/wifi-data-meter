@@ -26,7 +26,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.Alignment
+import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalConfiguration
@@ -334,7 +334,7 @@ class UsageOverlayService :
                     // النافذة فينمو من موضعها بدل أن يقفز إلى وسطها.
                     Box(
                         modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.TopLeft,
+                        contentAlignment = AbsoluteAlignment.TopLeft,
                     ) {
                         UsageOverlayContent(state = ui.value, actions = overlayActions)
                     }
