@@ -34,7 +34,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.AbsoluteRoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RectangleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Apps
@@ -301,7 +300,8 @@ private fun OverlayTopBar(state: OverlayUiState, actions: OverlayActions) {
                     }
                 },
             // بلا استدارة ولا ظل: شريط مسطّح ملتصق بحرفي الشاشة كامتداد لشريط الحالة.
-            shape = RectangleShape,
+            // (استدارة صفر = مستطيل؛ فالاسم RectangleShape أُزيل من كومبوز الحديث.)
+            shape = RoundedCornerShape(0.dp),
             color = OverlayTopBarScrim,
             contentColor = Color.White,
         ) {
@@ -457,29 +457,6 @@ private fun BarStat(icon: androidx.compose.ui.graphics.vector.ImageVector, tint:
             text = value,
             style = MaterialTheme.typography.bodyMedium,
             color = Color.White,
-            maxLines = 1,
-            softWrap = false,
-        )
-    }
-}
-
-/** قيمة صغيرة بسهم ملوّن في الشريط العلوي (تنزيل/رفع). */
-@Composable
-private fun BarStat(icon: androidx.compose.ui.graphics.vector.ImageVector, tint: Color, value: String) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(3.dp),
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = tint,
-            modifier = Modifier.size(12.dp),
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             softWrap = false,
         )
