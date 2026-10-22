@@ -2,7 +2,7 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/header-title-dark.png" />
-  <img src="docs/images/header-title-light.png" alt="Wi-Fi Data Meter" width="510" />
+  <img src="docs/images/header-title-light.png" alt="Wi-Fi Data Meter" width="397" />
 </picture>
 
 <p><strong>Track Wi‑Fi data usage, understand app traffic, and stay ahead of your plan.</strong></p>
