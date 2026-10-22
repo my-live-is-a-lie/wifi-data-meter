@@ -12,10 +12,10 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: 'وسم الإصدار، مثل v1.0.1-preview.1'
+        description: 'وسم الإصدار، مثل v1.0.1'
         required: true
         type: string
-        default: 'v1.0.1-preview.1'
+        default: 'v1.0.1'
       prerelease:
         description: 'علّم الإصدار بأنه أولي وقيد التطوير'
         required: true
@@ -185,7 +185,9 @@ jobs:
             exit 1
           }
 
-          cat > release-notes.md <<EOF
+          if [[ "$prerelease" == "true" ]]; then
+            title="$tag — Early Preview (In Development)"
+            cat > release-notes.md <<EOF
           ## Early preview — actively in development
 
           This is an early preview of **Wi-Fi Data Meter**. The app is still under active development; bugs and changes to existing features are possible.
@@ -196,8 +198,18 @@ jobs:
 
           Minimum supported version: **Android 8.0 (API 26)**. Per-app usage requires Android's Usage access permission.
           EOF
+          else
+            title="$tag"
+            cat > release-notes.md <<EOF
+          ## Wi-Fi Data Meter $tag
 
-          title="$tag — Early Preview (In Development)"
+          ### APK files
+          - **app-universal-release.apk** — recommended; works across Android architectures.
+          - Separate builds are also available for **ARM64**, **ARMv7**, **x86_64**, and **x86**.
+
+          Minimum supported version: **Android 8.0 (API 26)**. Per-app usage requires Android's Usage access permission.
+          EOF
+          fi
           args=("$tag" "${apks[@]}" --title "$title" --notes-file release-notes.md --target "$GITHUB_SHA")
           if [[ "$prerelease" == "true" ]]; then
             args+=(--prerelease)
