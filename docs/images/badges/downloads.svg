@@ -1,10 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="379" height="56">
-<defs><clipPath id="p"><rect width="379" height="56" rx="28"/></clipPath></defs>
+<svg xmlns="http://www.w3.org/2000/svg" width="273" height="40">
+<defs><clipPath id="p"><rect width="273" height="40" rx="20"/></clipPath></defs>
 <g clip-path="url(#p)">
-<rect x="0" y="0" width="270" height="56" fill="#2B7CD3"/>
-<rect x="242" y="0" width="165" height="56" fill="#101F33"/>
+<rect x="0" y="0" width="194" height="40" fill="#2B7CD3"/>
+<rect x="174" y="0" width="119" height="40" fill="#101F33"/>
 </g>
-<g transform="translate(20,11)"><rect x="15" y="5" width="4" height="13" fill="#FFFFFF"/><polygon points="9,16 25,16 17,25" fill="#FFFFFF"/><polyline points="7,27 7,32 27,32 27,27" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></g>
-<text x="68" y="30" font-family="DejaVu Sans, Arial, sans-serif" font-size="25" font-weight="bold" fill="#FFFFFF">Downloads</text>
-<text x="262" y="30" font-family="DejaVu Sans, Arial, sans-serif" font-size="25" font-weight="bold" fill="#EAF3FD">1 total</text>
+<g transform="translate(14,7.0)"><g transform="scale(0.765)"><rect x="15" y="4" width="4" height="13" fill="#FFFFFF"/><polygon points="9,15 25,15 17,24" fill="#FFFFFF"/><polyline points="7,27 7,31 27,31 27,27" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></g></g>
+<text x="49" y="21.0" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="bold" fill="#FFFFFF" dominant-baseline="central">Downloads</text>
+<text x="188" y="21.0" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="bold" fill="#EAF3FD" dominant-baseline="central">1 total</text>
 </svg>
