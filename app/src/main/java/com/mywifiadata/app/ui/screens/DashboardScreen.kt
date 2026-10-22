@@ -43,6 +43,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -125,6 +126,7 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.mywifiadata.app.R
 import com.mywifiadata.app.core.Format
 import com.mywifiadata.app.data.model.AppUsage
@@ -425,7 +427,7 @@ fun DashboardScreen(
             userScrollEnabled = !isEditing || dragState.activeLongPressIds.isEmpty(),
             // تُترك مساحة أفقية للبطاقات العادية، بينما تمتد الواجهة المصغّرة حتى حافتي الشاشة.
             contentPadding = PaddingValues(
-                top = if (isEditing) 0.dp else contentPadding.calculateTopPadding(),
+                top = if (isEditing) 16.dp else contentPadding.calculateTopPadding(),
                 bottom = contentPadding.calculateBottomPadding(),
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -1233,7 +1235,12 @@ private fun FullUsageCard(
                         progressColor = gaugeStartColor,
                         contentDescription = stringResource(R.string.quota_ring_title),
                     ) {
-                        FullGaugeCenter(usageValue, usageLabel, usedValue)
+                        FullGaugeContent(
+                            usageValue = usageValue,
+                            usageLabel = usageLabel,
+                            usedValue = usedValue,
+                            daysLeft = if (hasQuota) state.daysLeft else null,
+                        )
                     }
                 }
 
@@ -1259,7 +1266,12 @@ private fun FullUsageCard(
                         endColor = gaugeEndColor,
                         contentDescription = stringResource(R.string.quota_ring_title),
                     ) {
-                        FullGaugeCenter(usageValue, usageLabel, usedValue)
+                        FullGaugeContent(
+                            usageValue = usageValue,
+                            usageLabel = usageLabel,
+                            usedValue = usedValue,
+                            daysLeft = if (hasQuota) state.daysLeft else null,
+                        )
                     }
                 }
             }
@@ -1338,30 +1350,77 @@ private fun FullUsageCard(
 }
 
 @Composable
+private fun FullGaugeContent(
+    usageValue: String,
+    usageLabel: String,
+    usedValue: String,
+    daysLeft: Int?,
+) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        FullGaugeCenter(
+            usageValue = usageValue,
+            usageLabel = usageLabel,
+            usedValue = usedValue,
+            modifier = Modifier.fillMaxSize(),
+        )
+        if (daysLeft != null) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 24.dp),
+            ) {
+                Text(
+                    text = daysLeft.toString(),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                )
+                Text(
+                    text = stringResource(R.string.clock_usage_days_unit),
+                    style = MaterialTheme.typography.labelSmall.copy(lineHeight = 11.sp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    modifier = Modifier.offset(y = (-3).dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun FullGaugeCenter(
     usageValue: String,
     usageLabel: String,
     usedValue: String,
+    modifier: Modifier = Modifier,
 ) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    Box(modifier = modifier.fillMaxSize()) {
         Text(
             text = usageValue,
             style = MaterialTheme.typography.displaySmallEmphasized,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
+            modifier = Modifier.align(Alignment.Center),
         )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = usageLabel,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = usedValue,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
-        )
+        Column(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .offset(y = 40.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = usageLabel,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = usedValue,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
     }
 }
 

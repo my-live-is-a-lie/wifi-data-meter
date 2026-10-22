@@ -1,6 +1,8 @@
 package com.mywifiadata.app.ui.components
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -12,7 +14,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import com.mywifiadata.app.ui.theme.AppButtonShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -22,13 +25,22 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.mywifiadata.app.R
+import com.mywifiadata.app.ui.theme.AppButtonShape
 
 /**
  * عنوان قسم مع نص توضيحي اختياري وعناصر إضافية في النهاية.
@@ -233,6 +245,16 @@ fun SettingSwitchRow(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
+    var subtitleExpanded by remember(subtitle) { mutableStateOf(false) }
+    var subtitleCanExpand by remember(subtitle) { mutableStateOf(false) }
+    val subtitleChevronRotation by animateFloatAsState(
+        targetValue = if (subtitleExpanded) 180f else 0f,
+        label = "settingDescriptionChevron",
+    )
+    val descriptionActionLabel = stringResource(
+        if (subtitleExpanded) R.string.settings_description_collapse else R.string.settings_description_expand,
+    )
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -246,18 +268,48 @@ fun SettingSwitchRow(
             modifier = Modifier.size(22.dp),
         )
         Spacer(modifier = Modifier.width(14.dp))
-        Column(modifier = Modifier.weight(1f)) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .clickable(
+                    enabled = subtitle != null && subtitleCanExpand,
+                    onClickLabel = descriptionActionLabel,
+                    role = Role.Button,
+                ) { subtitleExpanded = !subtitleExpanded },
+        ) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.bodyLargeEmphasized,
                 color = MaterialTheme.colorScheme.onSurface,
             )
             if (subtitle != null) {
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.Bottom,
+                ) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f),
+                        maxLines = if (subtitleExpanded) Int.MAX_VALUE else 2,
+                        overflow = TextOverflow.Ellipsis,
+                        onTextLayout = { layout ->
+                            subtitleCanExpand = layout.lineCount > 2 || layout.hasVisualOverflow
+                        },
+                    )
+                    if (subtitleCanExpand) {
+                        Icon(
+                            imageVector = Icons.Rounded.ExpandMore,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .size(16.dp)
+                                .rotate(subtitleChevronRotation),
+                        )
+                    }
+                }
             }
         }
         Spacer(modifier = Modifier.width(12.dp))

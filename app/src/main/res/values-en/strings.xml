@@ -186,6 +186,8 @@
     <string name="apps_screen_title">App usage</string>
     <string name="apps_empty_title">No usage recorded</string>
     <string name="apps_empty_body">No data for this period yet. Browse a bit and refresh.</string>
+    <string name="apps_usage_filter_empty_title">No apps match this filter</string>
+    <string name="apps_usage_filter_empty_body">Lower the usage limit, choose a different percentage, or turn filtering off to show the apps.</string>
     <string name="dashboard_today_top_apps_title">Top 5 apps by %1$s</string>
     <string name="dashboard_today_apps_loading">Loading app usage…</string>
     <string name="dashboard_today_apps_empty">No usage recorded for this category today.</string>
@@ -291,6 +293,18 @@
     <string name="settings_usage_access_granted">Granted</string>
     <string name="settings_usage_access_missing">Not granted — tap to grant</string>
     <string name="settings_section_more">More</string>
+    <string name="apps_usage_filter_title">Filter apps</string>
+    <string name="apps_usage_filter_description">Hide apps from the usage list by data amount or share</string>
+    <string name="apps_usage_filter_expand">Open app filter options</string>
+    <string name="apps_usage_filter_collapse">Close app filter options</string>
+    <string name="apps_usage_filter_mode_title">Filter type</string>
+    <string name="apps_usage_filter_mode_amount">Usage</string>
+    <string name="apps_usage_filter_mode_percentage">Percentage</string>
+    <string name="apps_usage_filter_amount_accessibility">Usage amount threshold</string>
+    <string name="apps_usage_filter_percent_value">%1$d%%</string>
+    <string name="apps_usage_filter_decrease">Decrease percentage</string>
+    <string name="apps_usage_filter_increase">Increase percentage</string>
+    <string name="apps_usage_filter_slider_description">Drag left to increase and right to decrease. Moving farther from center speeds up changes; return to center to stop.</string>
     <string name="settings_quick_settings_tile">Network monitoring Quick Settings tile</string>
     <string name="settings_quick_settings_tile_desc">Add a tile to toggle monitoring from Quick Settings. The system may ask for confirmation, or require manual adding. Turning this option off disables the tile in the app but does not remove it; remove it manually from Quick Settings.</string>
     <string name="settings_hide_status_bar_icon">Hide monitoring icon from status bar</string>
@@ -344,6 +358,8 @@
     <string name="qs_tile_disabled">The tile is disabled. If it is still shown, remove it from Quick Settings Edit.</string>
     <string name="settings_more_expand">Show additional settings</string>
     <string name="settings_more_collapse">Hide additional settings</string>
+    <string name="settings_description_expand">Expand setting description</string>
+    <string name="settings_description_collapse">Collapse setting description</string>
 
     <string name="channel_monitor_name">Usage monitoring</string>
     <string name="channel_monitor_desc">Persistent notification showing current Wi‑Fi usage.</string>
