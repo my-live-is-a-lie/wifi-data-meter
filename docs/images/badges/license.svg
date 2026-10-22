@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="326" height="56">
 <defs><clipPath id="p"><rect width="326" height="56" rx="28"/></clipPath></defs>
 <g clip-path="url(#p)">
-<rect x="0" y="0" width="222" height="56" fill="#F2A9A2"/>
-<rect x="194" y="0" width="160" height="56" fill="#3B2A2A"/>
+<rect x="0" y="0" width="222" height="56" fill="#2B7CD3"/>
+<rect x="194" y="0" width="160" height="56" fill="#101F33"/>
 </g>
-<g transform="translate(20,11)"><path d="M17 3 L29 8.5 V17 C29 25 23.5 29.5 17 32 C10.5 29.5 5 25 5 17 V8.5 Z" fill="#4A2323"/><polyline points="12,16.5 15.8,20.5 22.5,12.5" fill="none" stroke="#F2A9A2" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></g>
-<text x="68" y="30" font-family="DejaVu Sans, Arial, sans-serif" font-size="25" font-weight="bold" fill="#4A2323">License</text>
-<text x="214" y="30" font-family="DejaVu Sans, Arial, sans-serif" font-size="25" font-weight="bold" fill="#F6E8E8">GPLv3</text>
+<g transform="translate(20,11)"><path d="M17 3 L29 8.5 V17 C29 25 23.5 29.5 17 32 C10.5 29.5 5 25 5 17 V8.5 Z" fill="#FFFFFF"/><polyline points="12,16.5 15.8,20.5 22.5,12.5" fill="none" stroke="#2B7CD3" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="68" y="30" font-family="DejaVu Sans, Arial, sans-serif" font-size="25" font-weight="bold" fill="#FFFFFF">License</text>
+<text x="214" y="30" font-family="DejaVu Sans, Arial, sans-serif" font-size="25" font-weight="bold" fill="#EAF3FD">GPLv3</text>
 </svg>
