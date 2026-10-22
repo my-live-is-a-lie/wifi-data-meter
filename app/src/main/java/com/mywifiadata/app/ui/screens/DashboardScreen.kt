@@ -1235,7 +1235,7 @@ private fun FullUsageCard(
                         progressColor = gaugeStartColor,
                         contentDescription = stringResource(R.string.quota_ring_title),
                     ) {
-                        FullGaugeCenter(
+                        FullGaugeContent(
                             usageValue = usageValue,
                             usageLabel = usageLabel,
                             usedValue = usedValue,
@@ -1266,7 +1266,7 @@ private fun FullUsageCard(
                         endColor = gaugeEndColor,
                         contentDescription = stringResource(R.string.quota_ring_title),
                     ) {
-                        FullGaugeCenter(
+                        FullGaugeContent(
                             usageValue = usageValue,
                             usageLabel = usageLabel,
                             usedValue = usedValue,
@@ -1350,16 +1350,26 @@ private fun FullUsageCard(
 }
 
 @Composable
-private fun FullGaugeCenter(
+private fun FullGaugeContent(
     usageValue: String,
     usageLabel: String,
     usedValue: String,
-    daysLeft: Int? = null,
+    daysLeft: Int?,
 ) {
-    val daysUnit = stringResource(R.string.clock_usage_days_unit)
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        FullGaugeCenter(
+            usageValue = usageValue,
+            usageLabel = usageLabel,
+            usedValue = usedValue,
+            modifier = Modifier.align(Alignment.Center),
+        )
         if (daysLeft != null) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 24.dp),
+            ) {
                 Text(
                     text = daysLeft.toString(),
                     style = MaterialTheme.typography.titleSmall,
@@ -1367,15 +1377,28 @@ private fun FullGaugeCenter(
                     maxLines = 1,
                 )
                 Text(
-                    text = daysUnit,
+                    text = stringResource(R.string.clock_usage_days_unit),
                     style = MaterialTheme.typography.labelSmall.copy(lineHeight = 11.sp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     modifier = Modifier.offset(y = (-3).dp),
                 )
             }
-            Spacer(modifier = Modifier.height(18.dp))
         }
+    }
+}
+
+@Composable
+private fun FullGaugeCenter(
+    usageValue: String,
+    usageLabel: String,
+    usedValue: String,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
         Text(
             text = usageValue,
             style = MaterialTheme.typography.displaySmallEmphasized,
