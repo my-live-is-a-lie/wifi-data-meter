@@ -358,6 +358,8 @@
     <string name="qs_tile_disabled">The tile is disabled. If it is still shown, remove it from Quick Settings Edit.</string>
     <string name="settings_more_expand">Show additional settings</string>
     <string name="settings_more_collapse">Hide additional settings</string>
+    <string name="settings_description_expand">Expand setting description</string>
+    <string name="settings_description_collapse">Collapse setting description</string>
 
     <string name="channel_monitor_name">Usage monitoring</string>
     <string name="channel_monitor_desc">Persistent notification showing current Wi‑Fi usage.</string>

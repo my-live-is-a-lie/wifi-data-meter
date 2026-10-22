@@ -43,6 +43,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -125,6 +126,7 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.mywifiadata.app.R
 import com.mywifiadata.app.core.Format
 import com.mywifiadata.app.data.model.AppUsage
@@ -1233,7 +1235,12 @@ private fun FullUsageCard(
                         progressColor = gaugeStartColor,
                         contentDescription = stringResource(R.string.quota_ring_title),
                     ) {
-                        FullGaugeCenter(usageValue, usageLabel, usedValue)
+                        FullGaugeCenter(
+                            usageValue = usageValue,
+                            usageLabel = usageLabel,
+                            usedValue = usedValue,
+                            daysLeft = if (hasQuota) state.daysLeft else null,
+                        )
                     }
                 }
 
@@ -1259,7 +1266,12 @@ private fun FullUsageCard(
                         endColor = gaugeEndColor,
                         contentDescription = stringResource(R.string.quota_ring_title),
                     ) {
-                        FullGaugeCenter(usageValue, usageLabel, usedValue)
+                        FullGaugeCenter(
+                            usageValue = usageValue,
+                            usageLabel = usageLabel,
+                            usedValue = usedValue,
+                            daysLeft = if (hasQuota) state.daysLeft else null,
+                        )
                     }
                 }
             }
@@ -1342,8 +1354,28 @@ private fun FullGaugeCenter(
     usageValue: String,
     usageLabel: String,
     usedValue: String,
+    daysLeft: Int? = null,
 ) {
+    val daysUnit = stringResource(R.string.clock_usage_days_unit)
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        if (daysLeft != null) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = daysLeft.toString(),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                )
+                Text(
+                    text = daysUnit,
+                    style = MaterialTheme.typography.labelSmall.copy(lineHeight = 11.sp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    modifier = Modifier.offset(y = (-3).dp),
+                )
+            }
+            Spacer(modifier = Modifier.height(18.dp))
+        }
         Text(
             text = usageValue,
             style = MaterialTheme.typography.displaySmallEmphasized,
