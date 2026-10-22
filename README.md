@@ -1,13 +1,11 @@
 <div align="center">
 
-# 📶 Wi‑Fi Data Meter
+<h1><img src="docs/images/app-icon.png" width="64" align="center" alt="Wi-Fi Data Meter app icon" /> Wi‑Fi Data Meter</h1>
 
-### Stay ahead of your data usage.
+<p><strong>Track Wi‑Fi data usage, understand app traffic, and stay ahead of your plan.</strong></p>
 
-An Android app for tracking Wi‑Fi usage, managing data plans, and seeing where your data goes.
-
-[![Version](https://img.shields.io/github/v/release/my-live-is-a-lie/mywifiaData?include_prereleases=true&style=for-the-badge&color=7c83fd)](https://github.com/my-live-is-a-lie/mywifiaData/releases)
-[![Downloads](https://img.shields.io/github/downloads/my-live-is-a-lie/mywifiaData/total?style=for-the-badge&color=8b6de9)](https://github.com/my-live-is-a-lie/mywifiaData/releases)
+[![Version](https://img.shields.io/badge/version-v1.0.1--preview.1-7c83fd?style=for-the-badge)](https://github.com/my-live-is-a-lie/mywifiaData/releases/tag/v1.0.1-preview.1)
+[![Downloads](https://img.shields.io/badge/downloads-1%20total-8b6de9?style=for-the-badge)](https://github.com/my-live-is-a-lie/mywifiaData/releases/tag/v1.0.1-preview.1)
 ![Android 8+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)
 ![Preview](https://img.shields.io/badge/status-preview%20%7C%20in%20development-e7b7ff?style=for-the-badge)
 
@@ -23,9 +21,9 @@ An Android app for tracking Wi‑Fi usage, managing data plans, and seeing where
 
 </div>
 
-> ⚠️ This is an early preview and may contain bugs or unfinished features. The repository is private, so downloads require a GitHub account with repository access.
+> This is an early preview and may contain bugs or unfinished features. The repository is private, so downloads require a GitHub account with repository access. GitHub provides live per-file download totals on the release page; the Downloads badge above is a snapshot.
 
-## ✨ Features
+## Features
 
 - **Usage dashboard:** plan usage, remaining data, cycle days, and upload/download totals.
 - **Per-app analytics:** review app data usage with time-period filters, app filters, and sorting.
@@ -36,7 +34,7 @@ An Android app for tracking Wi‑Fi usage, managing data plans, and seeing where
 - **Flexible plans:** set your data allowance and billing-cycle start date.
 - **Personalization:** Arabic and English interfaces, plus light and dark themes.
 
-## 📱 Screenshots
+## Screenshots
 
 <div align="center">
 <table>
@@ -55,7 +53,7 @@ An Android app for tracking Wi‑Fi usage, managing data plans, and seeing where
 </table>
 </div>
 
-## ⬇️ Download & compatibility
+## Download and compatibility
 
 The release includes a **universal APK** (recommended if you are unsure which file to choose) and ABI-specific builds for **ARM64**, **ARMv7**, **x86_64**, and **x86**.
 
@@ -64,6 +62,6 @@ The release includes a **universal APK** (recommended if you are unsure which fi
 
 Per-app usage requires Android's **Usage access** permission. The floating window also requires permission to display over other apps.
 
-## 🛠️ Built with
+## Built with
 
 **Kotlin · Jetpack Compose · Material 3 Expressive.** GitHub Actions builds and signs the release APKs, runs unit tests, and publishes the assets to GitHub Releases. Releases can be started manually, by pushing a `v*` tag, or from an `arena/*` branch with `[publish-release]` in the commit message.
