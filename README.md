@@ -1,20 +1,15 @@
 <div align="center">
 
-<h1><img src="docs/images/app-icon.png" width="64" align="center" alt="Wi-Fi Data Meter app icon" /> Wi‑Fi Data Meter</h1>
+<h2><img src="docs/images/app-icon.png" width="44" align="center" alt="Wi-Fi Data Meter app icon" /> Wi‑Fi Data Meter</h2>
 
 <p><strong>Track Wi‑Fi data usage, understand app traffic, and stay ahead of your plan.</strong></p>
 
-[![Version](https://img.shields.io/badge/version-v1.0.1--preview.1-7c83fd?style=for-the-badge)](https://github.com/my-live-is-a-lie/mywifiaData/releases/tag/v1.0.1-preview.1)
-[![Downloads](https://img.shields.io/badge/downloads-1%20total-8b6de9?style=for-the-badge)](https://github.com/my-live-is-a-lie/mywifiaData/releases/tag/v1.0.1-preview.1)
+[![Version](https://img.shields.io/badge/version-v1.0.1--preview.1-7c83fd?style=for-the-badge)](https://github.com/my-live-is-a-lie/wifi-data-meter/releases/tag/v1.0.1-preview.1)
+[![Downloads](https://img.shields.io/badge/downloads-1%20total-8b6de9?style=for-the-badge)](https://github.com/my-live-is-a-lie/wifi-data-meter/releases/tag/v1.0.1-preview.1)
 ![Android 8+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)
-![Preview](https://img.shields.io/badge/status-preview%20%7C%20in%20development-e7b7ff?style=for-the-badge)
 
-<a href="https://github.com/my-live-is-a-lie/mywifiaData/releases/download/v1.0.1-preview.1/app-universal-release.apk">
-  <img src="https://img.shields.io/badge/Download-Universal%20APK-5264d8?style=for-the-badge&logo=android&logoColor=white" alt="Download the universal APK" />
-</a>
-&nbsp;
-<a href="https://github.com/my-live-is-a-lie/mywifiaData/releases/tag/v1.0.1-preview.1">
-  <img src="https://img.shields.io/badge/All%20architectures-Release%20files-454a5c?style=for-the-badge&logo=github&logoColor=white" alt="View all APK builds" />
+<a href="https://github.com/my-live-is-a-lie/wifi-data-meter/releases">
+  <img src="https://img.shields.io/badge/Download-GitHub%20Releases-5264d8?style=for-the-badge&logo=android&logoColor=white" alt="Browse releases and download the app" />
 </a>
 
 **Early preview · Actively in development · Android 8.0+**
@@ -57,8 +52,8 @@
 
 The release includes a **universal APK** (recommended if you are unsure which file to choose) and ABI-specific builds for **ARM64**, **ARMv7**, **x86_64**, and **x86**.
 
-- [Download the universal APK](https://github.com/my-live-is-a-lie/mywifiaData/releases/download/v1.0.1-preview.1/app-universal-release.apk)
-- [View the release and all APKs](https://github.com/my-live-is-a-lie/mywifiaData/releases/tag/v1.0.1-preview.1)
+- [Download the universal APK](https://github.com/my-live-is-a-lie/wifi-data-meter/releases/download/v1.0.1-preview.1/app-universal-release.apk)
+- [View the release and all APKs](https://github.com/my-live-is-a-lie/wifi-data-meter/releases/tag/v1.0.1-preview.1)
 
 Per-app usage requires Android's **Usage access** permission. The floating window also requires permission to display over other apps.
 
