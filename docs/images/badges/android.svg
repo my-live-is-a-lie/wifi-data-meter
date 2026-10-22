@@ -1,10 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="308" height="56">
-<defs><clipPath id="p"><rect width="308" height="56" rx="28"/></clipPath></defs>
+<svg xmlns="http://www.w3.org/2000/svg" width="222" height="40">
+<defs><clipPath id="p"><rect width="222" height="40" rx="20"/></clipPath></defs>
 <g clip-path="url(#p)">
-<rect x="0" y="0" width="227" height="56" fill="#2B7CD3"/>
-<rect x="199" y="0" width="137" height="56" fill="#101F33"/>
+<rect x="0" y="0" width="163" height="40" fill="#2B7CD3"/>
+<rect x="143" y="0" width="99" height="40" fill="#101F33"/>
 </g>
-<g transform="translate(20,11)"><line x1="11" y1="9" x2="7" y2="3" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round"/><line x1="23" y1="9" x2="27" y2="3" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round"/><circle cx="17" cy="15" r="9" fill="#FFFFFF"/><circle cx="13.5" cy="14" r="1.9" fill="#2B7CD3"/><circle cx="20.5" cy="14" r="1.9" fill="#2B7CD3"/><rect x="7" y="26" width="20" height="8" rx="4" fill="#FFFFFF"/></g>
-<text x="68" y="30" font-family="DejaVu Sans, Arial, sans-serif" font-size="25" font-weight="bold" fill="#FFFFFF">Android</text>
-<text x="219" y="30" font-family="DejaVu Sans, Arial, sans-serif" font-size="25" font-weight="bold" fill="#EAF3FD">8.0+</text>
+<g transform="translate(14,7.0)"><g transform="scale(0.765)"><line x1="11" y1="10" x2="6.5" y2="3.5" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round"/><line x1="23" y1="10" x2="27.5" y2="3.5" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round"/><path d="M5 23 A12 12 0 0 1 29 23 Z" fill="#FFFFFF"/><ellipse cx="12.6" cy="17.5" rx="1.9" ry="2.7" fill="#2B7CD3"/><ellipse cx="21.4" cy="17.5" rx="1.9" ry="2.7" fill="#2B7CD3"/></g></g>
+<text x="49" y="21.0" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="bold" fill="#FFFFFF" dominant-baseline="central">Android</text>
+<text x="157" y="21.0" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="bold" fill="#EAF3FD" dominant-baseline="central">8.0+</text>
 </svg>
