@@ -6,6 +6,8 @@
 
 [![Version](https://img.shields.io/badge/version-v1.0.1--preview.1-7c83fd?style=for-the-badge)](https://github.com/my-live-is-a-lie/wifi-data-meter/releases/tag/v1.0.1-preview.1)
 [![Downloads](https://img.shields.io/badge/downloads-1%20total-8b6de9?style=for-the-badge)](https://github.com/my-live-is-a-lie/wifi-data-meter/releases/tag/v1.0.1-preview.1)
+[![Android Build](https://github.com/my-live-is-a-lie/wifi-data-meter/actions/workflows/android-build.yml/badge.svg?style=for-the-badge)](https://github.com/my-live-is-a-lie/wifi-data-meter/actions/workflows/android-build.yml)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=for-the-badge)](https://www.gnu.org/licenses/gpl-3.0)
 ![Android 8+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)
 
 <a href="https://github.com/my-live-is-a-lie/wifi-data-meter/releases/tag/v1.0.1-preview.1">
@@ -16,7 +18,7 @@
 
 </div>
 
-> This is an early preview and may contain bugs or unfinished features. The repository is private, so downloads require a GitHub account with repository access. GitHub provides live per-file download totals on the release page; the Downloads badge above is a snapshot.
+> This is an early preview and may contain bugs or unfinished features. GitHub provides live per-file download totals on the release page; the Downloads badge above is a snapshot.
 
 ## Features
 
