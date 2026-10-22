@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="473" height="56">
+<defs><clipPath id="p"><rect width="473" height="56" rx="28"/></clipPath></defs>
+<g clip-path="url(#p)">
+<rect x="0" y="0" width="222" height="56" fill="#F2A9A2"/>
+<rect x="194" y="0" width="307" height="56" fill="#3B2A2A"/>
+</g>
+<g transform="translate(20,11)"><polygon points="8,5 26,5 33,12 19,29 5,29 5,15" fill="#4A2323"/><circle cx="13" cy="13" r="2.6" fill="#F2A9A2"/></g>
+<text x="68" y="30" font-family="DejaVu Sans, Arial, sans-serif" font-size="25" font-weight="bold" fill="#4A2323">Version</text>
+<text x="214" y="30" font-family="DejaVu Sans, Arial, sans-serif" font-size="25" font-weight="bold" fill="#F6E8E8">v1.0.1-preview.1</text>
+</svg>
