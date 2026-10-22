@@ -55,6 +55,25 @@ jobs:
           validate-wrappers: true
           add-job-summary: always
 
+      - name: Restore release keystore from secrets
+        env:
+          RELEASE_KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE_B64 }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${RELEASE_KEYSTORE_B64:-}" ]]; then
+            echo "::error title=Signing::Secret RELEASE_KEYSTORE_B64 is not set"
+            exit 1
+          fi
+          echo "$RELEASE_KEYSTORE_B64" | base64 -d > "${RUNNER_TEMP}/release-keystore.p12"
+          {
+            echo "RELEASE_STORE_FILE=${RUNNER_TEMP}/release-keystore.p12"
+            echo "RELEASE_STORE_PASSWORD=${RELEASE_STORE_PASSWORD}"
+            echo "RELEASE_KEY_ALIAS=${RELEASE_KEY_ALIAS}"
+            echo "RELEASE_KEY_PASSWORD=${RELEASE_KEY_PASSWORD}"
+          } >> "$GITHUB_ENV"
       - name: Build release APKs and run unit tests
         run: |
           set -o pipefail

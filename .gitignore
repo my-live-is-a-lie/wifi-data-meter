@@ -14,3 +14,7 @@ build/
 *.aab
 *.hprof
 output.json
+
+# signing material must never be committed; provided via GitHub Actions Secrets
+release-keystore.p12
+keystore.properties
