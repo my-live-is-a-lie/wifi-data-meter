@@ -167,18 +167,18 @@ jobs:
           }
 
           cat > release-notes.md <<EOF
-          ## نسخة أولية قيد التطوير
+          ## Early preview — actively in development
 
-          هذا إصدار تجريبي مبكر من **مقياس الواي فاي**. التطبيق ما زال قيد التطوير، وقد تظهر أخطاء أو تتغير بعض الميزات.
+          This is an early preview of **Wi-Fi Data Meter**. The app is still under active development; bugs and changes to existing features are possible.
 
-          ### ملفات التثبيت
-          - **app-universal-release.apk** — الخيار الموصى به، يعمل على جميع معماريات أندرويد.
-          - ملفات منفصلة لمعالجات **ARM64** و**ARMv7** و**x86_64** و**x86**.
+          ### APK files
+          - **app-universal-release.apk** — recommended; works across Android architectures.
+          - Separate builds are also available for **ARM64**, **ARMv7**, **x86_64**, and **x86**.
 
-          الحد الأدنى: **Android 8.0 (API 26)**. يتطلب تحليل الاستهلاك منح صلاحية «الوصول إلى الاستخدام» من إعدادات أندرويد.
+          Minimum supported version: **Android 8.0 (API 26)**. Per-app usage requires Android's Usage access permission.
           EOF
 
-          title="$tag — نسخة أولية قيد التطوير"
+          title="$tag — Early Preview (In Development)"
           args=("$tag" "${apks[@]}" --title "$title" --notes-file release-notes.md --target "$GITHUB_SHA")
           if [[ "$prerelease" == "true" ]]; then
             args+=(--prerelease)
