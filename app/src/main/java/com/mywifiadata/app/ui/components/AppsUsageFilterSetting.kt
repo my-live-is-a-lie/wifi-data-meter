@@ -172,7 +172,11 @@ fun AppsUsageFilterSetting(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 8.dp),
-                verticalAlignment = Alignment.Top,
+                verticalAlignment = if (mode == AppsUsageFilterMode.PERCENTAGE) {
+                    Alignment.CenterVertically
+                } else {
+                    Alignment.Top
+                },
                 horizontalArrangement = if (mode == AppsUsageFilterMode.PERCENTAGE) {
                     Arrangement.SpaceBetween
                 } else {
@@ -381,10 +385,12 @@ private fun AutoRepeatPercentSlider(
 ) {
     var widthPx by remember { mutableIntStateOf(0) }
     var dragOffsetPx by remember { mutableFloatStateOf(0f) }
+    var lastStepDirection by remember { mutableIntStateOf(0) }
     val density = LocalDensity.current
     val thumbRadiusPx = with(density) { 12.dp.toPx() }
     val trackInsetPx = with(density) { 3.dp.toPx() }
     val centerDeadZonePx = with(density) { 3.dp.toPx() }
+    val edgeThresholdPx = with(density) { 4.dp.toPx() }
     val currentValue by rememberUpdatedState(value)
     val latestOnValueChange by rememberUpdatedState(onValueChange)
     val description = stringResource(R.string.apps_usage_filter_slider_description)
@@ -405,6 +411,7 @@ private fun AutoRepeatPercentSlider(
             if (activeRange <= 0f || offsetDistance <= centerDeadZonePx) {
                 elapsedMillis = 0L
                 previousIncrease = null
+                lastStepDirection = 0
                 delay(tickMillis)
                 continue
             }
@@ -426,6 +433,7 @@ private fun AutoRepeatPercentSlider(
                     previousIncrease = if (abs(currentOffset) <= centerDeadZonePx) null else currentIncrease
                 } else {
                     elapsedMillis -= intervalMillis
+                    lastStepDirection = if (currentIncrease) 1 else -1
                     latestOnValueChange(stepAppsUsageFilterPercent(currentValue, increase = currentIncrease))
                 }
             }
@@ -438,9 +446,10 @@ private fun AutoRepeatPercentSlider(
             .fillMaxWidth()
             .height(18.dp)
             .onSizeChanged { widthPx = it.width }
-            .pointerInput(widthPx, thumbRadiusPx, trackInsetPx) {
+            .pointerInput(widthPx, thumbRadiusPx, trackInsetPx, edgeThresholdPx) {
                 detectDragGestures(
                     onDragStart = { touch ->
+                        lastStepDirection = 0
                         val maxOffset = (size.width / 2f - trackInsetPx - thumbRadiusPx).coerceAtLeast(0f)
                         dragOffsetPx = (touch.x - size.width / 2f).coerceIn(-maxOffset, maxOffset)
                     },
@@ -449,8 +458,25 @@ private fun AutoRepeatPercentSlider(
                         val maxOffset = (size.width / 2f - trackInsetPx - thumbRadiusPx).coerceAtLeast(0f)
                         dragOffsetPx = (change.position.x - size.width / 2f).coerceIn(-maxOffset, maxOffset)
                     },
-                    onDragEnd = { dragOffsetPx = 0f },
-                    onDragCancel = { dragOffsetPx = 0f },
+                    onDragEnd = {
+                        val maxOffset = (size.width / 2f - trackInsetPx - thumbRadiusPx).coerceAtLeast(0f)
+                        val releasedOffset = dragOffsetPx
+                        val reachedExtreme = maxOffset > edgeThresholdPx &&
+                            abs(releasedOffset) >= maxOffset - edgeThresholdPx
+                        val releaseIncrease = releasedOffset < 0f
+                        val releaseDirection = if (releaseIncrease) 1 else -1
+                        if (reachedExtreme && lastStepDirection != releaseDirection) {
+                            latestOnValueChange(
+                                stepAppsUsageFilterPercent(currentValue, increase = releaseIncrease),
+                            )
+                        }
+                        dragOffsetPx = 0f
+                        lastStepDirection = 0
+                    },
+                    onDragCancel = {
+                        dragOffsetPx = 0f
+                        lastStepDirection = 0
+                    },
                 )
             }
             .semantics {

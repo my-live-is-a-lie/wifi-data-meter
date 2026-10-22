@@ -377,6 +377,8 @@
     <string name="qs_tile_disabled">أُوقفت وظيفة الزر. إن كان مضافًا، أزِله يدويًا من تعديل الإعدادات السريعة.</string>
     <string name="settings_more_expand">عرض إعدادات إضافية</string>
     <string name="settings_more_collapse">إخفاء إعدادات إضافية</string>
+    <string name="settings_description_expand">عرض الوصف كاملًا</string>
+    <string name="settings_description_collapse">طيّ الوصف</string>
 
     <!-- الإشعارات -->
     <string name="channel_monitor_name">مراقبة الاستهلاك</string>
