@@ -8,8 +8,8 @@
 [![Downloads](https://img.shields.io/badge/downloads-1%20total-8b6de9?style=for-the-badge)](https://github.com/my-live-is-a-lie/wifi-data-meter/releases/tag/v1.0.1-preview.1)
 ![Android 8+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)
 
-<a href="https://github.com/my-live-is-a-lie/wifi-data-meter/releases">
-  <img src="https://img.shields.io/badge/Download-GitHub%20Releases-5264d8?style=for-the-badge&logo=android&logoColor=white" alt="Browse releases and download the app" />
+<a href="https://github.com/my-live-is-a-lie/wifi-data-meter/releases/tag/v1.0.1-preview.1">
+  <img src="https://img.shields.io/badge/Download-v1.0.1%20Preview-5264d8?style=for-the-badge&logo=android&logoColor=white" alt="Open the published preview release" />
 </a>
 
 **Early preview · Actively in development · Android 8.0+**
