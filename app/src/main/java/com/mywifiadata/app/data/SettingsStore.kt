@@ -9,6 +9,7 @@ import com.mywifiadata.app.core.UsageCardStyles
 import com.mywifiadata.app.data.model.AccentColor
 import com.mywifiadata.app.data.model.AppLayoutDirection
 import com.mywifiadata.app.data.model.AppSettings
+import com.mywifiadata.app.data.model.AppsUsageFilterMode
 import com.mywifiadata.app.data.model.DashboardLayout
 import com.mywifiadata.app.data.model.MonitorTarget
 import com.mywifiadata.app.data.model.OverlayEdge
@@ -180,6 +181,15 @@ class SettingsStore(context: Context) {
         dashboardLayout = DashboardLayout.decode(prefs.getString(KEY_DASHBOARD_LAYOUT, null)),
         historyLineChartEnabled = prefs.getBoolean(KEY_HISTORY_LINE_CHART, false),
         appsLineChartEnabled = prefs.getBoolean(KEY_APPS_LINE_CHART, false),
+        appsUsageFilterEnabled = prefs.getBoolean(KEY_APPS_USAGE_FILTER_ENABLED, false),
+        appsUsageFilterMode = prefs.getString(KEY_APPS_USAGE_FILTER_MODE, null)
+            ?.let { stored -> AppsUsageFilterMode.entries.firstOrNull { it.name == stored } }
+            ?: AppsUsageFilterMode.AMOUNT,
+        appsUsageFilterAmount = prefs.getInt(KEY_APPS_USAGE_FILTER_AMOUNT, 5).coerceAtLeast(0),
+        appsUsageFilterUnit = prefs.getString(KEY_APPS_USAGE_FILTER_UNIT, null)
+            ?.let { stored -> PlanCapacityUnit.entries.firstOrNull { it.name == stored } }
+            ?: PlanCapacityUnit.MB,
+        appsUsageFilterPercent = prefs.getInt(KEY_APPS_USAGE_FILTER_PERCENT, 3).coerceIn(1, 30),
         appSearchHistory = AppSearchHistory.decode(prefs.getString(KEY_APP_SEARCH_HISTORY, null)),
         monitorTarget = MonitorTarget(
             uid = prefs.getInt(KEY_MONITOR_TARGET_UID, MonitorTarget.NO_APP),
@@ -312,6 +322,11 @@ class SettingsStore(context: Context) {
             .putString(KEY_DASHBOARD_LAYOUT, settings.dashboardLayout.encode())
             .putBoolean(KEY_HISTORY_LINE_CHART, settings.historyLineChartEnabled)
             .putBoolean(KEY_APPS_LINE_CHART, settings.appsLineChartEnabled)
+            .putBoolean(KEY_APPS_USAGE_FILTER_ENABLED, settings.appsUsageFilterEnabled)
+            .putString(KEY_APPS_USAGE_FILTER_MODE, settings.appsUsageFilterMode.name)
+            .putInt(KEY_APPS_USAGE_FILTER_AMOUNT, settings.appsUsageFilterAmount.coerceAtLeast(0))
+            .putString(KEY_APPS_USAGE_FILTER_UNIT, settings.appsUsageFilterUnit.name)
+            .putInt(KEY_APPS_USAGE_FILTER_PERCENT, settings.appsUsageFilterPercent.coerceIn(1, 30))
             .putString(KEY_APP_SEARCH_HISTORY, AppSearchHistory.encode(settings.appSearchHistory))
             .putInt(KEY_MONITOR_TARGET_UID, settings.monitorTarget.uid)
             .putString(KEY_MONITOR_TARGET_PACKAGE, settings.monitorTarget.packageName)
@@ -395,6 +410,11 @@ class SettingsStore(context: Context) {
         private const val KEY_DASHBOARD_LAYOUT = "dashboard_layout"
         private const val KEY_HISTORY_LINE_CHART = "history_line_chart_enabled"
         private const val KEY_APPS_LINE_CHART = "apps_line_chart_enabled"
+        private const val KEY_APPS_USAGE_FILTER_ENABLED = "apps_usage_filter_enabled"
+        private const val KEY_APPS_USAGE_FILTER_MODE = "apps_usage_filter_mode"
+        private const val KEY_APPS_USAGE_FILTER_AMOUNT = "apps_usage_filter_amount"
+        private const val KEY_APPS_USAGE_FILTER_UNIT = "apps_usage_filter_unit"
+        private const val KEY_APPS_USAGE_FILTER_PERCENT = "apps_usage_filter_percent"
         private const val KEY_APP_SEARCH_HISTORY = "app_search_selection_history"
         private const val KEY_MONITOR_TARGET_UID = "monitor_target_uid"
         private const val KEY_MONITOR_TARGET_PACKAGE = "monitor_target_package"

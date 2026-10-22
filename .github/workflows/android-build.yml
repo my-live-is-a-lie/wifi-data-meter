@@ -1,44 +1,9 @@
-# بناء تطبيق «مقياس الواي فاي» على GitHub Actions
-#
-# - يعتمد على الـ Wrapper المضمَّن في المشروع (Gradle 9.5.0) فلا حاجة لتثبيت Gradle يدويًا.
-# - يبني APK **إصدار (Release) بمعمارية arm64-v8a** موقّعًا وجاهزًا للتثبيت + يشغّل اختبارات الوحدة.
-# - عند إنشاء وسم v* يُرفق الملف بـ GitHub Releases، ويمكن اختيار بناء debug يدويًا من Run workflow.
-# - عند كل دفع ناجح يُدفع ملف APK أيضًا إلى فرع «apk-builds» ليسهل تنزيله مباشرة عبر git.
-#
-# أهم ما يجعل البناء سريعًا:
-#  1) Enhanced Caching من setup-gradle: كاش مُجزّأ (fine-grained) + إزالة تكرار (Deduplication)
-#     + استرجاع جزئي عبر restore keys، وهو أسرع بكثير من الكاش البسيط (الذي يفقد الكاش كاملًا
-#     عند أي تعديل في ملفات البناء). مجاني للمستودعات العامة، ومتاح حاليًا كمعاينة مجانية للخاصة.
-#     (للرجوع إلى المسار مفتوح المصدر بالكامل: cache-provider: basic)
-#  2) لا تنزيل لـ JDK: نطلب Temurin 25 الموجود مسبقًا في hosted tool cache لصورة ubuntu-latest.
-#  3) لا خطوة تثبيت لـ Android SDK: الصورة تأتي بـ cmdline-tools + build-tools 37 + platform-tools
-#     وANDROID_HOME مضبوطًا والتراخيص مقبولة، ويتكفّل AGP بتنزيل أي منصة ناقصة عند الحاجة.
-#  4) أمر Gradle واحد لكل المهام (تجميع + اختبارات) = تشغيل واحد لـ Gradle.
-#  5) تشغيل واحد فقط لكل تغيير (push على الفرع) + إلغاء التشغيلات القديمة تلقائيًا (concurrency)
-#     + تخطي البناء عند تعديل ملفات التوثيق فقط.
-#  6) الكتابة في الكاش من كل المراجع (كل فرع له نطاق كاش مستقل)، فيصبح التشغيل التالي
-#     على نفس المرجع دافئًا؛ البارد مرة واحدة فقط عند أول تشغيل.
-#  7) كاش configuration cache عبر actions/cache، وتشغيل اختبارات نسخة الإصدار
-#     (testReleaseUnitTest) بدل نسخة التصحيح لتفادي تصريف نسختين من التطبيق.
-#
-# ملاحظات:
-# - الإصدارات مثبّتة بـ SHA (نفس النسخ المستخدمة في مستودع Google الرسمي android/snippets).
-# - يمكن تعديل قائمة الفروع التي تُشغّل البناء من قسم on.push.branches.
-# - إن كانت خاصية Actions معطّلة في المستودع: Settings → Actions → General → Allow all actions.
-# - توقيع نسخة الإصدار يعتمد على الملفين release-keystore.p12 و keystore.properties في جذر المستودع،
-#   ويمكن لاحقًا استخدام أسرار بدلًا منهما: RELEASE_STORE_FILE / RELEASE_STORE_PASSWORD /
-#   RELEASE_KEY_ALIAS / RELEASE_KEY_PASSWORD (يقرأها build.gradle.kts قبل الملف).
-
-name: Android Build
+name: Android Build & Release
 
 on:
-  # بناء واحد فقط لكل فرع: الدفع إلى الفرع نفسه (أو إلى main بعد الدمج) هو
-  # المشغّل الوحيد. كان `pull_request` يُشغّل بناءً ثانيًا موازيًا لكل PR من
-  # فرع داخلي (مثل arena/**)، فيظهر تشغيلان لنفس التعديلات؛ أُزيل لأن بناء
-  # الـpush يغطيها. لو احتجت فحوص PR لاحقًا فأعِد `pull_request` مع شرط في
-  # المهمة يستثني الفروع الداخلية: !startsWith(github.head_ref, 'arena/').
   push:
     branches: [main, 'arena/**']
+    tags: ['v*']
     paths-ignore:
       - '**/*.md'
       - 'LICENSE'
@@ -46,45 +11,29 @@ on:
       - 'docs/**'
   workflow_dispatch:
     inputs:
-      variant:
-        description: 'نوع البناء (release: موقّع ومعماري arm64-v8a)'
-        type: choice
-        options: [release, debug]
-        default: release
-      run_tests:
-        description: 'تشغيل اختبارات الوحدة'
+      release_tag:
+        description: 'وسم الإصدار، مثل v1.0.1-preview.1'
+        required: true
+        type: string
+        default: 'v1.0.1-preview.1'
+      prerelease:
+        description: 'علّم الإصدار بأنه أولي وقيد التطوير'
+        required: true
         type: boolean
         default: true
-      fast_build:
-        description: 'بناء سريع بلا R8/تقليص موارد (ملف أكبر)'
-        type: boolean
-        default: false
-
-# منع تكرار التشغيلات على نفس الفرع وإلغاء الأقدم (يوفّر الوقت والدقائق).
-# المجموعة باسم الفرع لا بالـref الكامل: دفع الفرع وPR منه (أو تشغيل يدوي)
-# يتشاركان المجموعة نفسها، فيبقى بناء واحد فقط ويعمل بدل أي تشغيل مكرر.
-concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
-  cancel-in-progress: true
 
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  # ———————————————————————————— بناء APK للتصحيح + الاختبارات ————————————————————————————
   build:
-    # عند طلب إصدار يدوي، تتولى مهمة release البناء لتجنّب تكرار APK/الـ artifact.
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.variant != 'release' }}
-    name: Release APK (arm64-v8a) + Unit tests
+    name: Build all Android ABIs + tests
     runs-on: ubuntu-latest
-    timeout-minutes: 25
-
-    env:
-      # يمكن استخدام [skip tests] في رسالة دفع لتجميع/نشر APK دون اختبارات.
-      RUN_TESTS: ${{ (github.event_name != 'workflow_dispatch' || inputs.run_tests) && !(github.event_name == 'push' && contains(github.event.head_commit.message, '[skip tests]')) }}
-      # الافتراضي: بناء الإصدار. اختيار debug متاح عند التشغيل اليدوي فقط.
-      VARIANT: ${{ github.event_name == 'workflow_dispatch' && inputs.variant || 'release' }}
-      FAST_BUILD: ${{ github.event_name == 'workflow_dispatch' && inputs.fast_build || 'false' }}
+    timeout-minutes: 35
 
     steps:
       - name: Checkout
@@ -92,322 +41,147 @@ jobs:
         with:
           persist-credentials: false
 
-      # Temurin 25 موجود مسبقًا في الـ tool cache الخاص بصورة ubuntu-latest،
-      # فالتجهيز يستغرق ثانية أو ثانيتين بدون أي تنزيل (أسرع ~10 ثوانٍ من تنزيل Zulu).
-      - name: Set up JDK 25 (Temurin, pre-cached)
+      - name: Set up JDK 25
         uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: temurin
           java-version: '25'
 
-      # الكاش: مجلد Gradle User Home (الاعتماديات + distribution الـ Wrapper + مخزن البناء)
-      # مع إزالة التكرار بين التشغيلات، ويعرض أيضًا ملخصًا للبناء في صفحة التشغيل.
-      - name: Set up Gradle (enhanced caching)
-        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6
-        with:
-          cache-provider: enhanced # الكاش المحسّن (الافتراضي في v6): تجزئة دقيقة + إزالة تكرار + restore keys
-          # الكتابة في الكاش مفعّلة لكل المراجع: كاش كل مرجع (فرع أو PR) مستقل عن غيره،
-          # فيستفيد التشغيل التالي على نفس المرجع من كاش دافئ (أول تشغيل على كل مرجع هو البارد فقط).
-          cache-read-only: false
-          cache-cleanup: on-success
-          validate-wrappers: true # ملف gradle-wrapper.jar مأخوذ من مستودع Google الرسمي
-          add-job-summary: always
-
-      # صورة ubuntu-latest تتضمن Android SDK مسبقًا (cmdline-tools + build-tools 37 + platform-tools)
-      # مع ANDROID_HOME/ANDROID_SDK_ROOT جاهزين وتراخيص مقبولة، ويقوم AGP بتنزيل أي مكوّن ناقص.
-      # لذلك نكتفي بخطوة تحقق سريعة (< ثانية) بدل خطوات تثبيت تكلّف ~16 ثانية في كل تشغيل.
-      - name: Verify Android SDK (preinstalled)
-        run: |
-          SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
-          echo "ANDROID_HOME=$SDK_ROOT"
-          echo "platforms:  $(ls "$SDK_ROOT/platforms" 2>/dev/null | tr '\n' ' ')"
-          echo "build-tools: $(ls "$SDK_ROOT/build-tools" 2>/dev/null | tr '\n' ' ')"
-
-      # كاش configuration cache: يوفّر مرحلة إعداد المشروع (فحص التبعيات وبناء شجرة المهام)
-      # في التشغيلات التالية. يعمل بدون أي أسرار، ولا يعطّل البناء إن لم يوجد الكاش.
-      - name: Cache Gradle configuration cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: .gradle/configuration-cache
-          key: gradle-config-cache-v1-${{ runner.os }}-${{ hashFiles('**/*.gradle.kts', '**/gradle-wrapper.properties', 'gradle/libs.versions.toml', 'gradle.properties') }}
-          restore-keys: |
-            gradle-config-cache-v1-${{ runner.os }}-
-
-      # كاش مخرجات المهام (Build Cache) بمفتاح ثابت: يعيد استخدام نتائج R8 وتصريف Kotlin
-      # بين التشغيلات حتى لا تُعاد من الصفر في كل مرة (يُخزَّن آخر تشغيل ويُقرأ في التالي).
-      - name: Cache Gradle build cache (task outputs)
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.gradle/caches/build-cache-1
-          key: gradle-build-cache-v1-${{ runner.os }}-${{ github.ref_name }}-${{ github.run_id }}
-          restore-keys: |
-            gradle-build-cache-v1-${{ runner.os }}-${{ github.ref_name }}-
-            gradle-build-cache-v1-${{ runner.os }}-
-
-      # أمر Gradle واحد لكل المهام: هدف التجميع المطلوب فقط + اختبارات نفس النوع
-      # (assembleRelease يشمل R8 وتقليص الموارد، ولا يشمل lint لأن checkReleaseBuilds=false).
-      # الناتج يُحفظ في build.log لتحليل الأخطاء عند الفشل.
-      - name: Build APK and run unit tests
-        run: |
-          set -o pipefail
-          if [ "$VARIANT" = "debug" ]; then
-            TASKS=":app:assembleDebug"
-            TEST_TASK=":app:testDebugUnitTest"
-          else
-            TASKS=":app:assembleRelease"
-            TEST_TASK=":app:testReleaseUnitTest"
-          fi
-          if [ "$RUN_TESTS" = "true" ]; then
-            TASKS="$TASKS $TEST_TASK"
-          fi
-          echo "نوع البناء: $VARIANT | المهام: $TASKS"
-          EXTRA_FLAGS=""
-          if [ "$FAST_BUILD" = "true" ]; then
-            EXTRA_FLAGS="-Pmywifi.minify=false"
-            echo "وضع البناء السريع: بلا R8 وبلا تقليص موارد"
-          fi
-          ./gradlew $TASKS $EXTRA_FLAGS --stacktrace --console=plain 2>&1 | tee build.log
-
-      # تحقق سريع من الناتج (الاسم، الحجم، المعمارية، التوقيع) يظهر كملاحظة في صفحة التشغيل
-      - name: Verify APK (signature + ABI)
-        run: |
-          APK="$(ls app/build/outputs/apk/*/*.apk 2>/dev/null | head -1)"
-          [ -n "$APK" ] || { echo "::error title=APK::لم يُعثر على ملف APK"; exit 1; }
-          NAME="$(basename "$APK")"
-          SIZE="$(du -h "$APK" | cut -f1)"
-          ABIS="$(unzip -l "$APK" | grep -o 'lib/[^/]*/' | sort -u | tr '\n' ' ' || true)"
-          TOOLS="$(ls -d "${ANDROID_SDK_ROOT:-$ANDROID_HOME}"/build-tools/* 2>/dev/null | sort -V | tail -1)"
-          SIGNED="غير موقّع"
-          if [ -n "$TOOLS" ] && [ -x "$TOOLS/apksigner" ]; then
-            if "$TOOLS/apksigner" verify --print-certs "$APK" > /tmp/apk-verify.txt 2>&1; then
-              SIGNED="موقّع ✓ ($(grep -m1 'certificate DN' /tmp/apk-verify.txt | sed 's/^ *//'))"
-            else
-              SIGNED="فشل التحقق: $(head -2 /tmp/apk-verify.txt | tr '\n' ' ')"
-            fi
-          fi
-          MSG="${NAME} | ${SIZE} | ${SIGNED} | مكتبات أصلية: ${ABIS:-none}"
-          echo "::notice title=APK::${MSG}"
-          echo "$MSG"
-
-      # عند الفشل: أهم أسطر الخطأ تُنشر كتنبيهات (annotations) تظهر في صفحة التشغيل مباشرة.
-      # الحد الأقصى 10 تنبيهات لكل خطوة، لذا نوزّع الأخطاء على خطوتين (حتى 20 خطأ).
-      - name: Show failure details (errors 1-10)
-        if: failure()
-        run: |
-          [ -f build.log ] || { echo "لا يوجد سجل بناء"; exit 0; }
-          {
-            echo "### أسطر الخطأ"
-            echo '```'
-            grep -E "^e: |error: |Execution failed for task|What went wrong|Caused by:|Could not (find|resolve|determine|install)" build.log | head -40 || true
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-
-          mapfile -t ERRORS < <(grep -E "^e: |error: |Execution failed for task|What went wrong|Could not (find|resolve|determine|install)" build.log | head -10)
-          for line in "${ERRORS[@]}"; do
-            echo "::error title=Build::$(printf '%s' "$line" | sed 's/%/%25/g; s/\r//g')"
-          done
-
-          # رسالة الفشل الحقيقية: الأسطر التالية لعبارة «What went wrong:» (أي خطأ غير مطابق للأنماط أعلاه)
-          START="$(grep -n 'What went wrong' build.log | head -1 | cut -d: -f1)"
-          if [ -n "$START" ]; then
-            CAUSE="$(tail -n +"$START" build.log | head -n 20 | sed 's/%/%25/g; s/\r//g' | sed ':a;N;$!ba;s/\n/%0A/g')"
-            echo "::error title=Cause::${CAUSE}"
-          fi
-
-          # رسالة الفشل الحقيقية: الأسطر التالية لعبارة «What went wrong:» (أي خطأ غير مطابق للأنماط أعلاه)
-          START="$(grep -n 'What went wrong' build.log | head -1 | cut -d: -f1)"
-          if [ -n "$START" ]; then
-            CAUSE="$(tail -n +"$START" build.log | head -n 20 | sed 's/%/%25/g; s/\r//g' | sed ':a;N;$!ba;s/\n/%0A/g')"
-            echo "::error title=Cause::${CAUSE}"
-          fi
-
-      - name: Show failure details (errors 11-20)
-        if: failure()
-        run: |
-          [ -f build.log ] || exit 0
-          mapfile -t ERRORS < <(grep -E "^e: |error: |Execution failed for task|What went wrong|Could not (find|resolve|determine|install)" build.log | sed -n '11,20p')
-          for line in "${ERRORS[@]}"; do
-            echo "::error title=Build2::$(printf '%s' "$line" | sed 's/%/%25/g; s/\r//g')"
-          done
-
-      # آخر 30 سطرًا في تنبيه واحد (يحتوي عادةً على سبب الفشل النهائي)
-      - name: Show failure tail
-        if: failure()
-        run: |
-          [ -f build.log ] || exit 0
-          TAIL="$(tail -n 30 build.log | sed 's/%/%25/g; s/\r//g' | sed ':a;N;$!ba;s/\n/%0A/g')"
-          echo "::error title=Tail::${TAIL}"
-
-      # اختبارات الوحدة الفاشلة تُنشر كتنبيهات باسم الصنف والدالة وسبب الفشل،
-      # فلا نحتاج إلى تنزيل تقرير HTML لمعرفة أي اختبار أسقط البناء.
-      - name: Show failing unit tests
-        if: failure()
-        run: python3 .github/scripts/report-test-failures.py
-
-      - name: Upload build log (on failure)
-        if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: build-log
-          path: build.log
-          if-no-files-found: ignore
-          compression-level: 9
-          retention-days: 7
-
-      - name: Upload APK
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: app-${{ env.VARIANT }}-apk
-          path: app/build/outputs/apk/**/*.apk
-          if-no-files-found: error
-          compression-level: 0 # الـ APK مضغوط أصلًا، فالرفع يصبح أسرع
-          retention-days: 7
-
-      - name: Upload unit test report (on failure)
-        if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: unit-test-report
-          path: app/build/reports/tests/
-          if-no-files-found: ignore
-          retention-days: 7
-
-  # ———————————————— بناء الإصدار للوسوم (v*) ورفعه إلى GitHub Releases ————————————————
-  # نفس مخرجات مهمة build (app-arm64-v8a-release.apk موقّع) لكنها تُرفق بـ Release عند وسم v*.
-  release:
-    name: Release APK (arm64-v8a, signed)
-    if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.variant == 'release') }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    permissions:
-      contents: write # لإنشاء Release ورفع ملف APK إليه عند بناء وسم v*
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          persist-credentials: false
-
-      - name: Set up JDK 25 (Temurin, pre-cached)
-        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
-        with:
-          distribution: temurin
-          java-version: '25'
-
-      - name: Set up Gradle (enhanced caching)
+      - name: Set up Gradle
         uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6
         with:
           cache-provider: enhanced
-          # الوسوم تُبنى مرات قليلة، فلا داعي للكتابة في الكاش منها (نطاق الكاش لا يصل للفروع)
-          cache-read-only: ${{ startsWith(github.ref, 'refs/tags/v') }}
           cache-cleanup: on-success
           validate-wrappers: true
+          add-job-summary: always
 
-      - name: Verify Android SDK (preinstalled)
+      - name: Build release APKs and run unit tests
         run: |
-          SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
-          echo "ANDROID_HOME=$SDK_ROOT"
-          echo "platforms:  $(ls "$SDK_ROOT/platforms" 2>/dev/null | tr '\n' ' ')"
-          echo "build-tools: $(ls "$SDK_ROOT/build-tools" 2>/dev/null | tr '\n' ' ')"
+          set -o pipefail
+          ./gradlew :app:assembleRelease :app:testReleaseUnitTest --stacktrace --console=plain 2>&1 | tee build.log
 
-      # كاش configuration cache: يوفّر مرحلة إعداد المشروع (فحص التبعيات وبناء شجرة المهام)
-      # في التشغيلات التالية. يعمل بدون أي أسرار، ولا يعطّل البناء إن لم يوجد الكاش.
-      - name: Cache Gradle configuration cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: .gradle/configuration-cache
-          key: gradle-config-cache-v1-${{ runner.os }}-${{ hashFiles('**/*.gradle.kts', '**/gradle-wrapper.properties', 'gradle/libs.versions.toml', 'gradle.properties') }}
-          restore-keys: |
-            gradle-config-cache-v1-${{ runner.os }}-
-
-      # كاش مخرجات المهام (Build Cache) بمفتاح ثابت: يعيد استخدام نتائج R8 وتصريف Kotlin
-      # بين التشغيلات حتى لا تُعاد من الصفر في كل مرة (يُخزَّن آخر تشغيل ويُقرأ في التالي).
-      - name: Cache Gradle build cache (task outputs)
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.gradle/caches/build-cache-1
-          key: gradle-build-cache-v1-${{ runner.os }}-${{ github.ref_name }}-${{ github.run_id }}
-          restore-keys: |
-            gradle-build-cache-v1-${{ runner.os }}-${{ github.ref_name }}-
-            gradle-build-cache-v1-${{ runner.os }}-
-
-      - name: Build release APK (R8 + resource shrinking)
-        run: ./gradlew :app:assembleRelease --stacktrace --console=plain 2>&1 | tee build.log
-
-      - name: Show failure details
-        if: failure()
+      - name: Verify APKs and release signature
+        shell: bash
         run: |
-          [ -f build.log ] || exit 0
-          mapfile -t ERRORS < <(grep -E "^e: |error: |Execution failed for task|What went wrong|Could not (find|resolve|determine|install)" build.log | head -10)
-          for line in "${ERRORS[@]}"; do
-            echo "::error title=Build::$(printf '%s' "$line" | sed 's/%/%25/g; s/\r//g')"
+          set -euo pipefail
+          APK_DIR="app/build/outputs/apk/release"
+          EXPECTED_APKS=(
+            app-arm64-v8a-release.apk
+            app-armeabi-v7a-release.apk
+            app-x86_64-release.apk
+            app-x86-release.apk
+            app-universal-release.apk
+          )
+          APKSIGNER="$(find "${ANDROID_SDK_ROOT:-$ANDROID_HOME}/build-tools" -type f -name apksigner | sort -V | tail -1)"
+          [[ -x "$APKSIGNER" ]] || { echo '::error::apksigner was not found'; exit 1; }
+
+          {
+            echo '### Release APKs (signed)'
+            echo
+            echo '| File | Size |'
+            echo '|---|---:|'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          for name in "${EXPECTED_APKS[@]}"; do
+            apk="$APK_DIR/$name"
+            [[ -s "$apk" ]] || { echo "::error title=Missing APK::$name"; exit 1; }
+            "$APKSIGNER" verify "$apk"
+            size="$(du -h "$apk" | cut -f1)"
+            echo "| \`$name\` | $size |" >> "$GITHUB_STEP_SUMMARY"
+            echo "Verified $name ($size)"
           done
 
-      - name: Show failure tail
-        if: failure()
-        run: |
-          [ -f build.log ] || exit 0
-          TAIL="$(tail -n 30 build.log | sed 's/%/%25/g; s/\r//g' | sed ':a;N;$!ba;s/\n/%0A/g')"
-          echo "::error title=Tail::${TAIL}"
-
-      - name: Upload release APK
+      - name: Upload release APKs
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: app-release-apk
+          name: release-apks-${{ github.run_number }}
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
           compression-level: 0
           retention-days: 30
 
-      - name: Attach APK to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 \
-            || gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes "بناء تلقائي من GitHub Actions"
-          gh release upload "$GITHUB_REF_NAME" app/build/outputs/apk/release/*.apk --clobber
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: build-log-${{ github.run_number }}
+          path: build.log
+          if-no-files-found: ignore
+          retention-days: 7
 
-  # ——————————————————— نشر ملف APK على فرع apk-builds ———————————————————
-  # بعض البيئات تحجب تنزيل أرشيفات Actions وملفات Releases (Azure Blob)،
-  # لذا يُدفع الـ APK إلى فرع مستقل في المستودع نفسه ليُجلب عبر git.
-  # الفرع يُستبدل بالكامل في كل بناء (force-push) فيبقى هو آخر نسخة مبنية.
-  publish:
-    name: Publish APK to apk-builds branch
+  publish-release:
+    name: Publish GitHub Release
     needs: build
-    if: ${{ github.event_name == 'push' }}
+    if: >-
+      ${{ startsWith(github.ref, 'refs/tags/v')
+          || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
+          || (github.event_name == 'push'
+              && startsWith(github.ref, 'refs/heads/arena/')
+              && contains(github.event.head_commit.message, '[publish-release]')) }}
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     permissions:
-      contents: write # لدفع ملف APK إلى فرع apk-builds
+      contents: write
 
     steps:
-      - name: Download APK artifact
+      - name: Checkout version metadata
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Download signed APKs
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: app-release-apk
-          path: apk
+          name: release-apks-${{ github.run_number }}
+          path: release-apks
 
-      - name: Push APK to apk-builds branch
+      - name: Create prerelease and attach all APKs
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG_INPUT: ${{ inputs.release_tag }}
+          RELEASE_PRERELEASE_INPUT: ${{ inputs.prerelease }}
         run: |
           set -euo pipefail
-          # الـ artifact يحتفظ ببنية المجلدات (release/...)، فنبحث بـ find
-          APK="$(find apk -type f -name '*.apk' | head -1)"
-          if [ -z "$APK" ]; then
-            echo "::error title=APK::لم يُعثر على ملف APK داخل الأرشيف"
-            find apk -type f -print || true
-            exit 1
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            tag="$RELEASE_TAG_INPUT"
+            prerelease="$RELEASE_PRERELEASE_INPUT"
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            tag="$GITHUB_REF_NAME"
+            prerelease=false
+          else
+            version_name="$(sed -nE 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' app/build.gradle.kts | head -1)"
+            [[ -n "$version_name" ]] || { echo '::error title=Release version::Could not read app versionName'; exit 1; }
+            tag="v$version_name"
+            prerelease=false
           fi
-          echo "الملف: $APK ($(du -h "$APK" | cut -f1))"
-          STAGE="$(mktemp -d)"
-          cp "$APK" "$STAGE/app-release.apk"
-          cd "$STAGE"
-          git init -q -b main
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app-release.apk
-          git commit -qm "APK ${GITHUB_SHA} (${GITHUB_REF_NAME}) run=${GITHUB_RUN_ID}"
-          git push -f "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" main:refs/heads/apk-builds
-          echo "تم دفع app-release.apk إلى فرع apk-builds"
+          case "$tag" in
+            *-alpha*|*-beta*|*-preview*|*-rc*) prerelease=true ;;
+          esac
+          [[ "$tag" == v* ]] || { echo "::error title=Release tag::Expected a tag starting with v"; exit 1; }
+
+          mapfile -t apks < <(find release-apks -type f -name '*.apk' -print | sort)
+          [[ "${#apks[@]}" -eq 5 ]] || {
+            echo "::error title=Release assets::Expected 5 APKs, found ${#apks[@]}"
+            find release-apks -type f -print || true
+            exit 1
+          }
+
+          cat > release-notes.md <<EOF
+          ## Early preview — actively in development
+
+          This is an early preview of **Wi-Fi Data Meter**. The app is still under active development; bugs and changes to existing features are possible.
+
+          ### APK files
+          - **app-universal-release.apk** — recommended; works across Android architectures.
+          - Separate builds are also available for **ARM64**, **ARMv7**, **x86_64**, and **x86**.
+
+          Minimum supported version: **Android 8.0 (API 26)**. Per-app usage requires Android's Usage access permission.
+          EOF
+
+          title="$tag — Early Preview (In Development)"
+          args=("$tag" "${apks[@]}" --title "$title" --notes-file release-notes.md --target "$GITHUB_SHA")
+          if [[ "$prerelease" == "true" ]]; then
+            args+=(--prerelease)
+          fi
+          gh release create "${args[@]}"
+          gh release view "$tag" --json tagName,name,isPrerelease,assets --jq '{tagName, name, isPrerelease, assets: [.assets[].name]}'

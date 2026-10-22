@@ -2,6 +2,7 @@ package com.mywifiadata.app.core
 
 import com.mywifiadata.app.data.model.AppUsage
 import com.mywifiadata.app.data.model.AppsFilter
+import com.mywifiadata.app.data.model.PlanCapacityUnit
 import com.mywifiadata.app.data.model.TrafficTotals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -121,6 +122,65 @@ class AppsUsageFiltersTest {
         assertEquals(listOf(2, 1), filterApps(apps, AppsFilter.ALL).map { it.uid })
         assertEquals(listOf(1), filterApps(apps, AppsFilter.INSTALLED).map { it.uid })
         assertEquals(listOf(1, 2), filterApps(apps, AppsFilter.ALL, sortOrder = AppsSortOrder.LOWEST_USAGE).map { it.uid })
+    }
+
+    @Test
+    fun `usage amount filter hides apps at or below the selected byte amount`() {
+        val apps = listOf(app(1, 5_000_000), app(2, 5_000_001), app(3, 20_000_000))
+        assertEquals(listOf(2, 3), filterAppsAtOrBelowUsage(apps, 5_000_000).map { it.uid })
+        assertEquals(listOf(1, 2, 3), filterAppsAtOrBelowUsage(apps, -1).map { it.uid })
+        assertEquals(5_000_000L, appUsageThresholdBytes(5, PlanCapacityUnit.MB))
+        assertEquals(5_000_000_000L, appUsageThresholdBytes(5, PlanCapacityUnit.GB))
+        assertEquals(5_000_000_000_000L, appUsageThresholdBytes(5, PlanCapacityUnit.TB))
+    }
+
+    @Test
+    fun `percentage filter hides the lowest usage tail closest to the selected share`() {
+        val apps = listOf(app(1, 70), app(2, 10), app(3, 20))
+        assertEquals(listOf(1), filterAppsByCumulativeUsagePercent(apps, 30).map { it.uid })
+        assertEquals(apps.map { it.uid }, filterAppsByCumulativeUsagePercent(apps, 0).map { it.uid })
+    }
+
+    @Test
+    fun `percentage filter never hides the only app or removes a dominant final app`() {
+        assertEquals(listOf(1), filterAppsByCumulativeUsagePercent(listOf(app(1, 100)), 30).map { it.uid })
+        assertEquals(listOf(2), filterAppsByCumulativeUsagePercent(listOf(app(1, 1), app(2, 99)), 30).map { it.uid })
+    }
+
+    @Test
+    fun `percentage control steps in both directions and wraps continuously`() {
+        assertEquals(6, stepAppsUsageFilterPercent(5, increase = true))
+        assertEquals(4, stepAppsUsageFilterPercent(5, increase = false))
+        assertEquals(1, stepAppsUsageFilterPercent(30, increase = true))
+        assertEquals(30, stepAppsUsageFilterPercent(1, increase = false))
+        assertEquals(1, wrapAppsUsageFilterPercent(31))
+        assertEquals(30, wrapAppsUsageFilterPercent(0))
+        assertEquals(15, wrapAppsUsageFilterPercent(45))
+    }
+
+    @Test
+    fun `percentage slider speeds up gently with distance and stays within a precise rate range`() {
+        val centerInterval = appsUsageFilterRepeatIntervalMillis(0f)
+        val nearCenterInterval = appsUsageFilterRepeatIntervalMillis(0.2f)
+        val farInterval = appsUsageFilterRepeatIntervalMillis(0.8f)
+
+        assertEquals(900L, centerInterval)
+        assertTrue(centerInterval > nearCenterInterval)
+        assertTrue(nearCenterInterval > farInterval)
+        assertEquals(450L, appsUsageFilterRepeatIntervalMillis(1f))
+        assertEquals(450L, appsUsageFilterRepeatIntervalMillis(2f))
+    }
+
+    @Test
+    fun `percentage filter leaves zero total lists unchanged and hides zero usage tail when total exists`() {
+        assertEquals(
+            listOf(1, 2),
+            filterAppsByCumulativeUsagePercent(listOf(app(1, 0), app(2, 0)), 5).map { it.uid },
+        )
+        assertEquals(
+            listOf(2),
+            filterAppsByCumulativeUsagePercent(listOf(app(1, 0), app(2, 100)), 5).map { it.uid },
+        )
     }
 
 }

@@ -105,6 +105,8 @@ fun AppsScreen(
     BackHandler(enabled = isActive && state.appsSearchActive) { onSearchActiveChange(false) }
     val apps = state.visibleApps
     val totalBytes = state.filteredApps.sumOf { it.totals.totalBytes }.coerceAtLeast(1L)
+    val isEmptyDueToUsageFilter = state.settings.appsUsageFilterEnabled &&
+        !state.appsSearchActive && state.filteredApps.isNotEmpty() && apps.isEmpty()
     // Search has its own viewport. The normal list state is never scrolled or measured
     // against filtered results, so closing search restores its exact index and offset.
     fun changeSearchActive(active: Boolean) {
@@ -273,12 +275,14 @@ fun AppsScreen(
                                 icon = Icons.Rounded.Apps,
                                 title = stringResource(
                                     when {
+                                        isEmptyDueToUsageFilter -> R.string.apps_usage_filter_empty_title
                                         !state.appsSearchActive || state.appsSearchQuery.isBlank() -> R.string.apps_empty_title
                                         else -> R.string.apps_search_empty_title
                                     },
                                 ),
                                 message = stringResource(
                                     when {
+                                        isEmptyDueToUsageFilter -> R.string.apps_usage_filter_empty_body
                                         !state.appsSearchActive || state.appsSearchQuery.isBlank() -> R.string.apps_empty_body
                                         else -> R.string.apps_search_empty_body
                                     },

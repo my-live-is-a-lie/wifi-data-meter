@@ -17,6 +17,9 @@ import com.mywifiadata.app.core.appsUsageRange
 import com.mywifiadata.app.core.availableHistoryMonths
 import com.mywifiadata.app.core.availableHistoryYears
 import com.mywifiadata.app.core.filterApps
+import com.mywifiadata.app.core.filterAppsAtOrBelowUsage
+import com.mywifiadata.app.core.filterAppsByCumulativeUsagePercent
+import com.mywifiadata.app.core.appUsageThresholdBytes
 import com.mywifiadata.app.core.isCustomHistoryMonth
 import com.mywifiadata.app.core.resolveHistoryMonthForYear
 import com.mywifiadata.app.core.within
@@ -39,11 +42,13 @@ import com.mywifiadata.app.data.model.AppLayoutDirection
 import com.mywifiadata.app.data.model.AppSettings
 import com.mywifiadata.app.data.model.AppUsage
 import com.mywifiadata.app.data.model.AppsFilter
+import com.mywifiadata.app.data.model.AppsUsageFilterMode
 import com.mywifiadata.app.data.model.CompletedPlanRecord
 import com.mywifiadata.app.data.model.DayUsage
 import com.mywifiadata.app.data.model.DashboardLayout
 import com.mywifiadata.app.data.model.DataPlan
 import com.mywifiadata.app.data.model.MonitorTarget
+import com.mywifiadata.app.data.model.PlanCapacityUnit
 import com.mywifiadata.app.data.model.PlanDraft
 import com.mywifiadata.app.data.model.PlanNetworkType
 import com.mywifiadata.app.data.model.SpeedSample
@@ -254,7 +259,22 @@ data class UiState(
 
     val visibleApps: List<AppUsage>
         get() {
-            val sorted = filterApps(apps, appsFilter, sortOrder = appsSortOrder)
+            val typedApps = filterApps(apps, appsFilter)
+            val usageFilteredApps = if (!settings.appsUsageFilterEnabled) {
+                typedApps
+            } else {
+                when (settings.appsUsageFilterMode) {
+                    AppsUsageFilterMode.AMOUNT -> filterAppsAtOrBelowUsage(
+                        typedApps,
+                        appUsageThresholdBytes(settings.appsUsageFilterAmount, settings.appsUsageFilterUnit),
+                    )
+                    AppsUsageFilterMode.PERCENTAGE -> filterAppsByCumulativeUsagePercent(
+                        typedApps,
+                        settings.appsUsageFilterPercent,
+                    )
+                }
+            }
+            val sorted = filterApps(usageFilteredApps, AppsFilter.ALL, sortOrder = appsSortOrder)
             val matching = if (appsSearchActive) {
                 AppSearchHistory.search(sorted, appsSearchQuery, settings.appSearchHistory)
             } else sorted
@@ -1316,6 +1336,26 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
 
     fun setAppsLineChartEnabled(enabled: Boolean) {
         repository.settingsStore.update { it.copy(appsLineChartEnabled = enabled) }
+    }
+
+    fun setAppsUsageFilterEnabled(enabled: Boolean) {
+        repository.settingsStore.update { it.copy(appsUsageFilterEnabled = enabled) }
+    }
+
+    fun setAppsUsageFilterMode(mode: AppsUsageFilterMode) {
+        repository.settingsStore.update { it.copy(appsUsageFilterMode = mode) }
+    }
+
+    fun setAppsUsageFilterAmount(amount: Int) {
+        repository.settingsStore.update { it.copy(appsUsageFilterAmount = amount.coerceAtLeast(0)) }
+    }
+
+    fun setAppsUsageFilterUnit(unit: PlanCapacityUnit) {
+        repository.settingsStore.update { it.copy(appsUsageFilterUnit = unit) }
+    }
+
+    fun setAppsUsageFilterPercent(percent: Int) {
+        repository.settingsStore.update { it.copy(appsUsageFilterPercent = percent.coerceIn(1, 30)) }
     }
 
     fun setCycleStartDay(day: Int) {
