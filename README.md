@@ -4,10 +4,10 @@
 
 <p><strong>Track Wi‑Fi data usage, understand app traffic, and stay ahead of your plan.</strong></p>
 
-<a href="https://github.com/my-live-is-a-lie/wifi-data-meter/releases/tag/v1.0.1-preview.1"><img src="docs/images/badges/version.svg?v=2" alt="Version" /></a>
-<a href="https://github.com/my-live-is-a-lie/wifi-data-meter/releases"><img src="docs/images/badges/downloads.svg?v=2" alt="Downloads" /></a>
-<a href="https://www.gnu.org/licenses/gpl-3.0"><img src="docs/images/badges/license.svg?v=2" alt="License" /></a>
-<img src="docs/images/badges/android.svg?v=2" alt="Android" />
+<a href="https://github.com/my-live-is-a-lie/wifi-data-meter/releases/tag/v1.0.1-preview.1"><img src="docs/images/badges/version.svg?v=3" alt="Version" /></a>
+<a href="https://github.com/my-live-is-a-lie/wifi-data-meter/releases"><img src="docs/images/badges/downloads.svg?v=3" alt="Downloads" /></a>
+<a href="https://www.gnu.org/licenses/gpl-3.0"><img src="docs/images/badges/license.svg?v=3" alt="License" /></a>
+<img src="docs/images/badges/android.svg?v=3" alt="Android" />
 
 
 **Early preview · Actively in development · Android 8.0+**
