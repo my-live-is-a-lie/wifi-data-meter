@@ -145,6 +145,25 @@ jobs:
       # أمر Gradle واحد لكل المهام: هدف التجميع المطلوب فقط + اختبارات نفس النوع
       # (assembleRelease يشمل R8 وتقليص الموارد، ولا يشمل lint لأن checkReleaseBuilds=false).
       # الناتج يُحفظ في build.log لتحليل الأخطاء عند الفشل.
+      - name: Restore release keystore from secrets
+        env:
+          RELEASE_KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE_B64 }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${RELEASE_KEYSTORE_B64:-}" ]]; then
+            echo "::error title=Signing::Secret RELEASE_KEYSTORE_B64 is not set"
+            exit 1
+          fi
+          echo "$RELEASE_KEYSTORE_B64" | base64 -d > "${RUNNER_TEMP}/release-keystore.p12"
+          {
+            echo "RELEASE_STORE_FILE=${RUNNER_TEMP}/release-keystore.p12"
+            echo "RELEASE_STORE_PASSWORD=${RELEASE_STORE_PASSWORD}"
+            echo "RELEASE_KEY_ALIAS=${RELEASE_KEY_ALIAS}"
+            echo "RELEASE_KEY_PASSWORD=${RELEASE_KEY_PASSWORD}"
+          } >> "$GITHUB_ENV"
       - name: Build APK and run unit tests
         run: |
           set -o pipefail
@@ -323,6 +342,25 @@ jobs:
             gradle-build-cache-v1-${{ runner.os }}-${{ github.ref_name }}-
             gradle-build-cache-v1-${{ runner.os }}-
 
+      - name: Restore release keystore from secrets
+        env:
+          RELEASE_KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE_B64 }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${RELEASE_KEYSTORE_B64:-}" ]]; then
+            echo "::error title=Signing::Secret RELEASE_KEYSTORE_B64 is not set"
+            exit 1
+          fi
+          echo "$RELEASE_KEYSTORE_B64" | base64 -d > "${RUNNER_TEMP}/release-keystore.p12"
+          {
+            echo "RELEASE_STORE_FILE=${RUNNER_TEMP}/release-keystore.p12"
+            echo "RELEASE_STORE_PASSWORD=${RELEASE_STORE_PASSWORD}"
+            echo "RELEASE_KEY_ALIAS=${RELEASE_KEY_ALIAS}"
+            echo "RELEASE_KEY_PASSWORD=${RELEASE_KEY_PASSWORD}"
+          } >> "$GITHUB_ENV"
       - name: Build release APK (R8 + resource shrinking)
         run: ./gradlew :app:assembleRelease --stacktrace --console=plain 2>&1 | tee build.log
 
