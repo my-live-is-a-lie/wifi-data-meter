@@ -1,6 +1,11 @@
 <div align="center">
 
-<h2><img src="docs/images/app-icon.png" width="44" align="center" alt="Wi-Fi Data Meter app icon" /> Wi‑Fi Data Meter</h2>
+<table>
+  <tr>
+    <td valign="middle"><img src="docs/images/app-icon.png" width="44" alt="Wi-Fi Data Meter app icon" /></td>
+    <td valign="middle"><h2>Wi‑Fi Data Meter</h2></td>
+  </tr>
+</table>
 
 <p><strong>Track Wi‑Fi data usage, understand app traffic, and stay ahead of your plan.</strong></p>
 
