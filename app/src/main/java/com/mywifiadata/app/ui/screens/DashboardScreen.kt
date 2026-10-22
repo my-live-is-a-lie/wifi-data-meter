@@ -427,7 +427,7 @@ fun DashboardScreen(
             userScrollEnabled = !isEditing || dragState.activeLongPressIds.isEmpty(),
             // تُترك مساحة أفقية للبطاقات العادية، بينما تمتد الواجهة المصغّرة حتى حافتي الشاشة.
             contentPadding = PaddingValues(
-                top = if (isEditing) 0.dp else contentPadding.calculateTopPadding(),
+                top = if (isEditing) 16.dp else contentPadding.calculateTopPadding(),
                 bottom = contentPadding.calculateBottomPadding(),
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -1361,7 +1361,7 @@ private fun FullGaugeContent(
             usageValue = usageValue,
             usageLabel = usageLabel,
             usedValue = usedValue,
-            modifier = Modifier.align(Alignment.Center),
+            modifier = Modifier.fillMaxSize(),
         )
         if (daysLeft != null) {
             Column(
@@ -1395,28 +1395,32 @@ private fun FullGaugeCenter(
     usedValue: String,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
+    Box(modifier = modifier.fillMaxSize()) {
         Text(
             text = usageValue,
             style = MaterialTheme.typography.displaySmallEmphasized,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
+            modifier = Modifier.align(Alignment.Center),
         )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = usageLabel,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = usedValue,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
-        )
+        Column(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .offset(y = 40.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = usageLabel,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = usedValue,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
     }
 }
 
