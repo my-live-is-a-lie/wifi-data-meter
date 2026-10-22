@@ -1,10 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="273" height="40">
-<defs><clipPath id="p"><rect width="273" height="40" rx="20"/></clipPath></defs>
-<g clip-path="url(#p)">
-<rect x="0" y="0" width="194" height="40" fill="#2B7CD3"/>
-<rect x="174" y="0" width="119" height="40" fill="#101F33"/>
-</g>
-<g transform="translate(14,7.0)"><g transform="scale(0.765)"><rect x="15" y="4" width="4" height="13" fill="#FFFFFF"/><polygon points="9,15 25,15 17,24" fill="#FFFFFF"/><polyline points="7,27 7,31 27,31 27,27" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></g></g>
-<text x="49" y="21.0" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="bold" fill="#FFFFFF" dominant-baseline="central">Downloads</text>
-<text x="188" y="21.0" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="bold" fill="#EAF3FD" dominant-baseline="central">1 total</text>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="212" height="32" viewBox="0 0 212 32" role="img"><path fill="#2B7CD3" d="M16 0H128 A5 5 0 0 1 133 5V27A5 5 0 0 1 128 32H16A16 16 0 0 1 0 16V16A16 16 0 0 1 16 0Z"/><path fill="#101F33" d="M141 0H196 A16 16 0 0 1 212 16V16A16 16 0 0 1 196 32H141A5 5 0 0 1 136 27V5A5 5 0 0 1 141 0Z"/><g transform="translate(10 7) scale(0.75)" fill="#FFFFFF"><rect x="10.5" y="2" width="3" height="10"/><polygon points="6,10 18,10 12,17"/><path d="M4 19 h16 v4 h-16 z M4 19 v4 h16 v-4" fill-rule="evenodd"/><rect x="4" y="19" width="16" height="2.6"/><rect x="4" y="19" width="2.6" height="5"/><rect x="17.4" y="19" width="2.6" height="5"/><rect x="4" y="21.4" width="16" height="2.6"/></g><text x="35" y="21" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="bold" fill="#FFFFFF">Downloads</text><text x="146" y="21" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="bold" fill="#DCE9FA">1 total</text></svg>
