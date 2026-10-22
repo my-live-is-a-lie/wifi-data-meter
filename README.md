@@ -66,4 +66,4 @@
 
 ## 🛠️ نبذة تقنية
 
-مبنيّ بـ **Kotlin** و**Jetpack Compose** و**Material 3 Expressive**. يُنتج GitHub Actions إصدارات Release موقّعة، ويشغّل اختبارات الوحدة، ثم يرفق ملفات APK بإصدار GitHub عند تشغيله يدويًا أو عند دفع وسم يبدأ بـ `v`.
+مبنيّ بـ **Kotlin** و**Jetpack Compose** و**Material 3 Expressive**. يُنتج GitHub Actions إصدارات Release موقّعة ويشغّل اختبارات الوحدة، ثم ينشر ملفات APK عند التشغيل اليدوي أو دفع وسم يبدأ بـ `v`؛ ويمكن طلب نشر إصدار من فرع `arena/*` بإضافة `[publish-release]` إلى رسالة الالتزام.
