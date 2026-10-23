@@ -50,13 +50,13 @@
 
 ## Download and compatibility
 
-The current preview release includes a universal APK and ABI-specific builds for **ARM64**, **ARMv7**, **x86_64**, and **x86**. Future releases will publish only the **ARM64 APK**.
+The release includes a **universal APK** (recommended if you are unsure which file to choose) and ABI-specific builds for **ARM64**, **ARMv7**, **x86_64**, and **x86**.
 
-- [Download the ARM64 APK](https://github.com/my-live-is-a-lie/wifi-data-meter/releases/download/v1.0.1-preview.1/app-arm64-v8a-release.apk)
-- [View the current preview release and its assets](https://github.com/my-live-is-a-lie/wifi-data-meter/releases/tag/v1.0.1-preview.1)
+- [Download the universal APK](https://github.com/my-live-is-a-lie/wifi-data-meter/releases/download/v1.0.1-preview.1/app-universal-release.apk)
+- [View the release and all APKs](https://github.com/my-live-is-a-lie/wifi-data-meter/releases/tag/v1.0.1-preview.1)
 
 Per-app usage requires Android's **Usage access** permission. The floating window also requires permission to display over other apps.
 
 ## Built with
 
-**Kotlin · Jetpack Compose · Material 3 Expressive.** GitHub Actions keeps the all-ABI build and test workflow separate from the ARM64-only release workflow. The release workflow signs and publishes only the ARM64 APK. Releases can be started manually, by pushing a `v*` tag, or from an `arena/*` branch with `[publish-release]` in the commit message.
+**Kotlin · Jetpack Compose · Material 3 Expressive.** GitHub Actions builds and signs the release APKs, runs unit tests, and publishes the assets to GitHub Releases. Releases can be started manually, by pushing a `v*` tag, or from an `arena/*` branch with `[publish-release]` in the commit message.
