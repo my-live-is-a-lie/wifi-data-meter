@@ -60,6 +60,17 @@ jobs:
           set -o pipefail
           ./gradlew :app:assembleRelease :app:testReleaseUnitTest --stacktrace --console=plain 2>&1 | tee build.log
 
+      - name: Surface build log on failure
+        if: failure()
+        shell: bash
+        run: |
+          if [[ -f build.log ]]; then
+            tail -n 40 build.log | while IFS= read -r line; do
+              line="${line//'%'/'%25'}"
+              echo "::error title=Gradle build log::$line"
+            done
+          fi
+
       - name: Verify APKs and release signature
         shell: bash
         run: |
