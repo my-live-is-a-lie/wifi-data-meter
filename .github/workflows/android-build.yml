@@ -1,26 +1,14 @@
-name: Android Build & Release
+name: Android Build (All ABIs)
 
 on:
   push:
     branches: [main, 'arena/**']
-    tags: ['v*']
     paths-ignore:
       - '**/*.md'
       - 'LICENSE'
       - '.gitignore'
       - 'docs/**'
   workflow_dispatch:
-    inputs:
-      release_tag:
-        description: 'وسم الإصدار، مثل v1.0.1-preview.1'
-        required: true
-        type: string
-        default: 'v1.0.1-preview.1'
-      prerelease:
-        description: 'علّم الإصدار بأنه أولي وقيد التطوير'
-        required: true
-        type: boolean
-        default: true
 
 permissions:
   contents: read
@@ -55,12 +43,12 @@ jobs:
           validate-wrappers: true
           add-job-summary: always
 
-      - name: Build release APKs and run unit tests
+      - name: Build all release ABIs and run unit tests
         run: |
           set -o pipefail
-          ./gradlew :app:assembleRelease :app:testReleaseUnitTest --stacktrace --console=plain 2>&1 | tee build.log
+          ./gradlew :app:assembleRelease :app:testReleaseUnitTest -Pmywifi.allAbis=true --stacktrace --console=plain 2>&1 | tee build.log
 
-      - name: Surface build log on failure
+      - name: Surface build errors on failure
         if: failure()
         shell: bash
         run: |
@@ -73,7 +61,7 @@ jobs:
             done
           fi
 
-      - name: Verify APKs and release signature
+      - name: Verify all ABI APKs and release signature
         shell: bash
         run: |
           set -euo pipefail
@@ -89,7 +77,7 @@ jobs:
           [[ -x "$APKSIGNER" ]] || { echo '::error::apksigner was not found'; exit 1; }
 
           {
-            echo '### Release APKs (signed)'
+            echo '### All-ABI APKs (CI)'
             echo
             echo '| File | Size |'
             echo '|---|---:|'
@@ -104,10 +92,10 @@ jobs:
             echo "Verified $name ($size)"
           done
 
-      - name: Upload release APKs
+      - name: Upload all-ABI APK artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: release-apks-${{ github.run_number }}
+          name: all-abi-apks-${{ github.run_number }}
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
           compression-level: 0
@@ -121,80 +109,3 @@ jobs:
           path: build.log
           if-no-files-found: ignore
           retention-days: 7
-
-  publish-release:
-    name: Publish GitHub Release
-    needs: build
-    if: >-
-      ${{ startsWith(github.ref, 'refs/tags/v')
-          || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
-          || (github.event_name == 'push'
-              && startsWith(github.ref, 'refs/heads/arena/')
-              && contains(github.event.head_commit.message, '[publish-release]')) }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: write
-
-    steps:
-      - name: Checkout version metadata
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          persist-credentials: false
-
-      - name: Download signed APKs
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: release-apks-${{ github.run_number }}
-          path: release-apks
-
-      - name: Create prerelease and attach all APKs
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG_INPUT: ${{ inputs.release_tag }}
-          RELEASE_PRERELEASE_INPUT: ${{ inputs.prerelease }}
-        run: |
-          set -euo pipefail
-          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
-            tag="$RELEASE_TAG_INPUT"
-            prerelease="$RELEASE_PRERELEASE_INPUT"
-          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            tag="$GITHUB_REF_NAME"
-            prerelease=false
-          else
-            version_name="$(sed -nE 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' app/build.gradle.kts | head -1)"
-            [[ -n "$version_name" ]] || { echo '::error title=Release version::Could not read app versionName'; exit 1; }
-            tag="v$version_name"
-            prerelease=false
-          fi
-          case "$tag" in
-            *-alpha*|*-beta*|*-preview*|*-rc*) prerelease=true ;;
-          esac
-          [[ "$tag" == v* ]] || { echo "::error title=Release tag::Expected a tag starting with v"; exit 1; }
-
-          mapfile -t apks < <(find release-apks -type f -name '*.apk' -print | sort)
-          [[ "${#apks[@]}" -eq 5 ]] || {
-            echo "::error title=Release assets::Expected 5 APKs, found ${#apks[@]}"
-            find release-apks -type f -print || true
-            exit 1
-          }
-
-          cat > release-notes.md <<EOF
-          ## Early preview — actively in development
-
-          This is an early preview of **Wi-Fi Data Meter**. The app is still under active development; bugs and changes to existing features are possible.
-
-          ### APK files
-          - **app-universal-release.apk** — recommended; works across Android architectures.
-          - Separate builds are also available for **ARM64**, **ARMv7**, **x86_64**, and **x86**.
-
-          Minimum supported version: **Android 8.0 (API 26)**. Per-app usage requires Android's Usage access permission.
-          EOF
-
-          title="$tag — Early Preview (In Development)"
-          args=("$tag" "${apks[@]}" --title "$title" --notes-file release-notes.md --target "$GITHUB_SHA")
-          if [[ "$prerelease" == "true" ]]; then
-            args+=(--prerelease)
-          fi
-          gh release create "${args[@]}"
-          gh release view "$tag" --json tagName,name,isPrerelease,assets --jq '{tagName, name, isPrerelease, assets: [.assets[].name]}'

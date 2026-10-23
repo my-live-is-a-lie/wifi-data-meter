@@ -1,0 +1,217 @@
+name: Android Release (ARM64 only)
+
+on:
+  push:
+    branches: ['arena/**']
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Optional release tag; leave blank to use the app version
+        required: false
+        type: string
+        default: ''
+      prerelease:
+        description: Mark this release as a pre-release
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-arm64-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and verify ARM64 release APK
+    if: >-
+      ${{ startsWith(github.ref, 'refs/tags/v')
+          || github.event_name == 'workflow_dispatch'
+          || (github.event_name == 'push'
+              && startsWith(github.ref, 'refs/heads/arena/')
+              && contains(github.event.head_commit.message, '[publish-release]')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6
+        with:
+          cache-provider: enhanced
+          cache-cleanup: on-success
+          validate-wrappers: true
+          add-job-summary: always
+
+      - name: Build ARM64 release APK and run unit tests
+        run: |
+          set -o pipefail
+          ./gradlew :app:assembleRelease :app:testReleaseUnitTest -Pmywifi.allAbis=false --stacktrace --console=plain 2>&1 | tee build.log
+
+      - name: Surface build errors on failure
+        if: failure()
+        shell: bash
+        run: |
+          if [[ -f build.log ]]; then
+            {
+              grep -E '(^e: |^w: |^ERROR:|^error:|^FAILURE:|^\* What went wrong:|^Execution failed for task|^> Task .* FAILED|^> There were failing tests)' build.log || true
+            } | tail -n 40 | while IFS= read -r line; do
+              line="${line//'%'/'%25'}"
+              echo "::error title=Gradle build failure::$line"
+            done
+          fi
+
+      - name: Verify ARM64 APK and signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK_DIR="app/build/outputs/apk/release"
+          EXPECTED_APK="$APK_DIR/app-arm64-v8a-release.apk"
+          APKSIGNER="$(find "${ANDROID_SDK_ROOT:-$ANDROID_HOME}/build-tools" -type f -name apksigner | sort -V | tail -1)"
+          [[ -x "$APKSIGNER" ]] || { echo '::error::apksigner was not found'; exit 1; }
+          [[ -s "$EXPECTED_APK" ]] || { echo '::error title=Missing APK::Expected app-arm64-v8a-release.apk'; exit 1; }
+
+          mapfile -t apks < <(find "$APK_DIR" -maxdepth 1 -type f -name '*.apk' -print | sort)
+          if [[ "${#apks[@]}" -ne 1 ]]; then
+            echo '::error title=Unexpected APK output::The release build must produce only the ARM64 APK.'
+            printf '%s\n' "${apks[@]}"
+            exit 1
+          fi
+          if [[ "${apks[0]##*/}" != "app-arm64-v8a-release.apk" ]]; then
+            echo '::error title=Unexpected APK output::The release build must produce only the ARM64 APK.'
+            printf '%s\n' "${apks[@]}"
+            exit 1
+          fi
+
+          "$APKSIGNER" verify "$EXPECTED_APK"
+          size="$(du -h "$EXPECTED_APK" | cut -f1)"
+          {
+            echo '### ARM64 Release APK'
+            echo
+            echo '| File | Size |'
+            echo '|---|---:|'
+            echo "| \`app-arm64-v8a-release.apk\` | $size |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Verified app-arm64-v8a-release.apk ($size)"
+
+      - name: Upload ARM64 release artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-arm64-${{ github.run_number }}
+          path: app/build/outputs/apk/release/app-arm64-v8a-release.apk
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: build-log-${{ github.run_number }}
+          path: build.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+  publish-release:
+    name: Publish ARM64 APK to GitHub Releases
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout version metadata
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Download ARM64 release artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-arm64-${{ github.run_number }}
+          path: release-apk
+
+      - name: Create GitHub Release and attach ARM64 APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG_INPUT: ${{ inputs.release_tag }}
+          RELEASE_PRERELEASE_INPUT: ${{ inputs.prerelease }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            tag="$RELEASE_TAG_INPUT"
+            if [[ -z "$tag" ]]; then
+              version_name="$(sed -nE 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' app/build.gradle.kts | head -1)"
+              [[ -n "$version_name" ]] || { echo '::error title=Release version::Could not read app versionName'; exit 1; }
+              tag="v$version_name"
+            fi
+            prerelease="$RELEASE_PRERELEASE_INPUT"
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            tag="$GITHUB_REF_NAME"
+            prerelease=false
+          else
+            version_name="$(sed -nE 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' app/build.gradle.kts | head -1)"
+            [[ -n "$version_name" ]] || { echo '::error title=Release version::Could not read app versionName'; exit 1; }
+            tag="v$version_name"
+            prerelease=false
+          fi
+          case "$tag" in
+            *-alpha*|*-beta*|*-preview*|*-rc*) prerelease=true ;;
+          esac
+          [[ "$tag" == v* ]] || { echo "::error title=Release tag::Expected a tag starting with v"; exit 1; }
+
+          mapfile -t apks < <(find release-apk -type f -name '*.apk' -print | sort)
+          if [[ "${#apks[@]}" -ne 1 ]]; then
+            echo "::error title=Release assets::Expected only app-arm64-v8a-release.apk"
+            find release-apk -type f -print || true
+            exit 1
+          fi
+          if [[ "${apks[0]##*/}" != "app-arm64-v8a-release.apk" ]]; then
+            echo "::error title=Release assets::Expected only app-arm64-v8a-release.apk"
+            find release-apk -type f -print || true
+            exit 1
+          fi
+
+          if [[ "$prerelease" == "true" ]]; then
+            cat > release-notes.md <<EOF
+          ## ARM64 early preview — actively in development
+
+          This is an early preview of **Wi-Fi Data Meter**. The app is still under active development; bugs and changes to existing features are possible.
+
+          ### APK file
+          - **app-arm64-v8a-release.apk** — for Android devices with the ARM64 (arm64-v8a) architecture.
+
+          Minimum supported version: **Android 8.0 (API 26)**. Per-app usage requires Android's Usage access permission.
+          EOF
+            title="$tag — ARM64 Early Preview (In Development)"
+          else
+            cat > release-notes.md <<EOF
+          ## Wi-Fi Data Meter $tag
+
+          ### APK file
+          - **app-arm64-v8a-release.apk** — for Android devices with the ARM64 (arm64-v8a) architecture.
+
+          Minimum supported version: **Android 8.0 (API 26)**. Per-app usage requires Android's Usage access permission.
+          EOF
+            title="$tag"
+          fi
+          args=("$tag" "${apks[0]}" --title "$title" --notes-file release-notes.md --target "$GITHUB_SHA")
+          if [[ "$prerelease" == "true" ]]; then
+            args+=(--prerelease)
+          fi
+          gh release create "${args[@]}"
+          gh release view "$tag" --json tagName,name,isPrerelease,assets --jq '{tagName, name, isPrerelease, assets: [.assets[].name]}'

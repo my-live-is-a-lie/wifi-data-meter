@@ -28,6 +28,14 @@ val releaseKeyAlias = signingValue("RELEASE_KEY_ALIAS", "keyAlias")
 val releaseKeyPassword = signingValue("RELEASE_KEY_PASSWORD", "keyPassword") ?: releaseStorePassword
 val canSignRelease = releaseStoreFile.exists() && releaseStorePassword != null && releaseKeyAlias != null
 
+// تُبنى إصدارات APK بمعمارية ARM64 افتراضيًا. استخدم -Pmywifi.allAbis=true للبناء الشامل.
+val buildAllAbis = (findProperty("mywifi.allAbis") as String?)?.toBoolean() ?: false
+val apkAbis = if (buildAllAbis) {
+    listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
+} else {
+    listOf("arm64-v8a")
+}
+
 // وضع البناء السريع: ./gradlew :app:assembleRelease -Pmywifi.minify=false
 // يتخطى R8 وتقليص الموارد (أسرع بمراحل، لكن ملف APK أكبر) — مفيد للبناءات التجريبية.
 val minifyRequested = (findProperty("mywifi.minify") as String?)?.toBoolean() ?: true
@@ -70,13 +78,13 @@ android {
         }
     }
 
-    // إنتاج APK مستقل لكل ABI شائع على أجهزة أندرويد، إضافة إلى APK شامل للجميع.
+    // البناء الافتراضي ARM64 فقط؛ بناء كل المعماريات مخصص لسير CI المنفصل.
     splits {
         abi {
             isEnable = true
             reset()
-            include("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
-            isUniversalApk = true
+            include(*apkAbis.toTypedArray())
+            isUniversalApk = buildAllAbis
         }
     }
 
