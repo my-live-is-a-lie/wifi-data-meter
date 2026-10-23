@@ -33,6 +33,7 @@ import com.mywifiadata.app.core.SpeedTestEngine
 import com.mywifiadata.app.core.TimeRange
 import com.mywifiadata.app.core.TimeRanges
 import com.mywifiadata.app.core.UsagePeriod
+import com.mywifiadata.app.backup.SettingsBackupManager
 import com.mywifiadata.app.data.AppSearchHistory
 import com.mywifiadata.app.data.NetworkStatsGate
 import com.mywifiadata.app.data.UsageRepository
@@ -351,6 +352,31 @@ data class AppDetailState(
  * حامل حالة الشاشة الرئيسية: يحدّث القياسات دوريًا ويوفّر إجراءات المستخدم.
  */
 class AppViewModel(private val repository: UsageRepository) : ViewModel() {
+
+    val settingsStore get() = repository.settingsStore
+
+    fun createSettingsBackupJson(): String = repository.settingsStore.createSettingsBackupJson()
+
+    fun validateSettingsBackupJson(json: String) =
+        repository.settingsStore.validateSettingsBackupJson(json)
+
+    fun restoreSettingsBackupJson(json: String) {
+        repository.settingsStore.restoreSettingsBackupJson(json)
+        val restored = repository.settingsStore.current
+        UsageWidgetUpdater.syncStyle(repository.context, restored.usageCardStyleIndex)
+        MonitoringTileService.requestRefresh(repository.context)
+        appsLoadedAt = 0L
+        todayAppsLoadedAt = 0L
+        dailyLoadedAt = 0L
+        dailyLoadedNetwork = null
+        viewModelScope.launch {
+            runCatching { repository.pruneUsageArchive() }
+            if (repository.hasUsageAccess()) {
+                runCatching { loadHistory(adjustSelectionToRecorded = true) }
+            }
+            runCatching { refresh(force = true) }
+        }
+    }
 
     // تُستعاد الإعدادات وآخر نتيجة اختبار سرعة فور إنشاء الحالة (قبل أي تحديث).
     private val initialSettings = repository.settingsStore.current
@@ -1428,6 +1454,7 @@ class AppViewModel(private val repository: UsageRepository) : ViewModel() {
         dailyLoadedMonth = 0
         LauncherIconVisibility.setVisible(repository.context, visible = true)
         stopTracking()
+        SettingsBackupManager(repository.context, repository.settingsStore).clearAutomaticSettings()
         repository.settingsStore.clearAll()
         MonitoringTileService.requestRefresh(repository.context)
         _uiState.update {

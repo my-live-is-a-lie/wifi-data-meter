@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import androidx.core.content.ContextCompat
 import com.mywifiadata.app.data.AppIdentityReceiver
+import com.mywifiadata.app.backup.SettingsBackupManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -27,6 +28,9 @@ class MyWifiApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         Notifier(this).ensureChannels()
+        val backupManager = SettingsBackupManager(this, repository.settingsStore)
+        runCatching { backupManager.syncSchedule() }
+            .onFailure { backupManager.markAttemptFailed() }
         // Runtime registration observes changes while the UI or monitoring service is alive.
         // The startup scan reconciles changes that occurred while our process was stopped.
         ContextCompat.registerReceiver(

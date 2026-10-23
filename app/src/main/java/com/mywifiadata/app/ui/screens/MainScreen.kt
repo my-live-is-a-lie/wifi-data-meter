@@ -100,6 +100,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mywifiadata.app.R
+import com.mywifiadata.app.backup.AutomaticBackupSettings
+import com.mywifiadata.app.backup.SettingsBackupManager
 import com.mywifiadata.app.core.HistorySection
 import com.mywifiadata.app.core.NavigationPageChange
 import com.mywifiadata.app.core.navigationPageChange
@@ -119,7 +121,15 @@ import com.mywifiadata.app.overlay.UsageOverlayService
 import com.mywifiadata.app.ui.theme.AppButtonShape
 import com.mywifiadata.app.widget.UsageWidgetProvider
 import com.mywifiadata.app.widget.UsageWidgetUpdater
+import java.io.ByteArrayOutputStream
+import java.io.IOException
+import java.io.InputStream
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private enum class AppTab(val labelRes: Int, val icon: ImageVector) {
     DASHBOARD(R.string.tab_dashboard, Icons.Rounded.Home),
@@ -144,6 +154,26 @@ fun MainScreen(
     val pageStateHolder = rememberSaveableStateHolder()
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+    val settingsBackupManager = remember(context, viewModel) {
+        SettingsBackupManager(context.applicationContext, viewModel.settingsStore)
+    }
+    var automaticBackupSettings by remember(settingsBackupManager) {
+        mutableStateOf(settingsBackupManager.currentAutomaticSettings())
+    }
+    var enableAutomaticBackupAfterFolderPick by remember { mutableStateOf(false) }
+    var pendingSettingsRestoreJson by remember { mutableStateOf<String?>(null) }
+    fun saveAutomaticBackupSettings(updated: AutomaticBackupSettings) {
+        runCatching {
+            settingsBackupManager.saveAutomaticSettings(updated)
+            settingsBackupManager.currentAutomaticSettings()
+        }.onSuccess { automaticBackupSettings = it }
+            .onFailure {
+                automaticBackupSettings = settingsBackupManager.currentAutomaticSettings()
+                scope.launch {
+                    snackbarHostState.showSnackbar(context.getString(R.string.settings_auto_backup_failed))
+                }
+            }
+    }
     val dashboardListState = rememberLazyListState()
     val appsListState = rememberLazyListState()
     val appsSearchListState = rememberLazyListState()
@@ -158,7 +188,10 @@ fun MainScreen(
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_RESUME -> viewModel.setUiVisible(true)
+                Lifecycle.Event.ON_RESUME -> {
+                    viewModel.setUiVisible(true)
+                    automaticBackupSettings = settingsBackupManager.currentAutomaticSettings()
+                }
                 Lifecycle.Event.ON_PAUSE -> viewModel.setUiVisible(false)
                 else -> Unit
             }
@@ -207,6 +240,98 @@ fun MainScreen(
     val quickSettingsTileAddCancelledMessage = stringResource(R.string.qs_tile_add_cancelled)
     val quickSettingsTileManualAddMessage = stringResource(R.string.qs_tile_manual_add)
     val quickSettingsTileDisabledMessage = stringResource(R.string.qs_tile_disabled)
+
+    val createSettingsBackupLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument(SettingsBackupManager.JSON_MIME_TYPE),
+        onResult = { uri ->
+            if (uri != null) {
+                scope.launch {
+                    val result = runCatching {
+                        withContext(Dispatchers.IO) {
+                            val json = viewModel.createSettingsBackupJson()
+                            val output = context.contentResolver.openOutputStream(uri, "wt")
+                                ?: throw IOException("Could not open the backup destination.")
+                            output.bufferedWriter(Charsets.UTF_8).use { it.write(json) }
+                        }
+                    }
+                    snackbarHostState.showSnackbar(
+                        context.getString(
+                            if (result.isSuccess) R.string.settings_backup_saved
+                            else R.string.settings_backup_error,
+                        ),
+                    )
+                }
+            }
+        },
+    )
+
+    val openSettingsBackupLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+        onResult = { uri ->
+            if (uri != null) {
+                scope.launch {
+                    val result = runCatching {
+                        withContext(Dispatchers.IO) {
+                            val input = context.contentResolver.openInputStream(uri)
+                                ?: throw IOException("Could not open the selected backup.")
+                            input.use { stream -> readUtf8Limited(stream, MAX_SETTINGS_BACKUP_BYTES) }
+                                .also(viewModel::validateSettingsBackupJson)
+                        }
+                    }
+                    result.onSuccess { pendingSettingsRestoreJson = it }
+                        .onFailure {
+                            snackbarHostState.showSnackbar(context.getString(R.string.settings_backup_invalid))
+                        }
+                }
+            }
+        },
+    )
+
+    val automaticBackupFolderLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree(),
+        onResult = { uri ->
+            val enableAfterSelection = enableAutomaticBackupAfterFolderPick
+            enableAutomaticBackupAfterFolderPick = false
+            if (uri != null) {
+                val currentSettings = settingsBackupManager.currentAutomaticSettings()
+                val previousFolderUri = currentSettings.folderUri
+                val permissionFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                    Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                scope.launch {
+                    val result = runCatching {
+                        context.contentResolver.takePersistableUriPermission(uri, permissionFlags)
+                        val updated = currentSettings.copy(
+                            folderUri = uri.toString(),
+                            enabled = currentSettings.enabled || enableAfterSelection,
+                        )
+                        settingsBackupManager.saveAutomaticSettings(updated)
+                        if (previousFolderUri != null && previousFolderUri != uri.toString()) {
+                            runCatching {
+                                context.contentResolver.releasePersistableUriPermission(
+                                    Uri.parse(previousFolderUri),
+                                    permissionFlags,
+                                )
+                            }
+                        }
+                        settingsBackupManager.currentAutomaticSettings()
+                    }
+                    result.onSuccess { automaticBackupSettings = it }
+                        .onFailure {
+                            if (previousFolderUri != uri.toString()) {
+                                runCatching {
+                                    context.contentResolver.releasePersistableUriPermission(uri, permissionFlags)
+                                }
+                            }
+                            snackbarHostState.showSnackbar(context.getString(R.string.settings_auto_backup_failed))
+                        }
+                }
+            } else if (enableAfterSelection) {
+                scope.launch {
+                    snackbarHostState.showSnackbar(context.getString(R.string.settings_auto_backup_folder_required))
+                }
+            }
+        },
+    )
 
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
@@ -811,6 +936,47 @@ fun MainScreen(
                     onClearData = { viewModel.clearData() },
                     onLayoutDirectionChange = { viewModel.setLayoutDirection(it) },
                     onHistoryRetentionChange = { viewModel.setHistoryRetention(it) },
+                    automaticBackupSettings = automaticBackupSettings,
+                    autoBackupFolderDisplayName = settingsBackupManager.folderDisplayName(
+                        automaticBackupSettings.folderUri,
+                    ),
+                    onCreateSettingsBackup = {
+                        val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
+                        createSettingsBackupLauncher.launch("wifi-data-meter-settings-$stamp.json")
+                    },
+                    onChooseSettingsBackup = {
+                        openSettingsBackupLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
+                    },
+                    onAutoBackupSettingsRefresh = {
+                        automaticBackupSettings = settingsBackupManager.currentAutomaticSettings()
+                    },
+                    onAutoBackupEnabledChange = { enabled ->
+                        saveAutomaticBackupSettings(automaticBackupSettings.copy(enabled = enabled))
+                    },
+                    onAutoBackupFrequencyChange = { frequency ->
+                        saveAutomaticBackupSettings(automaticBackupSettings.copy(frequency = frequency))
+                    },
+                    onChooseAutoBackupFolder = { enableAfterSelection ->
+                        enableAutomaticBackupAfterFolderPick = enableAfterSelection
+                        automaticBackupFolderLauncher.launch(null)
+                    },
+                    onAutoBackupNow = {
+                        scope.launch {
+                            val result = runCatching {
+                                withContext(Dispatchers.IO) {
+                                    settingsBackupManager.backupToSelectedFolder()
+                                }
+                                settingsBackupManager.currentAutomaticSettings()
+                            }
+                            result.onSuccess {
+                                automaticBackupSettings = it
+                                snackbarHostState.showSnackbar(context.getString(R.string.settings_backup_saved))
+                            }.onFailure {
+                                automaticBackupSettings = settingsBackupManager.currentAutomaticSettings()
+                                snackbarHostState.showSnackbar(context.getString(R.string.settings_auto_backup_failed))
+                            }
+                        }
+                    },
                     onAppsUsageFilterEnabledChange = viewModel::setAppsUsageFilterEnabled,
                     onAppsUsageFilterModeChange = viewModel::setAppsUsageFilterMode,
                     onAppsUsageFilterAmountChange = viewModel::setAppsUsageFilterAmount,
@@ -922,6 +1088,44 @@ fun MainScreen(
             }
         }
     }
+
+    pendingSettingsRestoreJson?.let { backupJson ->
+        AlertDialog(
+            onDismissRequest = { pendingSettingsRestoreJson = null },
+            title = { Text(text = stringResource(R.string.settings_backup_restore_confirm_title)) },
+            text = { Text(text = stringResource(R.string.settings_backup_restore_confirm_body)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val previousLanguage = viewModel.settingsStore.current.appLanguage
+                        pendingSettingsRestoreJson = null
+                        scope.launch {
+                            val result = runCatching {
+                                withContext(Dispatchers.IO) {
+                                    viewModel.restoreSettingsBackupJson(backupJson)
+                                }
+                            }
+                            if (result.isSuccess) {
+                                snackbarHostState.showSnackbar(context.getString(R.string.settings_backup_restored))
+                                if (viewModel.settingsStore.current.appLanguage != previousLanguage) {
+                                    context.findActivity()?.recreate()
+                                }
+                            } else {
+                                snackbarHostState.showSnackbar(context.getString(R.string.settings_backup_error))
+                            }
+                        }
+                    },
+                ) {
+                    Text(text = stringResource(R.string.settings_backup_restore_confirm_action))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingSettingsRestoreJson = null }) {
+                    Text(text = stringResource(R.string.settings_backup_cancel_action))
+                }
+            },
+        )
+    }
 }
 
 private fun Context.findActivity(): Activity? {
@@ -931,4 +1135,20 @@ private fun Context.findActivity(): Activity? {
         current = (current as? ContextWrapper)?.baseContext
     }
     return null
+}
+
+private const val MAX_SETTINGS_BACKUP_BYTES = 2 * 1024 * 1024
+
+private fun readUtf8Limited(input: InputStream, maxBytes: Int): String {
+    val output = ByteArrayOutputStream()
+    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+    var total = 0
+    while (true) {
+        val count = input.read(buffer)
+        if (count < 0) break
+        total += count
+        if (total > maxBytes) throw IOException("Backup file is too large.")
+        output.write(buffer, 0, count)
+    }
+    return String(output.toByteArray(), Charsets.UTF_8)
 }

@@ -20,6 +20,8 @@ import com.mywifiadata.app.data.model.PlanNetworkType
 import com.mywifiadata.app.data.model.SpeedTestRecord
 import com.mywifiadata.app.data.model.ThemeMode
 import com.mywifiadata.app.data.model.TrafficTotals
+import com.mywifiadata.app.backup.SettingsBackupCodec
+import java.io.IOException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -74,6 +76,46 @@ class SettingsStore(context: Context) {
             quickSettingsTileAdded = current.quickSettingsTileAdded,
             appLanguage = current.appLanguage,
         )
+    }
+
+    /** Creates a portable backup of user-configurable preferences, not usage-log archives. */
+    fun createSettingsBackupJson(): String = SettingsBackupCodec.encode(prefs.all)
+
+    /** Validates a selected file before asking the user to replace their current settings. */
+    fun validateSettingsBackupJson(json: String) {
+        SettingsBackupCodec.decode(json)
+    }
+
+    /**
+     * Replaces backed-up settings after validating the entire file. Device-specific and live
+     * runtime values (tracking, system tile state, session counters, and speed-test records)
+     * remain on this device and are never imported from another installation.
+     */
+    @Synchronized
+    fun restoreSettingsBackupJson(json: String) {
+        val restoredValues = SettingsBackupCodec.decode(json)
+        val preservedValues = prefs.all.filterKeys { key -> SettingsBackupCodec.isExcluded(key) }
+        val editor = prefs.edit().clear()
+        preservedValues.forEach { (key, value) -> putPreference(editor, key, value) }
+        restoredValues.forEach { (key, value) -> putPreference(editor, key, value) }
+        if (!editor.commit()) throw IOException("Could not save restored settings.")
+        _settings.value = read()
+    }
+
+    private fun putPreference(
+        editor: android.content.SharedPreferences.Editor,
+        key: String,
+        value: Any,
+    ) {
+        when (value) {
+            is String -> editor.putString(key, value)
+            is Boolean -> editor.putBoolean(key, value)
+            is Int -> editor.putInt(key, value)
+            is Long -> editor.putLong(key, value)
+            is Float -> editor.putFloat(key, value)
+            is Double -> editor.putFloat(key, value.toFloat())
+            is Set<*> -> editor.putStringSet(key, value.filterIsInstance<String>().toSet())
+        }
     }
 
     /** يضيف كمية إلى «خط الأساس» للجلسة (يُستخدم عند تصفير الجلسة). */

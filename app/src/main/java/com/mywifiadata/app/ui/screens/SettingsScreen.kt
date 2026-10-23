@@ -176,6 +176,8 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mywifiadata.app.R
+import com.mywifiadata.app.backup.AutoBackupFrequency
+import com.mywifiadata.app.backup.AutomaticBackupSettings
 import com.mywifiadata.app.core.Format
 import com.mywifiadata.app.core.HistoryRetention
 import com.mywifiadata.app.core.SamplingIntervalUnit
@@ -251,6 +253,15 @@ fun SettingsScreen(
     onClearData: () -> Unit,
     onLayoutDirectionChange: (AppLayoutDirection) -> Unit = {},
     onHistoryRetentionChange: (Int) -> Unit = {},
+    automaticBackupSettings: AutomaticBackupSettings = AutomaticBackupSettings(),
+    autoBackupFolderDisplayName: String? = null,
+    onCreateSettingsBackup: () -> Unit = {},
+    onChooseSettingsBackup: () -> Unit = {},
+    onAutoBackupSettingsRefresh: () -> Unit = {},
+    onAutoBackupEnabledChange: (Boolean) -> Unit = {},
+    onAutoBackupFrequencyChange: (AutoBackupFrequency) -> Unit = {},
+    onChooseAutoBackupFolder: (enableAfterSelection: Boolean) -> Unit = {},
+    onAutoBackupNow: () -> Unit = {},
     onAppsUsageFilterEnabledChange: (Boolean) -> Unit = {},
     onAppsUsageFilterModeChange: (AppsUsageFilterMode) -> Unit = {},
     onAppsUsageFilterAmountChange: (Int) -> Unit = {},
@@ -288,6 +299,7 @@ fun SettingsScreen(
     }
     var showClearDialog by rememberSaveable { mutableStateOf(false) }
     var showHistoryRetentionDialog by rememberSaveable { mutableStateOf(false) }
+    var showAutoBackupSettings by rememberSaveable { mutableStateOf(false) }
     var showHideAppIconDialog by rememberSaveable { mutableStateOf(false) }
     var hideAppIconFailed by rememberSaveable { mutableStateOf(false) }
     var moreExpanded by rememberSaveable { mutableStateOf(false) }
@@ -730,6 +742,53 @@ fun SettingsScreen(
                         onClick = { showHistoryRetentionDialog = true },
                     )
 
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        FilledTonalButton(
+                            onClick = onChooseSettingsBackup,
+                            modifier = Modifier.weight(1.05f).height(56.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp),
+                            shape = AppButtonShape,
+                        ) {
+                            Text(
+                                text = stringResource(R.string.settings_restore_action),
+                                maxLines = 1,
+                                style = MaterialTheme.typography.labelLarge,
+                            )
+                        }
+                        FilledTonalButton(
+                            onClick = onCreateSettingsBackup,
+                            modifier = Modifier.weight(1.45f).height(56.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp),
+                            shape = AppButtonShape,
+                        ) {
+                            Text(
+                                text = stringResource(R.string.settings_backup_action),
+                                maxLines = 1,
+                                style = MaterialTheme.typography.labelLarge,
+                            )
+                        }
+                        FilledTonalButton(
+                            onClick = {
+                                onAutoBackupSettingsRefresh()
+                                showAutoBackupSettings = true
+                            },
+                            modifier = Modifier.weight(0.72f).height(56.dp),
+                            contentPadding = PaddingValues(0.dp),
+                            shape = AppButtonShape,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Settings,
+                                contentDescription = stringResource(R.string.settings_auto_backup_action),
+                            )
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(8.dp))
                     TextButton(
                         onClick = { showClearDialog = true },
@@ -975,6 +1034,24 @@ fun SettingsScreen(
                     Text(text = stringResource(R.string.action_cancel))
                 }
             },
+        )
+    }
+
+    if (showAutoBackupSettings) {
+        AutoBackupSettingsDialog(
+            settings = automaticBackupSettings,
+            folderDisplayName = autoBackupFolderDisplayName,
+            onDismiss = { showAutoBackupSettings = false },
+            onEnabledChange = { enabled ->
+                if (enabled && automaticBackupSettings.folderUri.isNullOrBlank()) {
+                    onChooseAutoBackupFolder(true)
+                } else {
+                    onAutoBackupEnabledChange(enabled)
+                }
+            },
+            onFrequencyChange = onAutoBackupFrequencyChange,
+            onChooseFolder = onChooseAutoBackupFolder,
+            onBackupNow = onAutoBackupNow,
         )
     }
 
