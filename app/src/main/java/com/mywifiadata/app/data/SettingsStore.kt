@@ -96,7 +96,9 @@ class SettingsStore(context: Context) {
         val restoredValues = SettingsBackupCodec.decode(json)
         val preservedValues = prefs.all.filterKeys { key -> SettingsBackupCodec.isExcluded(key) }
         val editor = prefs.edit().clear()
-        preservedValues.forEach { (key, value) -> putPreference(editor, key, value) }
+        preservedValues.forEach { (key, value) ->
+            value?.let { putPreference(editor, key, it) }
+        }
         restoredValues.forEach { (key, value) -> putPreference(editor, key, value) }
         if (!editor.commit()) throw IOException("Could not save restored settings.")
         _settings.value = read()
